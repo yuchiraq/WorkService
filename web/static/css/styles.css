@@ -1,184 +1,236 @@
-/* --- Global Styles --- */
-body {
-    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
-    margin: 0;
-    display: flex;
-    height: 100vh;
-    background: linear-gradient(120deg, #fdfbfb 0%, #ebedee 100%);
-    overflow: hidden; /* Prevent body scroll */
+/* --- Google Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+
+/* --- Global & Root Variables --- */
+:root {
+    --primary-orange: #FF9800; /* Orange 500 */
+    --primary-orange-dark: #F57C00; /* Orange 700 */
+    --background-light: #f5f5f5; /* Grey 100 */
+    --text-primary: #212121; /* Grey 900 */
+    --text-secondary: #757575; /* Grey 600 */
+    --border-color: #e0e0e0; /* Grey 300 */
+    --white: #FFFFFF;
+    --danger-red: #f44336;
+    --danger-red-dark: #d32f2f;
+    --success-green: #4CAF50;
+
+    --shadow-1: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    --shadow-2: 0 3px 6px rgba(0,0,0,0.16), 0 3px 6px rgba(0,0,0,0.23);
 }
 
-/* --- Sidebar Styles with Glassmorphism --- */
+body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    background-color: var(--background-light);
+    color: var(--text-primary);
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* --- Login Page Specific Styles --- */
+body.login-page {
+    justify-content: center;
+    align-items: center;
+}
+
+.login-container {
+    width: 100%;
+    max-width: 380px;
+    padding: 40px;
+    background-color: var(--white);
+    border-radius: 8px;
+    box-shadow: var(--shadow-2);
+}
+
+.login-container h1 {
+    text-align: center;
+    margin: 0 0 24px 0;
+    font-size: 24px;
+    font-weight: 700;
+}
+
+.form-group {
+    margin-bottom: 24px;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px 0;
+    border: none;
+    border-bottom: 2px solid var(--border-color);
+    background-color: transparent;
+    font-size: 16px;
+    color: var(--text-primary);
+    transition: border-color 0.2s ease-in-out;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-bottom-color: var(--primary-orange);
+}
+
+.form-group input::placeholder {
+    color: var(--border-color);
+}
+
+
+/* --- General Button Styles --- */
+.btn {
+    display: inline-block;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    text-align: center;
+    text-transform: uppercase;
+    font-weight: 500;
+    font-size: 14px;
+    box-shadow: var(--shadow-1);
+    transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.btn-primary {
+    background-color: var(--primary-orange);
+    color: var(--white);
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-orange-dark);
+    box-shadow: var(--shadow-2);
+}
+
+.btn-block {
+    display: block;
+    width: 100%;
+}
+
+/* --- Sidebar & Main Content Layout --- */
 .sidebar {
-    width: 250px;
-    background: rgba(255, 255, 255, 0.1); /* Semi-transparent white */
-    backdrop-filter: blur(15px); /* Frosted glass effect */
-    -webkit-backdrop-filter: blur(15px);
-    border-right: 1px solid rgba(255, 255, 255, 0.2);
-    color: #333;
+    width: 240px;
+    background-color: var(--white);
+    border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    padding: 25px;
-    box-shadow: 4px 0 15px rgba(0,0,0,0.08);
+    padding: 20px;
+    box-shadow: var(--shadow-1);
 }
 
 .sidebar h2 {
     text-align: center;
-    color: #000;
-    margin-bottom: 35px;
+    color: var(--text-primary);
+    margin: 10px 0 30px 0;
+    font-size: 22px;
     font-weight: 700;
-    letter-spacing: 1px;
 }
 
 .sidebar nav ul {
     list-style: none;
     padding: 0;
+    margin: 0;
 }
 
 .sidebar nav a {
-    color: #444;
+    color: var(--text-secondary);
     text-decoration: none;
-    padding: 14px 18px;
+    padding: 12px 16px;
+    margin-bottom: 8px;
     display: block;
-    border-radius: 8px;
-    transition: background-color 0.3s, color 0.3s;
+    border-radius: 4px;
+    transition: background-color 0.2s, color 0.2s;
     font-weight: 500;
 }
 
-.sidebar nav a:hover, .sidebar nav a.active {
-    background-color: rgba(0, 123, 255, 0.1); /* Light blue highlight */
-    color: #007bff;
+.sidebar nav a:hover {
+    background-color: var(--background-light);
+    color: var(--text-primary);
 }
 
-/* --- Main Content Styles --- */
+.sidebar nav a.active {
+    background-color: var(--primary-orange-dark);
+    color: var(--white);
+}
+
+.logout-btn {
+    background-color: var(--danger-red);
+    color: var(--white);
+    text-align: center;
+    padding: 12px;
+    border-radius: 4px;
+    text-decoration: none;
+    transition: background-color 0.2s;
+    margin-top: auto;
+    font-weight: 500;
+    text-transform: uppercase;
+    font-size: 14px;
+}
+
+.logout-btn:hover {
+    background-color: var(--danger-red-dark);
+}
+
 .content {
     flex-grow: 1;
-    padding: 40px;
+    padding: 32px;
     overflow-y: auto;
 }
 
 .container {
-    background: rgba(255, 255, 255, 0.2);
-    backdrop-filter: blur(15px);
-    -webkit-backdrop-filter: blur(15px);
-    padding: 35px;
-    border-radius: 12px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-}
-
-/* --- Login Page Styles --- */
-body.login-page {
-    justify-content: center;
-    align-items: center;
-    background: linear-gradient(to right, #6a11cb 0%, #2575fc 100%);
-}
-
-.login-container {
-    width: 100%;
-    max-width: 420px;
-    padding: 45px;
-    background: rgba(255, 255, 255, 0.15);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-radius: 15px;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
-    border: 1px solid rgba(255, 255, 255, 0.18);
-    color: #fff;
-}
-
-.login-container h1 {
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.form-group label {
-    display: block;
-    margin-bottom: 10px;
-    font-weight: 500;
-}
-
-.form-group input {
-    width: 100%;
-    padding: 14px;
-    border: 1px solid rgba(255, 255, 255, 0.3);
+    background: var(--white);
+    padding: 24px;
     border-radius: 8px;
-    background: rgba(255, 255, 255, 0.2);
-    color: #fff;
-    transition: background-color 0.3s, border-color 0.3s;
-}
-
-.form-group input::placeholder {
-    color: rgba(255, 255, 255, 0.7);
-}
-
-.form-group input:focus {
-    background: rgba(255, 255, 255, 0.3);
-    border-color: rgba(255, 255, 255, 0.5);
-    outline: none;
-}
-
-/* --- Buttons --- */
-.btn {
-    display: inline-block;
-    padding: 12px 20px;
-    background-color: #007bff;
-    color: #fff;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-    text-decoration: none;
-    text-align: center;
-    font-weight: 500;
-    box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
-    transition: background-color 0.3s, box-shadow 0.3s;
-}
-
-.btn:hover {
-    background-color: #0056b3;
-    box-shadow: 0 4px 12px rgba(0, 86, 179, 0.4);
-}
-
-.logout-btn {
-    display: block;
-    background-color: #dc3545;
-    color: #fff;
-    text-align: center;
-    padding: 12px;
-    border-radius: 8px;
-    text-decoration: none;
-    transition: background-color 0.3s;
-    margin-top: auto;
-}
-
-.logout-btn:hover {
-    background-color: #c82333;
+    box-shadow: var(--shadow-1);
 }
 
 /* --- Workers Table Styles --- */
 #workers-table {
     width: 100%;
     border-collapse: collapse;
-    margin-top: 20px;
+    margin-top: 24px;
 }
+
 #workers-table th, #workers-table td {
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    padding: 16px;
     text-align: left;
 }
-#workers-table thead {
-    background-color: rgba(0, 123, 255, 0.1);
+
+#workers-table th {
+    color: var(--text-secondary);
+    font-weight: 700;
+    font-size: 14px;
+    text-transform: uppercase;
 }
+
 .status-badge {
-    padding: 5px 10px;
-    border-radius: 20px;
-    font-size: 0.9em;
-    color: #fff;
+    padding: 4px 12px;
+    border-radius: 16px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--white);
     text-transform: capitalize;
 }
+
 .status-active {
-    background-color: #28a745; /* Green */
+    background-color: var(--success-green);
 }
+
 .status-dismissed {
-    background-color: #dc3545; /* Red */
+    background-color: var(--danger-red);
+}
+
+.btn-danger {
+	background-color: var(--danger-red);
+	color: white;
+}
+.btn-danger:hover {
+	background-color: var(--danger-red-dark);
 }

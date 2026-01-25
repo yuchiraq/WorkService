@@ -1,101 +1,69 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Добавить работника</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
-</head>
-<body>
-    {{ template "navigation.html" . }}
+{{define "content"}}
+<div class="container">
+    <h1>Добавить нового работника</h1>
 
-    <div class="content">
-        <div class="container">
-            <h1>Добавить работника</h1>
-            <form id="add-worker-form">
-                <!-- Required Fields -->
-                <div class="form-group">
-                    <label for="name">Имя</label>
-                    <input type="text" id="name" name="name" required>
-                </div>
-                <div class="form-group">
-                    <label for="position">Должность</label>
-                    <input type="text" id="position" name="position" required>
-                </div>
-                <div class="form-group">
-                    <label for="status">Статус</label>
-                    <select id="status" name="status">
-                        <option value="active">Active</option>
-                        <option value="dismissed">Dismissed</option>
-                    </select>
-                </div>
-
-                <!-- Optional Fields -->
-                <div class="form-group">
-                    <label for="phone">Телефон (необязательно)</label>
-                    <input type="tel" id="phone" name="phone">
-                </div>
-                <div class="form-group">
-                    <label for="hourlyRate">Почасовая ставка (необязательно)</label>
-                    <input type="number" id="hourlyRate" name="hourlyRate" step="0.01">
-                </div>
-                <div class="form-group">
-                    <label for="birthDate">Дата рождения (необязательно)</label>
-                    <input type="date" id="birthDate" name="birthDate">
-                </div>
-
-                <button type="submit" class="btn">Добавить работника</button>
-            </form>
+    <form action="/api/workers" method="post" id="add-worker-form">
+        <div class="form-group">
+            <label for="name">Имя</label>
+            <input type="text" id="name" name="name" required>
         </div>
-    </div>
 
-    <script>
-        document.getElementById('add-worker-form').addEventListener('submit', function(event) {
-            event.preventDefault();
+        <div class="form-group">
+            <label for="role">Должность</label>
+            <input type="text" id="role" name="role" required>
+        </div>
 
-            const formData = new FormData(this);
-            const data = {
-                name: formData.get('name'),
-                position: formData.get('position'),
-                status: formData.get('status'),
-            };
+        <div class="form-group">
+            <label for="startDate">Дата приема на работу</label>
+            <input type="date" id="startDate" name="startDate">
+        </div>
 
-            // Only include optional fields if they have a value
-            const phone = formData.get('phone');
-            if (phone) {
-                data.phone = phone;
-            }
+        <div class="form-group">
+            <label for="status">Статус</label>
+            <select id="status" name="status">
+                <option value="active">Активен</option>
+                <option value="dismissed">Уволен</option>
+            </select>
+        </div>
 
-            const hourlyRate = formData.get('hourlyRate');
-            if (hourlyRate) {
-                // Ensure it's a number
-                data.hourlyRate = parseFloat(hourlyRate);
-            }
+        <button type="submit" class="btn btn-primary">Добавить</button>
+        <a href="/workers" class="btn" style="margin-left: 10px;">Отмена</a>
+    </form>
 
-            const birthDate = formData.get('birthDate');
-            if (birthDate) {
-                data.birthDate = birthDate;
-            }
+</div>
 
-            fetch('/api/workers', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            })
-            .then(async response => {
-                if (response.ok) {
-                    window.location.href = '/workers';
-                } else {
-                    const error = await response.json();
-                    alert('Не удалось добавить работника: ' + (error.error || 'Unknown error'));
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-                alert('Произошла ошибка сети.');
-            });
+<script>
+    document.getElementById('add-worker-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const formData = new FormData(this);
+        const worker = {};
+        formData.forEach((value, key) => {
+            worker[key] = value;
         });
-    </script>
-</body>
-</html>
+
+        // Ensure start date is in the correct format
+        if (worker.startDate) {
+            worker.startDate = new Date(worker.startDate).toISOString();
+        } else {
+            worker.startDate = new Date().toISOString(); // Default to today if not set
+        }
+
+        fetch('/api/workers', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(worker),
+        })
+        .then(response => {
+            if (response.ok) {
+                window.location.href = '/workers';
+            } else {
+                // Handle error
+                alert('Произошла ошибка при добавлении работника.');
+            }
+        });
+    });
+</script>
+{{end}}

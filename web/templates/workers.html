@@ -1,104 +1,76 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Работники</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
-</head>
-<body>
-    {{ template "navigation.html" . }}
-
-    <div class="content">
-        <div class="container">
-            <h1>Работники</h1>
-            <a href="/workers/new" class="btn">Добавить работника</a>
-            <div style="overflow-x: auto;"> <!-- For responsiveness -->
-                <table id="workers-table">
-                    <thead>
-                        <tr>
-                            <th>Имя</th>
-                            <th>Должность</th>
-                            <th>Статус</th>
-                            <th>Телефон</th>
-                            <th>Почасовая ставка</th>
-                            <th>Дата рождения</th>
-                            <th>Автор</th>
-                            <th>Действия</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <!-- Worker data will be populated here by JavaScript -->
-                    </tbody>
-                </table>
-            </div>
-        </div>
+{{define "content"}}
+<div class="container">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>Список работников</h1>
+        <a href="/workers/new" class="btn btn-primary">Добавить работника</a>
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            fetch('/api/workers')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    const tableBody = document.querySelector('#workers-table tbody');
-                    if (!data || data.length === 0) {
-                        tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Работники не найдены.</td></tr>';
-                        return;
-                    }
+    <table id="workers-table">
+        <thead>
+            <tr>
+                <th>Имя</th>
+                <th>Должность</th>
+                <th>Дата приема</th>
+                <th>Статус</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            <!-- Worker data will be dynamically inserted here -->
+        </tbody>
+    </table>
+</div>
 
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        fetch('/api/workers')
+            .then(response => response.json())
+            .then(data => {
+                const tbody = document.querySelector('#workers-table tbody');
+                tbody.innerHTML = ''; // Clear existing rows
+
+                if (data && data.length) {
                     data.forEach(worker => {
-                        const row = document.createElement('tr');
-
-                        // Format optional fields
-                        const phone = worker.phone ? worker.phone : 'N/A';
-                        const hourlyRate = worker.hourlyRate ? `$${worker.hourlyRate.toFixed(2)}` : 'N/A';
-                        const birthDate = worker.birthDate ? new Date(worker.birthDate).toLocaleDateString() : 'N/A';
-
-                        row.innerHTML = `
-                            <td>${worker.name}</td>
-                            <td>${worker.position}</td>
-                            <td><span class="status-badge status-${worker.status}">${worker.status}</span></td>
-                            <td>${phone}</td>
-                            <td>${hourlyRate}</td>
-                            <td>${birthDate}</td>
-                            <td>${worker.createdByName}</td>
-                            <td><button class="btn" onclick="deleteWorker('${worker.id}')">Удалить</button></td>
+                        const row = `
+                            <tr>
+                                <td>${worker.name}</td>
+                                <td>${worker.role}</td>
+                                <td>${new Date(worker.startDate).toLocaleDateString()}</td>
+                                <td>
+                                    <span class="status-badge ${worker.status === 'active' ? 'status-active' : 'status-dismissed'}">
+                                        ${worker.status}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button class="btn btn-danger" onclick="deleteWorker('${worker.ID}')">Удалить</button>
+                                </td>
+                            </tr>
                         `;
-                        tableBody.appendChild(row);
+                        tbody.innerHTML += row;
                     });
-                })
-                .catch(error => {
-                    console.error('Error fetching workers:', error);
-                    const tableBody = document.querySelector('#workers-table tbody');
-                    tableBody.innerHTML = '<tr><td colspan="8" style="text-align: center;">Не удалось загрузить работников.</td></tr>';
-                });
-        });
-
-        function deleteWorker(workerId) {
-            if (!confirm('Вы уверены, что хотите удалить этого работника?')) {
-                return;
-            }
-
-            fetch(`/api/workers/${workerId}`, {
-                method: 'DELETE',
-            })
-            .then(response => {
-                if (response.ok) {
-                    // Refresh the page to show the updated list
-                    window.location.reload();
                 } else {
-                    alert('Не удалось удалить работника.');
+                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Нет данных о работниках</td></tr>';
                 }
-            })
-            .catch(error => {
-                console.error('Error deleting worker:', error);
-                alert('Произошла ошибка сети.');
             });
+    });
+
+    function deleteWorker(id) {
+        if (!confirm('Вы уверены, что хотите удалить этого работника?')) {
+            return;
         }
-    </script>
-</body>
-</html>
+
+        fetch(`/api/workers/${id}`, {
+            method: 'DELETE',
+        })
+        .then(response => {
+            if (response.ok) {
+                // Refresh the page to show the updated list
+                location.reload();
+            } else {
+                // Handle error
+                alert('Ошибка при удалении работника.');
+            }
+        });
+    }
+</script>
+{{end}}

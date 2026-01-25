@@ -1,23 +1,26 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Navigation</title>
+    <title>Управление работниками</title>
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
 <body>
+
     <div class="sidebar">
-        <h2>Menu</h2>
+        <h2>Меню</h2>
         <nav>
             <ul>
-                <li><a href="/dashboard">Dashboard</a></li>
-                <li><a href="/workers">Workers</a></li>
-                <li><a href="/some-other-link">Other Link</a></li>
+                <li><a href="/dashboard">Главная</a></li>
+                <li><a href="/workers" class="active">Работники</a></li>
             </ul>
         </nav>
-        <div class="logout-section">
-            <a href="/login" class="logout-btn">Logout</a>
-        </div>
+        <a href="/logout" class="logout-btn">Выйти</a>
     </div>
+
+    <div class="content">
+        <!-- Content will be injected here -->
+    </div>
+
 </body>
 </html>
