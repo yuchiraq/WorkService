@@ -10,8 +10,62 @@ import (
 )
 
 const (
-	workersFile = "data/workers.json"
+	articlesFile = "data/articles.json"
+	usersFile    = "data/users.json"
+	workersFile  = "data/workers.json"
 )
+
+// ReadArticles reads the JSON file and returns a slice of articles.
+func ReadArticles() ([]models.Article, error) {
+	data, err := ioutil.ReadFile(articlesFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []models.Article{}, nil // Return empty slice if file doesn't exist
+		}
+		return nil, err
+	}
+
+	var articles []models.Article
+	if err := json.Unmarshal(data, &articles); err != nil {
+		return nil, err
+	}
+	return articles, nil
+}
+
+// WriteArticles writes a slice of articles to the JSON file.
+func WriteArticles(articles []models.Article) error {
+	data, err := json.MarshalIndent(articles, "", "  ")
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(articlesFile, data, 0644)
+}
+
+// ReadUsers reads the JSON file and returns a slice of users.
+func ReadUsers() ([]models.User, error) {
+	data, err := ioutil.ReadFile(usersFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []models.User{}, nil // Return empty slice if file doesn't exist
+		}
+		return nil, err
+	}
+
+	var users []models.User
+	if err := json.Unmarshal(data, &users); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+// WriteUsers writes a slice of users to the JSON file.
+func WriteUsers(users []models.User) error {
+	data, err := json.MarshalIndent(users, "", "  ")
+	if err != nil {
+		return err
+	}
+	return ioutil.WriteFile(usersFile, data, 0644)
+}
 
 // GetWorkers reads the workers data file and returns a slice of Worker structs.
 func GetWorkers() ([]models.Worker, error) {
