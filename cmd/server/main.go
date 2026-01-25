@@ -4,6 +4,7 @@ import (
 	"log"
 	"net/http"
 
+	"project/internal/api"
 	"project/internal/router"
 
 	"github.com/gin-gonic/gin"
@@ -27,6 +28,13 @@ func main() {
 	r.GET("/login", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "login.html", nil)
 	})
+
+	// API routes
+	apiGroup := r.Group("/api")
+	{
+		apiGroup.GET("/workers", api.GetWorkers)
+		apiGroup.POST("/workers", api.CreateWorker)
+	}
 
 	router.SetupRouter(r)
 

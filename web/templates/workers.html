@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Workers</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Workers</h1>
+        <a href="/workers/new" class="btn">Add Worker</a>
+        <table id="workers-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Position</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Worker data will be populated here by JavaScript -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/api/workers')
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.querySelector('#workers-table tbody');
+                    data.forEach(worker => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td>${worker.name}</td>
+                            <td>${worker.position}</td>
+                            <td>${worker.status}</td>
+                            <td>
+                                <a href="/workers/edit/${worker.id}" class="btn-edit">Edit</a>
+                                <button class="btn-delete" data-id="${worker.id}">Delete</button>
+                            </td>
+                        `;
+                        tableBody.appendChild(row);
+                    });
+                });
+        });
+    </script>
+</body>
+</html>

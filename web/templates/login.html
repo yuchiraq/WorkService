@@ -1,16 +1,25 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Вход в систему</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
 </head>
-<body>
-    <h2>Вход в систему</h2>
-    <form action="/web/login" method="post">
-        <label for="username">Имя пользователя:</label><br>
-        <input type="text" id="username" name="username"><br>
-        <label for="password">Пароль:</label><br>
-        <input type="password" id="password" name="password"><br><br>
-        <input type="submit" value="Войти">
-    </form>
+<body class="login-body">
+    <div class="login-container">
+        <h2>Вход в систему</h2>
+        <form action="/web/login" method="post">
+            <div class="input-group">
+                <label for="username">Имя пользователя</label>
+                <input type="text" id="username" name="username" required>
+            </div>
+            <div class="input-group">
+                <label for="password">Пароль</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <input type="submit" value="Войти">
+        </form>
+    </div>
 </body>
 </html>

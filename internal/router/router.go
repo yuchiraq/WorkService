@@ -46,4 +46,12 @@ func SetupRouter(r *gin.Engine) {
 		// Dashboard route
 		webGroup.GET("/dashboard", api.Dashboard)
 	}
+
+	// Workers pages
+	r.GET("/workers", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "workers.html", nil)
+	})
+	r.GET("/workers/new", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "add-worker.html", nil)
+	})
 }
