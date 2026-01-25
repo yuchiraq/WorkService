@@ -1,7 +1,5 @@
 package models
 
-import "time"
-
 // User represents a user in the system
 // Note: This is a simplified model. In a real-world application, 
 // you would hash passwords and handle sensitive data more securely.
