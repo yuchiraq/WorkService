@@ -5,14 +5,12 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
 // DashboardPage renders the main dashboard page using manual HTML string building.
 func DashboardPage(c *gin.Context) {
-	session := sessions.Default(c)
-	userName := session.Get("userName")
+	userName, _ := c.Get("userName")
 
 	pageTemplate := `
 <!DOCTYPE html>
@@ -26,10 +24,10 @@ func DashboardPage(c *gin.Context) {
     {{SIDEBAR_HTML}}
     <div class="main-content">
         <div class="page-header">
-            <h1>Панель управления</h1>
+            <h1>Добро пожаловать, %s!</h1>
         </div>
         <div class="card">
-            <p>Добро пожаловать, %s! Вы находитесь в системе управления работниками.</p>
+            <p>Вы находитесь в системе управления работниками.</p>
 			<p>Используйте меню слева для навигации по разделам.</p>
         </div>
     </div>
