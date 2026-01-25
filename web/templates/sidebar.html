@@ -1,0 +1,21 @@
+{{define "sidebar"}}
+<div class="sidebar-header">
+    <!-- Placeholder for Logo -->
+    <img src="/static/img/logo.svg" alt="Logo" style="width: 100%; padding-bottom: 20px;">
+</div>
+<nav class="sidebar-nav">
+    <ul>
+        <li><a href="/dashboard" class="{{if eq .active_page "dashboard"}}active{{end}}">Панель управления</a></li>
+        <li><a href="/workers" class="{{if eq .active_page "workers"}}active{{end}}">Работники</a></li>
+        <!-- Add other navigation links here -->
+        <li><a href="#">Объекты</a></li>
+        <li><a href="#">Расписание</a></li>
+        <li><a href="#">Инженеры</a></li>
+        <li><a href="#">Отчеты</a></li>
+        <li><a href="#">Настройки</a></li>
+    </ul>
+</nav>
+<div class="sidebar-footer">
+    <!-- User Info -->
+</div>
+{{end}}

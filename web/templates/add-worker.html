@@ -1,8 +1,10 @@
 {{define "content"}}
-<div class="container">
+<div class="page-header">
     <h1>Добавить работника</h1>
+</div>
 
-    <form action="/api/workers" method="POST" class="form-container">
+<div class="card form-container">
+    <form action="/workers/new" method="POST">
         <div class="form-group">
             <label for="name">Полное имя</label>
             <input type="text" id="name" name="name" required>
@@ -29,7 +31,7 @@
         </div>
 
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Создать</button>
+            <button type="submit" class="btn btn-primary">Создать работника</button>
             <a href="/workers" class="btn btn-secondary">Отмена</a>
         </div>
     </form>

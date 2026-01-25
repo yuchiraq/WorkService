@@ -1,7 +1,9 @@
 package main
 
 import (
+	"html/template"
 	"log"
+	"path/filepath"
 
 	"project/internal/router"
 	"project/internal/storage"
@@ -20,6 +22,14 @@ func main() {
 
 	r := gin.Default()
 
+	// --- Custom Template Loading ---
+	templates, err := loadTemplates("web/templates")
+	if err != nil {
+		log.Fatalf("Failed to load templates: %v", err)
+	}
+	r.SetHTMLTemplate(templates)
+	// --- End Custom Template Loading ---
+
 	// Setup all routes from the router package
 	router.SetupRouter(r)
 
@@ -27,4 +37,32 @@ func main() {
 	if err := r.Run(":8099"); err != nil {
 		log.Fatalf("Failed to start HTTP server: %v", err)
 	}
+}
+
+// loadTemplates initializes a new template system that can handle layouts.
+func loadTemplates(templatesDir string) (*template.Template, error) {
+	templates := template.New("")
+
+	// Parse layout files separately
+	layouts, err := filepath.Glob(filepath.Join(templatesDir, "layout.html"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Parse all other template files (including includes like sidebar)
+	pages, err := filepath.Glob(filepath.Join(templatesDir, "*.html"))
+	if err != nil {
+		return nil, err
+	}
+
+	// Combine all files for parsing. The layout must be the first one.
+	files := append(layouts, pages...)
+
+	// Parse all files. The name of the template will be the base name of the file.
+	templates, err = templates.ParseFiles(files...)
+	if err != nil {
+		return nil, err
+	}
+
+	return templates, nil
 }

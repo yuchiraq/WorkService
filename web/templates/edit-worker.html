@@ -1,8 +1,10 @@
 {{define "content"}}
-<div class="container">
+<div class="page-header">
     <h1>Редактировать работника</h1>
+</div>
 
-    <form action="/workers/edit/{{.worker.ID}}" method="POST" class="form-container">
+<div class="card form-container">
+    <form action="/workers/edit/{{.worker.ID}}" method="POST">
         <div class="form-group">
             <label for="name">Полное имя</label>
             <input type="text" id="name" name="name" value="{{.worker.Name}}" required>
@@ -29,7 +31,7 @@
         </div>
 
         <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Сохранить</button>
+            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
             <a href="/workers" class="btn btn-secondary">Отмена</a>
         </div>
     </form>

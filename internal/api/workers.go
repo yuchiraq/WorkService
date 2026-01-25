@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// WorkersPage displays the list of workers.
+// WorkersPage displays the list of workers using the new layout.
 func WorkersPage(c *gin.Context) {
 	workers, err := storage.GetWorkers()
 	if err != nil {
@@ -18,14 +18,24 @@ func WorkersPage(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "workers.html", gin.H{
-		"workers": workers,
+	// Use the new layout system
+	c.HTML(http.StatusOK, "layout.html", gin.H{
+		"title":       "Работники",
+		"workers":     workers,
+		"active_page": "workers", 
+		"user":        true, // Placeholder for logged-in user
+		"content":     "workers.html", // Specify which content to render
 	})
 }
 
 // AddWorkerPage displays the form to add a new worker.
 func AddWorkerPage(c *gin.Context) {
-	c.HTML(http.StatusOK, "add-worker.html", nil)
+	c.HTML(http.StatusOK, "layout.html", gin.H{
+		"title":       "Добавить работника",
+		"active_page": "workers",
+		"user":        true, 
+		"content":     "add-worker.html",
+	})
 }
 
 // EditWorkerPage displays the form to edit an existing worker.
@@ -37,8 +47,12 @@ func EditWorkerPage(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "edit-worker.html", gin.H{
-		"worker": worker,
+	c.HTML(http.StatusOK, "layout.html", gin.H{
+		"title":       "Редактировать работника",
+		"worker":      worker,
+		"active_page": "workers",
+		"user":        true,
+		"content":     "edit-worker.html",
 	})
 }
 
@@ -46,22 +60,15 @@ func EditWorkerPage(c *gin.Context) {
 func UpdateWorker(c *gin.Context) {
 	workerID := c.Param("id")
 
-	// In a real app, you would get the user from the session/context
-	// For now, let's keep it simple
-	currentUserLogin := "user-login"
-	currentUserName := "Admin Name"
-
 	hourlyRate, _ := strconv.ParseFloat(c.PostForm("hourlyRate"), 64)
 
 	updatedWorker := models.Worker{
-		ID:            workerID, // Keep the original ID
-		Name:          c.PostForm("name"),
-		Position:      c.PostForm("position"),
-		Phone:         c.PostForm("phone"),
-		HourlyRate:    hourlyRate,
-		BirthDate:     c.PostForm("birthDate"),
-		CreatedBy:     currentUserLogin, // This should not be updated, but for now we will keep it
-		CreatedByName: currentUserName,
+		ID:         workerID,
+		Name:       c.PostForm("name"),
+		Position:   c.PostForm("position"),
+		Phone:      c.PostForm("phone"),
+		HourlyRate: hourlyRate,
+		BirthDate:  c.PostForm("birthDate"),
 	}
 
 	if err := storage.UpdateWorker(updatedWorker); err != nil {
@@ -72,25 +79,17 @@ func UpdateWorker(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/workers")
 }
 
-
 // CreateWorker handles the API request to add a new worker.
 func CreateWorker(c *gin.Context) {
-	// In a real app, you would get the user from the session/context
-	currentUserLogin := "user-login" // Example user login
-	currentUserName := "Admin Name"   // Example user name
-
 	hourlyRate, _ := strconv.ParseFloat(c.PostForm("hourlyRate"), 64)
 
 	newWorker := models.Worker{
-		Name:          c.PostForm("name"),
-		Position:      c.PostForm("position"),
-		Phone:         c.PostForm("phone"),
-		HourlyRate:    hourlyRate,
-		BirthDate:     c.PostForm("birthDate"),
-		CreatedBy:     currentUserLogin,
-		CreatedByName: currentUserName,
+		Name:       c.PostForm("name"),
+		Position:   c.PostForm("position"),
+		Phone:      c.PostForm("phone"),
+		HourlyRate: hourlyRate,
+		BirthDate:  c.PostForm("birthDate"),
 	}
-
 
 	_, err := storage.CreateWorker(newWorker)
 	if err != nil {
@@ -110,6 +109,5 @@ func DeleteWorker(c *gin.Context) {
 		return
 	}
 
-	// Redirect back to the workers list after deletion
 	c.Redirect(http.StatusFound, "/workers")
 }

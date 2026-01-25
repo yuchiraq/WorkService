@@ -1,32 +1,21 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Вход</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
-    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
-</head>
-<body class="login-page">
+{{define "content"}}
+<div class="login-page">
+    <div class="card login-card">
+        <img src="/static/img/logo.svg" alt="Авалонстрой">
+        <h1>АВАЛОССТРОЙ</h1>
+        <p>Войдите, чтобы получить доступ к вашему расписанию.</p>
 
-    <div class="login-card">
-        <img src="/static/img/logo.svg" alt="Аваюсстрой" class="login-logo">
-        <h2>АВАЮССТРОЙ</h2>
-        <p class="subtitle">Войдите, чтобы получить доступ к вашему расписанию.</p>
-
-        {{if .error}}
-            <p class="error-message">{{.error}}</p>
-        {{end}}
-
-        <form action="/login" method="post">
-            <div class="form-group">
-                <input type="text" id="username" name="username" placeholder="Имя пользователя" value="testuser" required>
+        <form action="/login" method="POST">
+            <div class="form-group" style="text-align: left;">
+                <label for="username">Имя пользователя</label>
+                <input type="text" id="username" name="username" required>
             </div>
-            <div class="form-group">
-                <input type="password" id="password" name="password" placeholder="Пароль" value="password" required>
+            <div class="form-group" style="text-align: left;">
+                <label for="password">Пароль</label>
+                <input type="password" id="password" name="password" required>
             </div>
-            <button type="submit" class="btn btn-primary">Войти</button>
+            <button type="submit" class="btn btn-primary" style="width: 100%;">Войти</button>
         </form>
     </div>
-
-</body>
-</html>
+</div>
+{{end}}

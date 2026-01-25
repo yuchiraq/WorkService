@@ -1,115 +1,208 @@
-/* General Body Styles */
-body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background-color: #121212;
-    color: #EAEAEA;
-    margin: 0;
-    line-height: 1.6;
+/*
+  MAIN STYLES INSPIRED BY THE SCREENSHOTS
+*/
+
+/* Global & Typography */
+:root {
+    --bg-color: #F0F2F5;
+    --sidebar-bg: #FFFFFF;
+    --card-bg: #FFFFFF;
+    --primary-color: #2F80ED;
+    --primary-hover-color: #2B73D8;
+    --text-color-dark: #333333;
+    --text-color-light: #828282;
+    --border-color: #E0E0E0;
+    --danger-color: #EB5757;
+    --danger-hover-color: #D34343;
 }
 
-/* Container */
-.container {
-    max-width: 1100px;
-    margin: 40px auto;
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    background-color: var(--bg-color);
+    color: var(--text-color-dark);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, h4, h5, h6 {
+    margin-top: 0;
+}
+
+/* App Layout */
+.app-layout {
+    display: flex;
+}
+
+.sidebar {
+    width: 240px;
+    background: var(--sidebar-bg);
+    height: 100vh;
+    position: fixed;
+    top: 0;
+    left: 0;
+    border-right: 1px solid var(--border-color);
     padding: 20px;
 }
 
-/* Page Header */
+.main-content {
+    margin-left: 240px; /* Same as sidebar width */
+    padding: 30px;
+    width: calc(100% - 240px);
+}
+
 .page-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
     margin-bottom: 30px;
-    border-bottom: 1px solid #333;
-    padding-bottom: 20px;
 }
 
-h1 {
-    font-size: 2.5em;
-    color: #FFFFFF;
+.page-header h1 {
+    font-size: 24px;
+    font-weight: 600;
+}
+
+/* Card */
+.card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 /* Buttons */
 .btn {
-    text-decoration: none;
-    color: #FFFFFF;
-    padding: 10px 20px;
-    border-radius: 5px;
-    transition: background-color 0.3s, transform 0.2s;
+    display: inline-block;
     border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+    text-decoration: none;
     cursor: pointer;
-    font-size: 1em;
+    transition: background-color 0.2s ease;
+    text-align: center;
 }
 
 .btn-primary {
-    background-color: #0D6EFD;
+    background-color: var(--primary-color);
+    color: white;
 }
-
 .btn-primary:hover {
-    background-color: #0B5ED7;
-    transform: translateY(-2px);
-}
-
-.btn-secondary {
-    background-color: #495057;
-}
-
-.btn-secondary:hover {
-    background-color: #5A6268;
+    background-color: var(--primary-hover-color);
 }
 
 .btn-danger {
-    background-color: #DC3545;
+    background-color: var(--danger-color);
+    color: white;
 }
-
 .btn-danger:hover {
-    background-color: #C82333;
+    background-color: var(--danger-hover-color);
 }
 
-.btn-sm {
-    padding: 5px 10px;
-    font-size: 0.875em;
+.btn-secondary {
+    background-color: #f0f2f5;
+    color: var(--text-color-dark);
+    border: 1px solid var(--border-color);
+}
+
+.btn-secondary:hover {
+    background-color: #e0e2e5;
 }
 
 
-/* Table Styles */
-.table-container {
-    background-color: #1E1E1E;
+/* Workers Page - Card Grid Layout */
+.workers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.worker-card {
+    background: var(--card-bg);
+    border-radius: 12px;
     padding: 20px;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    display: flex;
+    flex-direction: column;
 }
 
-table {
+.worker-card-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.worker-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background-color: var(--primary-color);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 600;
+    margin-right: 15px;
+}
+
+.worker-info h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.worker-info p {
+    margin: 0;
+    color: var(--text-color-light);
+    font-size: 14px;
+}
+
+.worker-card-footer {
+    margin-top: auto;
+    padding-top: 15px;
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+/* Login Page */
+.login-page {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    background-color: var(--bg-color);
+}
+
+.login-card {
     width: 100%;
-    border-collapse: collapse;
+    max-width: 400px;
+    text-align: center;
 }
 
-thead th {
-    text-align: left;
-    color: #0D6EFD;
-    border-bottom: 2px solid #0D6EFD;
-    padding-bottom: 10px;
-    font-size: 1.1em;
+.login-card img {
+    width: 64px;
+    height: 64px;
+    margin-bottom: 15px;
 }
 
-tbody td {
-    padding: 15px 0;
-    border-bottom: 1px solid #333;
+.login-card h1 {
+    font-size: 24px;
+    margin-bottom: 10px;
 }
 
-tbody tr:last-child td {
-    border-bottom: none;
+.login-card p {
+    color: var(--text-color-light);
+    margin-bottom: 30px;
 }
 
-/* Form Styles */
+/* Forms */
 .form-container {
-    background-color: #1E1E1E;
-    padding: 30px;
-    border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-    max-width: 600px;
-    margin: auto;
+    max-width: 700px;
 }
 
 .form-group {
@@ -118,31 +211,34 @@ tbody tr:last-child td {
 
 .form-group label {
     display: block;
+    font-size: 14px;
+    font-weight: 500;
     margin-bottom: 8px;
-    color: #BDBDBD;
 }
 
-.form-group input,
+.form-group input[type="text"],
+.form-group input[type="password"],
+.form-group input[type="email"],
+.form-group input[type="number"],
+.form-group input[type="date"],
 .form-group select {
     width: 100%;
     padding: 12px;
-    background-color: #333;
-    border: 1px solid #444;
-    border-radius: 5px;
-    color: #EAEAEA;
-    font-size: 1em;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: #fff;
+    font-size: 14px;
+    box-sizing: border-box;
 }
 
-.form-group input:focus,
-.form-group select:focus {
-    outline: none;
-    border-color: #0D6EFD;
-    box-shadow: 0 0 5px rgba(13, 110, 253, 0.5);
+.login-page .form-group input {
+    background-color: #FFFBEB;
 }
 
 .form-actions {
     display: flex;
-    gap: 15px;
-    justify-content: flex-end;
-    margin-top: 30px;
+    justify-content: flex-start;
+    gap: 10px;
+    margin-top: 20px;
 }
+
