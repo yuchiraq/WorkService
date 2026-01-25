@@ -7,9 +7,6 @@ import (
 )
 
 func SetupRouter(r *gin.Engine) {
-	// Load HTML templates
-	r.LoadHTMLGlob("web/templates/*")
-
 	// Serve static files (CSS, JS, images)
 	r.Static("/static", "./web/static")
 
