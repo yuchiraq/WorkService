@@ -48,7 +48,7 @@ func SetupRouter(r *gin.Engine) {
 
 		// Worker Pages
 		authenticated.GET("/workers", api.WorkersPage)
-		authenticated.GET("/workers/new", api.NewWorkerPage)
+		authenticated.GET("/workers/new", api.AddWorkerPage) // Corrected function name
 		authenticated.POST("/workers/new", api.CreateWorker)
 		authenticated.GET("/workers/edit/:id", api.EditWorkerPage)
 		authenticated.POST("/workers/edit/:id", api.UpdateWorker)
