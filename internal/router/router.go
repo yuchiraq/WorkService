@@ -66,6 +66,7 @@ func SetupRouter(r *gin.Engine) {
 		{
 			workerApiRoutes.GET("/", api.GetWorkers)
 			workerApiRoutes.POST("/", api.CreateWorker)
+			workerApiRoutes.DELETE("/:id", api.DeleteWorker) // New route for deleting a worker
 		}
 	}
 }

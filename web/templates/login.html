@@ -5,20 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Вход в систему</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
-<body class="login-body">
+<body class="login-page">
     <div class="login-container">
-        <h2>Вход в систему</h2>
-        <form action="/web/login" method="post">
-            <div class="input-group">
+        <h1>Вход в систему</h1>
+
+        {{ if .error }}
+            <div class="error-message" style="background-color: rgba(255, 100, 100, 0.2); color: #fdd; padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; text-align: center; border: 1px solid rgba(255, 100, 100, 0.3);">
+                {{ .error }}
+            </div>
+        {{ end }}
+
+        <form action="/login" method="post">
+            <div class="form-group">
                 <label for="username">Имя пользователя</label>
-                <input type="text" id="username" name="username" required>
+                <input type="text" id="username" name="username" placeholder="testuser" required>
             </div>
-            <div class="input-group">
+            <div class="form-group">
                 <label for="password">Пароль</label>
-                <input type="password" id="password" name="password" required>
+                <input type="password" id="password" name="password" placeholder="testpass" required>
             </div>
-            <input type="submit" value="Войти">
+            <button type="submit" class="btn" style="width: 100%;">Войти</button>
         </form>
     </div>
 </body>

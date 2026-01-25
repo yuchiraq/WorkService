@@ -9,34 +9,46 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetWorkers handles the API request to get all workers.
+// GetWorkers handles the API request to retrieve all workers.
 func GetWorkers(c *gin.Context) {
 	workers, err := storage.GetWorkers()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not fetch workers"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve workers"})
 		return
 	}
 	c.JSON(http.StatusOK, workers)
 }
 
-// CreateWorker handles the API request to create a new worker.
+// CreateWorker handles the API request to add a new worker.
 func CreateWorker(c *gin.Context) {
-	var worker models.Worker
-	if err := c.ShouldBindJSON(&worker); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	var newWorker models.Worker
+	if err := c.ShouldBindJSON(&newWorker); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid input: " + err.Error()})
 		return
 	}
 
-	// In a real app, you'd get the user from the session.
-	// For now, we'll hardcode it.
-	worker.CreatedBy = "u1"
-	worker.CreatedByName = "Admin"
+	// In a real application, user info would come from the session/token.
+	// For demonstration, we're hardcoding it.
+	newWorker.CreatedBy = "u1"
+	newWorker.CreatedByName = "Admin"
 
-	newWorker, err := storage.CreateWorker(worker)
+	createdWorker, err := storage.CreateWorker(newWorker)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Could not create worker"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create worker"})
 		return
 	}
 
-	c.JSON(http.StatusCreated, newWorker)
+	c.JSON(http.StatusCreated, createdWorker)
+}
+
+// DeleteWorker handles the API request to delete a worker.
+func DeleteWorker(c *gin.Context) {
+	workerID := c.Param("id")
+
+	if err := storage.DeleteWorker(workerID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete worker"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Worker deleted successfully"})
 }

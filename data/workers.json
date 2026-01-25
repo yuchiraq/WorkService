@@ -1,1 +1,32 @@
-[]
+[
+    {
+        "id": "w1",
+        "name": "Иван Петров",
+        "position": "Frontend Developer",
+        "phone": "+1234567890",
+        "hourlyRate": 25.5,
+        "status": "active",
+        "birthDate": "1990-05-15",
+        "createdBy": "u1",
+        "createdByName": "Admin"
+    },
+    {
+        "id": "w2",
+        "name": "Мария Сидорова",
+        "position": "Backend Developer",
+        "status": "active",
+        "birthDate": "1988-10-20",
+        "createdBy": "u1",
+        "createdByName": "Admin"
+    },
+    {
+        "id": "w3",
+        "name": "Алексей Иванов",
+        "position": "Project Manager",
+        "phone": "+1987654321",
+        "hourlyRate": 40.0,
+        "status": "dismissed",
+        "createdBy": "u1",
+        "createdByName": "Admin"
+    }
+]
