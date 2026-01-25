@@ -23,14 +23,26 @@ func LoadUsers() error {
 	file, err := os.ReadFile(usersFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			users = []models.User{}
-			return nil // File not existing is not an error; we start with an empty list.
+			users = []models.User{
+				{ID: "1", Username: "testuser", Password: "password", Name: "Test User"},
+			}
+			return saveUsers()
 		}
 		return err
 	}
 
 	return json.Unmarshal(file, &users)
 }
+
+// saveUsers writes the current state of the users slice to the users.json file.
+func saveUsers() error {
+	data, err := json.MarshalIndent(users, "", "    ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(usersFile, data, 0644)
+}
+
 
 // GetUserByID retrieves a single user by their ID.
 func GetUserByID(id string) (models.User, error) {

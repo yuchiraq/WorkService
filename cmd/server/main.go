@@ -4,11 +4,20 @@ import (
 	"log"
 
 	"project/internal/router"
+	"project/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	// Load initial data
+	if err := storage.LoadUsers(); err != nil {
+		log.Fatalf("Failed to load users: %v", err)
+	}
+	if err := storage.LoadWorkers(); err != nil {
+		log.Fatalf("Failed to load workers: %v", err)
+	}
+
 	r := gin.Default()
 
 	// Setup all routes from the router package

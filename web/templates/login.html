@@ -4,28 +4,28 @@
     <meta charset="UTF-8">
     <title>Вход</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
 </head>
 <body class="login-page">
 
-    <div class="login-container">
-        <h1>Вход в систему</h1>
+    <div class="login-card">
+        <img src="/static/img/logo.svg" alt="Аваюсстрой" class="login-logo">
+        <h2>АВАЮССТРОЙ</h2>
+        <p class="subtitle">Войдите, чтобы получить доступ к вашему расписанию.</p>
 
         {{if .error}}
-            <p style="color: var(--danger-red); text-align: center; margin-bottom: 20px;">{{.error}}</p>
+            <p class="error-message">{{.error}}</p>
         {{end}}
 
         <form action="/login" method="post">
             <div class="form-group">
-                <label for="username">Имя пользователя</label>
-                <input type="text" id="username" name="username" placeholder="Введите ваше имя пользователя" required>
+                <input type="text" id="username" name="username" placeholder="Имя пользователя" value="testuser" required>
             </div>
             <div class="form-group">
-                <label for="password">Пароль</label>
-                <input type="password" id="password" name="password" placeholder="Введите ваш пароль" required>
+                <input type="password" id="password" name="password" placeholder="Пароль" value="password" required>
             </div>
-            <button type="submit" class="btn btn-primary btn-block">Войти</button>
+            <button type="submit" class="btn btn-primary">Войти</button>
         </form>
-
     </div>
 
 </body>
