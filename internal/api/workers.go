@@ -1,8 +1,11 @@
 package api
 
 import (
+	"fmt"
+	"html/template"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"project/internal/models"
 	"project/internal/storage"
@@ -10,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// WorkersPage displays the list of workers using the new layout.
+// WorkersPage displays the list of workers using manual HTML generation.
 func WorkersPage(c *gin.Context) {
 	workers, err := storage.GetWorkers()
 	if err != nil {
@@ -18,11 +21,79 @@ func WorkersPage(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "workers.html", gin.H{
-		"title":       "Работники",
-		"workers":     workers,
-		"active_page": "workers",
-	})
+	// --- Manually generate the HTML for the workers grid ---
+	var workersGridHTML strings.Builder
+	for _, worker := range workers {
+		// UTF-8 safe initials
+		runes := []rune(worker.Name)
+		initials := ""
+		if len(runes) > 0 {
+			initials = string(runes[0])
+		}
+		if len(runes) > 1 {
+			initials = string(runes[0:2])
+		}
+
+		cardHTML := fmt.Sprintf(`
+			<div class="worker-card">
+				<div class="worker-card-header">
+					<div class="worker-avatar">%s</div>
+					<div class="worker-info">
+						<h3>%s</h3>
+						<p>%s</p>
+					</div>
+				</div>
+				<div class="worker-card-footer">
+					<a href="/workers/edit/%s" class="btn btn-secondary">Редакт.</a>
+					<form action="/workers/delete/%s" method="POST" style="display: inline;">
+						<button type="submit" class="btn btn-danger">Удалить</button>
+					</form>
+				</div>
+			</div>`,
+			strings.ToUpper(initials),
+			emplate.HTMLEscapeString(worker.Name),
+			emplate.HTMLEscapeString(worker.Position),
+			emplate.HTMLEscapeString(worker.ID),
+			emplate.HTMLEscapeString(worker.ID),
+		)
+		workersGridHTML.WriteString(cardHTML)
+	}
+
+	// --- Define the full page structure ---
+	pageTemplate := `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Работники</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <aside class="sidebar">
+		<div class="sidebar-header"><h2>Управление</h2></div>
+		<nav><ul>
+			<li><a href="/dashboard">Главная</a></li>
+			<li class="active"><a href="/workers">Работники</a></li>
+		</ul></nav>
+		<div class="sidebar-footer"><a href="/logout">Выход</a></div>
+	</aside>
+    <div class="main-content">
+        <div class="page-header">
+            <h1>Работники</h1>
+            <a href="/workers/new" class="btn btn-primary">Добавить работника</a>
+        </div>
+        <div class="card">
+            <p>Просмотр, добавление, редактирование или увольнение работников.</p>
+            <div class="workers-grid">{{WORKERS_GRID}}</div>
+        </div>
+    </div>
+</body>
+</html>`
+
+	// --- Assemble the final page ---
+	finalHTML := strings.Replace(pageTemplate, "{{WORKERS_GRID}}", workersGridHTML.String(), 1)
+
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
 
 // AddWorkerPage displays the form to add a new worker.
