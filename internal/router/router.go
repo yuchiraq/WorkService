@@ -7,6 +7,9 @@ import (
 )
 
 func SetupRouter(r *gin.Engine) {
+	// Load HTML templates
+	r.LoadHTMLGlob("web/templates/*")
+
 	// Serve static files (CSS, JS, images)
 	r.Static("/static", "./web/static")
 
@@ -20,7 +23,7 @@ func SetupRouter(r *gin.Engine) {
 
 	// Protected routes
 	authRequired := r.Group("/")
-	authRequired.Use(api.AuthRequired()) 
+	authRequired.Use(api.AuthRequired())
 	{
 		// Dashboard
 		authRequired.GET("/dashboard", api.DashboardPage)

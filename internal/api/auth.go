@@ -10,37 +10,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// LoginPage renders the login page.
+// LoginPage renders the login page using an HTML template.
 func LoginPage(c *gin.Context) {
-	pageTemplate := `
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <title>Вход в систему</title>
-    <link rel="stylesheet" href="/static/css/style.css">
-</head>
-<body>
-    <div class="login-container">
-        <div class="login-card">
-            <h1>Вход в систему</h1>
-            <p>Пожалуйста, введите свои учетные данные для входа.</p>
-            <form action="/login" method="POST">
-                <div class="form-group">
-                    <label for="username">Имя пользователя</label>
-                    <input type="text" id="username" name="username" required autofocus>
-                </div>
-                <div class="form-group">
-                    <label for="password">Пароль</label>
-                    <input type="password" id="password" name="password" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Войти</button>
-            </form>
-        </div>
-    </div>
-</body>
-</html>`
-	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(pageTemplate))
+	// The router is configured to load templates from "web/templates/*"
+	// We render the "login.html" template.
+	c.HTML(http.StatusOK, "login.html", gin.H{
+		"Title": "Вход в систему",
+	})
 }
 
 // Login handles the authentication logic.
@@ -50,6 +26,7 @@ func Login(c *gin.Context) {
 
 	user, err := storage.ValidateUser(username, password)
 	if err != nil {
+		// Redirect back to login page with an error
 		c.Redirect(http.StatusFound, "/login?error=invalid_credentials")
 		return
 	}
