@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strings"
 
-	"project/internal/models"
 	"project/internal/storage"
 
 	"github.com/gin-gonic/gin"
