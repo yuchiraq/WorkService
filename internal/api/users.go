@@ -17,21 +17,8 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
-	// In a real application, you would save the user to a database here.
-
+	database.DB.Create(&user)
 	c.JSON(http.StatusOK, user)
-}
-
-// GetUser retrieves a user by ID
-func GetUser(c *gin.Context) {
-	// In a real application, you would retrieve the user from a database here.
-	c.JSON(http.StatusOK, gin.H{"message": "GetUser not implemented"})
-}
-
-// UpdateUser updates a user's information
-func UpdateUser(c *gin.Context) {
-	// In a real application, you would update the user in a database here.
-	c.JSON(http.StatusOK, gin.H{"message": "UpdateUser not implemented"})
 }
 
 // Login authenticates a user
@@ -43,7 +30,7 @@ func Login(c *gin.Context) {
 	}
 
 	var foundUser models.User
-	if err := database.DB.First(&foundUser, "email = ?", user.Email).Error; err != nil {
+	if err := database.DB.First(&foundUser, "login = ?", user.Login).Error; err != nil {
 		c.Redirect(http.StatusMovedPermanently, "/login")
 		return
 	}

@@ -15,7 +15,7 @@ var DB *gorm.DB
 // Connect connects to the database
 func Connect() {
 	// In a real application, you would get these values from a config file
-	dsn := "host=localhost user=user password=password dbname=yourdb port=5432 sslmode=disable"
+	dsn := "host=db user=user password=password dbname=yourdb port=5432 sslmode=disable"
 
 	var err error
 	DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
@@ -37,8 +37,7 @@ func Connect() {
 	if err := DB.First(&adminUser, "role = ?", "admin").Error; err != nil {
 		if err == gorm.ErrRecordNotFound {
 			adminUser = models.User{
-				Name:     "Admin",
-				Email:    "admin@example.com",
+				Login:    "admin",
 				Password: "password", // In a real app, hash this!
 				Role:     "admin",
 			}
