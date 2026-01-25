@@ -51,10 +51,10 @@ func WorkersPage(c *gin.Context) {
 				</div>
 			</div>`,
 			strings.ToUpper(initials),
-			emplate.HTMLEscapeString(worker.Name),
-			emplate.HTMLEscapeString(worker.Position),
-			emplate.HTMLEscapeString(worker.ID),
-			emplate.HTMLEscapeString(worker.ID),
+			template.HTMLEscapeString(worker.Name),
+			template.HTMLEscapeString(worker.Position),
+			template.HTMLEscapeString(worker.ID),
+			template.HTMLEscapeString(worker.ID),
 		)
 		workersGridHTML.WriteString(cardHTML)
 	}
