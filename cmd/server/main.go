@@ -4,16 +4,12 @@ import (
 	"log"
 	"net/http"
 
-	"project/internal/database"
 	"project/internal/router"
 
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	// Connect to the database
-	database.Connect()
-
 	r := gin.Default()
 
 	// Serve static files

@@ -19,12 +19,6 @@ func SetupRouter(r *gin.Engine) {
 			})
 		})
 
-		// User routes
-		userRoutes := apiGroup.Group("/users")
-		{
-			userRoutes.POST("/", api.CreateUser)
-		}
-
 		// Article routes
 		articleRoutes := apiGroup.Group("/articles")
 		{

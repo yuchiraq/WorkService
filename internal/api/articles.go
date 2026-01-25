@@ -2,13 +2,14 @@ package api
 
 import (
 	"net/http"
+	"strconv"
 
 	"project/internal/models"
+	"project/internal/storage"
 
 	"github.com/gin-gonic/gin"
 )
 
-// CreateArticle creates a new article
 func CreateArticle(c *gin.Context) {
 	var article models.Article
 	if err := c.ShouldBindJSON(&article); err != nil {
@@ -16,19 +17,79 @@ func CreateArticle(c *gin.Context) {
 		return
 	}
 
-	// In a real application, you would save the article to a database here.
+	articles, err := storage.ReadArticles()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read articles"})
+		return
+	}
 
-	c.JSON(http.StatusOK, article)
+	article.ID = len(articles) + 1
+	articles = append(articles, article)
+
+	if err := storage.WriteArticles(articles); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write articles"})
+		return
+	}
+
+	c.JSON(http.StatusCreated, article)
 }
 
-// GetArticle retrieves an article by ID
 func GetArticle(c *gin.Context) {
-	// In a real application, you would retrieve the article from a database here.
-	c.JSON(http.StatusOK, gin.H{"message": "GetArticle not implemented"})
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid article ID"})
+		return
+	}
+
+	articles, err := storage.ReadArticles()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read articles"})
+		return
+	}
+
+	for _, article := range articles {
+		if article.ID == id {
+			c.JSON(http.StatusOK, article)
+			return
+		}
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})
 }
 
-// UpdateArticle updates an article
 func UpdateArticle(c *gin.Context) {
-	// In a real application, you would update the article in a database here.
-	c.JSON(http.StatusOK, gin.H{"message": "UpdateArticle not implemented"})
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid article ID"})
+		return
+	}
+
+	var updatedArticle models.Article
+	if err := c.ShouldBindJSON(&updatedArticle); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	articles, err := storage.ReadArticles()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to read articles"})
+		return
+	}
+
+	for i, article := range articles {
+		if article.ID == id {
+			articles[i] = updatedArticle
+			articles[i].ID = id
+
+			if err := storage.WriteArticles(articles); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to write articles"})
+				return
+			}
+
+			c.JSON(http.StatusOK, articles[i])
+			return
+		}
+	}
+
+	c.JSON(http.StatusNotFound, gin.H{"error": "Article not found"})
 }
