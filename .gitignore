@@ -1,8 +1,20 @@
-.vs/ProjectSettings.json
-.vs/slnx.sqlite
-.vs/VSWorkspaceState.json
-.vs/web-site/v17/.wsuo
-.vs/web-site/v17/DocumentLayout.backup.json
-.vs/web-site/v17/DocumentLayout.json
-*.vsidx
-settings.json
+# Compiled executables
+*.exe
+*.out
+*.test
+
+# Log files
+*.log
+logs/
+
+# Dependency directory
+vendor/
+
+# IDE and environment files
+.idea/
+.vscode/
+.DS_Store
+.idx/
+
+# Docker-compose local files
+*.local

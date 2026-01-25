@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="icon" href="/static/img/favicon.ico" type="image/x-icon">
+</head>
+<body>
+    <div class="login-container">
+        <img src="/static/img/logo.svg" alt="Logo" style="max-width: 150px; margin-bottom: 1rem;">
+        <h1>Login</h1>
+        <form action="/login" method="post">
+            <div class="form-group">
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" required>
+            </div>
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required>
+            </div>
+            <button type="submit">Login</button>
+        </form>
+        <div class="implemented-features">
+            <p class="features-toggle">Implemented Features</p>
+            <ul class="features-list">
+                <li>User authentication</li>
+                <li>Article creation and management</li>
+                <li>Dockerized environment</li>
+                <li>PostgreSQL database</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const toggle = document.querySelector('.features-toggle');
+        const list = document.querySelector('.features-list');
+
+        toggle.addEventListener('click', () => {
+            if (list.style.display === 'none') {
+                list.style.display = 'block';
+            } else {
+                list.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
