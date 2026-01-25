@@ -4,11 +4,14 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"project/internal/models"
 	"project/internal/storage"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 // WorkersPage renders the list of workers with clickable cards.
@@ -172,4 +175,279 @@ func WorkerProfilePage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{RATE}}", fmt.Sprintf("%.2f", worker.HourlyRate), -1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
+}
+
+// AddWorkerPage renders the page with a form to add a new worker.
+func AddWorkerPage(c *gin.Context) {
+	pageTemplate := `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Добавить работника</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    {{SIDEBAR_HTML}}
+    <div class="main-content">
+        <a href="/workers" class="back-link"><svg viewBox="0 0 16 16"><path d="M11.9,8.5H4.1l3.3,3.3c0.2,0.2,0.2,0.5,0,0.7s-0.5,0.2-0.7,0l-4-4C2.6,8.4,2.5,8.2,2.5,8s0.1-0.4,0.2-0.5l4-4c0.2-0.2,0.5-0.2,0.7,0s0.2,0.5,0,0.7L4.1,7.5H11.9c0.3,0,0.5,0.2,0.5,0.5S12.2,8.5,11.9,8.5z"/></svg>К списку работников</a>
+        <div class="page-header">
+            <h1>Новый работник</h1>
+        </div>
+        <div class="card">
+            <p>Заполните все поля для регистрации нового работника в системе.</p>
+            <form action="/workers/new" method="POST">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="name">Ф.И.О.</label>
+                        <input type="text" id="name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="position">Должность</label>
+                        <input type="text" id="position" name="position" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="phone">Телефон</label>
+                        <input type="tel" id="phone" name="phone" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="birth_date">Дата рождения</label>
+                        <input type="date" id="birth_date" name="birth_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="hourly_rate">Ставка (руб/час)</label>
+                        <input type="number" id="hourly_rate" name="hourly_rate" step="0.01" required>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary">Сохранить</button>
+                    <a href="/workers" class="btn btn-secondary">Отмена</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>`
+
+	sidebar := RenderSidebar("workers")
+	finalHTML := strings.Replace(pageTemplate, "{{SIDEBAR_HTML}}", sidebar, 1)
+
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
+}
+
+// CreateWorker handles the creation of a new worker.
+func CreateWorker(c *gin.Context) {
+	rate, err := strconv.ParseFloat(c.PostForm("hourly_rate"), 64)
+	if err != nil {
+		c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
+		return
+	}
+
+	newWorker := models.Worker{
+		ID:         uuid.New().String(),
+		Name:       c.PostForm("name"),
+		Position:   c.PostForm("position"),
+		Phone:      c.PostForm("phone"),
+		BirthDate:  c.PostForm("birth_date"),
+		HourlyRate: rate,
+		IsActive:   true,
+	}
+
+	workers, err := storage.GetWorkers()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to get workers: %v", err)
+		return
+	}
+
+	workers = append(workers, newWorker)
+
+	if err := storage.SaveWorkers(workers); err != nil {
+		c.String(http.StatusInternalServerError, "Failed to save worker: %v", err)
+		return
+	}
+
+	c.Redirect(http.StatusFound, "/workers")
+}
+
+// EditWorkerPage renders the page for editing an existing worker.
+func EditWorkerPage(c *gin.Context) {
+	workerID := c.Param("id")
+	worker, err := storage.GetWorkerByID(workerID)
+	if err != nil {
+		c.String(http.StatusNotFound, "Worker not found: %v", err)
+		return
+	}
+
+	pageTemplate := `
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Редактировать профиль</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    {{SIDEBAR_HTML}}
+    <div class="main-content">
+         <a href="/worker/{{WORKER_ID}}" class="back-link"><svg viewBox="0 0 16 16"><path d="M11.9,8.5H4.1l3.3,3.3c0.2,0.2,0.2,0.5,0,0.7s-0.5,0.2-0.7,0l-4-4C2.6,8.4,2.5,8.2,2.5,8s0.1-0.4,0.2-0.5l4-4c0.2-0.2,0.5-0.2,0.7,0s0.2,0.5,0,0.7L4.1,7.5H11.9c0.3,0,0.5,0.2,0.5,0.5S12.2,8.5,11.9,8.5z"/></svg>Назад к профилю</a>
+        <div class="page-header">
+            <h1>Редактировать профиль</h1>
+        </div>
+        <div class="card">
+            <p>Здесь можно обновить информацию о работнике.</p>
+            <form action="/workers/edit/{{WORKER_ID}}" method="POST" class="form-grid-edit">
+
+                <div class="form-group-edit form-group-name">
+                    <label for="name">Ф.И.О.</label>
+                    <input type="text" id="name" name="name" value="{{WORKER_NAME}}" required>
+                </div>
+
+                <div class="form-group-edit form-group-position">
+                    <label for="position">Должность</label>
+                    <input type="text" id="position" name="position" value="{{POSITION}}" required>
+                </div>
+
+                <div class="form-group-edit form-group-phone">
+                    <label for="phone">Телефон</label>
+                    <input type="tel" id="phone" name="phone" value="{{PHONE}}" required>
+                </div>
+
+                <div class="form-group-edit form-group-birthdate">
+                    <label for="birth_date">Дата рождения</label>
+                    <input type="date" id="birth_date" name="birth_date" value="{{BIRTH_DATE}}" required>
+                </div>
+
+                <div class="form-group-edit form-group-rate">
+                    <label for="hourly_rate">Ставка (руб/час)</label>
+                    <input type="number" id="hourly_rate" name="hourly_rate" value="{{RATE}}" step="0.01" required>
+                </div>
+
+                <div class="form-actions-edit">
+                    <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                    <a href="/worker/{{WORKER_ID}}" class="btn btn-secondary">Отмена</a>
+                    <button type="button" class="btn btn-danger" onclick="showDeleteModal()">Уволить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal for delete confirmation -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeDeleteModal()">&times;</span>
+            <h2>Подтверждение увольнения</h2>
+            <p>Вы уверены, что хотите уволить этого работника? Это действие нельзя будет отменить.</p>
+            <form action="/workers/delete/{{WORKER_ID}}" method="POST">
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-danger">Да, уволить</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Отмена</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function showDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'block';
+        }
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+        }
+        // Close modal if user clicks outside of it
+        window.onclick = function(event) {
+            if (event.target == document.getElementById('deleteModal')) {
+                closeDeleteModal();
+            }
+        }
+    </script>
+
+</body>
+</html>`
+
+	sidebar := RenderSidebar("workers")
+	finalHTML := pageTemplate
+	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, -1)
+	finalHTML = strings.Replace(finalHTML, "{{WORKER_ID}}", template.HTMLEscapeString(worker.ID), -1)
+	finalHTML = strings.Replace(finalHTML, "{{WORKER_NAME}}", template.HTMLEscapeString(worker.Name), -1)
+	finalHTML = strings.Replace(finalHTML, "{{POSITION}}", template.HTMLEscapeString(worker.Position), -1)
+	finalHTML = strings.Replace(finalHTML, "{{PHONE}}", template.HTMLEscapeString(worker.Phone), -1)
+	finalHTML = strings.Replace(finalHTML, "{{BIRTH_DATE}}", template.HTMLEscapeString(worker.BirthDate), -1)
+	finalHTML = strings.Replace(finalHTML, "{{RATE}}", fmt.Sprintf("%.2f", worker.HourlyRate), -1)
+
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
+}
+
+// UpdateWorker handles the update of an existing worker's details.
+func UpdateWorker(c *gin.Context) {
+	workerID := c.Param("id")
+
+	rate, err := strconv.ParseFloat(c.PostForm("hourly_rate"), 64)
+	if err != nil {
+		c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
+		return
+	}
+
+	workers, err := storage.GetWorkers()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
+		return
+	}
+
+	var workerFound bool
+	for i, w := range workers {
+		if w.ID == workerID {
+			workers[i].Name = c.PostForm("name")
+			workers[i].Position = c.PostForm("position")
+			workers[i].Phone = c.PostForm("phone")
+			workers[i].BirthDate = c.PostForm("birth_date")
+			workers[i].HourlyRate = rate
+			workerFound = true
+			break
+		}
+	}
+
+	if !workerFound {
+		c.String(http.StatusNotFound, "Worker with ID %s not found", workerID)
+		return
+	}
+
+	if err := storage.SaveWorkers(workers); err != nil {
+		c.String(http.StatusInternalServerError, "Failed to save updated worker data: %v", err)
+		return
+	}
+
+	c.Redirect(http.StatusFound, "/worker/"+workerID)
+}
+
+// DeleteWorker handles the deletion of a worker.
+func DeleteWorker(c *gin.Context) {
+	workerID := c.Param("id")
+
+	workers, err := storage.GetWorkers()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
+		return
+	}
+
+	var updatedWorkers []models.Worker
+	var workerFound bool
+	for _, worker := range workers {
+		if worker.ID != workerID {
+			updatedWorkers = append(updatedWorkers, worker)
+		} else {
+			workerFound = true
+		}
+	}
+
+	if !workerFound {
+		c.String(http.StatusNotFound, "Worker with ID %s not found to delete", workerID)
+		return
+	}
+
+	if err := storage.SaveWorkers(updatedWorkers); err != nil {
+		c.String(http.StatusInternalServerError, "Failed to save data after deleting worker: %v", err)
+		return
+	}
+
+	c.Redirect(http.StatusFound, "/workers")
 }

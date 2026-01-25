@@ -20,7 +20,7 @@ func SetupRouter(r *gin.Engine) {
 
 	// Protected routes
 	authRequired := r.Group("/")
-	authRequired.Use(api.AuthRequired())
+	authRequired.Use(api.AuthRequired()) 
 	{
 		// Dashboard
 		authRequired.GET("/dashboard", api.DashboardPage)
