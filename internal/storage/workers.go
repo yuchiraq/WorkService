@@ -14,7 +14,7 @@ import (
 var (
 	workers      []models.Worker
 	workersMutex sync.RWMutex
-	workersFile  = "data/workers.json"
+	workersFile  = "storage/workers.json" // Corrected path
 )
 
 // LoadWorkers reads the workers.json file and populates the workers slice.
@@ -25,8 +25,8 @@ func LoadWorkers() error {
 	file, err := os.ReadFile(workersFile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			workers = []models.Worker{}
-			return nil // File not existing is not an error; we start with an empty list.
+			workers = []models.Worker{} // If file doesn't exist, start with an empty slice
+			return nil
 		}
 		return err
 	}
@@ -38,6 +38,10 @@ func LoadWorkers() error {
 func saveWorkers() error {
 	data, err := json.MarshalIndent(workers, "", "    ")
 	if err != nil {
+		return err
+	}
+	// Ensure the directory exists
+	if err := os.MkdirAll("storage", 0755); err != nil {
 		return err
 	}
 	return os.WriteFile(workersFile, data, 0644)
@@ -73,6 +77,7 @@ func CreateWorker(worker models.Worker) (models.Worker, error) {
 	workers = append(workers, worker)
 
 	if err := saveWorkers(); err != nil {
+		// If save fails, roll back the addition
 		workers = workers[:len(workers)-1]
 		return models.Worker{}, err
 	}
@@ -87,10 +92,6 @@ func UpdateWorker(updatedWorker models.Worker) error {
 
 	for i, worker := range workers {
 		if worker.ID == updatedWorker.ID {
-			// Preserve original creation info
-			updatedWorker.CreatedBy = worker.CreatedBy
-			updatedWorker.CreatedByName = worker.CreatedByName
-
 			workers[i] = updatedWorker
 			return saveWorkers()
 		}

@@ -12,7 +12,7 @@ import (
 var (
 	users      []models.User
 	usersMutex sync.RWMutex
-	usersFile  = "data/users.json"
+	usersFile  = "storage/users.json" // Corrected path
 )
 
 // LoadUsers reads the users.json file and populates the users slice.
@@ -40,9 +40,12 @@ func saveUsers() error {
 	if err != nil {
 		return err
 	}
+	// Ensure the directory exists
+	if err := os.MkdirAll("storage", 0755); err != nil {
+		return err
+	}
 	return os.WriteFile(usersFile, data, 0644)
 }
-
 
 // GetUserByID retrieves a single user by their ID.
 func GetUserByID(id string) (models.User, error) {
@@ -57,15 +60,15 @@ func GetUserByID(id string) (models.User, error) {
 	return models.User{}, errors.New("user not found")
 }
 
-// GetUserByUsername retrieves a single user by their username.
-func GetUserByUsername(username string) (models.User, error) {
+// ValidateUser checks if a username and password combination is valid.
+func ValidateUser(username, password string) (models.User, error) {
 	usersMutex.RLock()
 	defer usersMutex.RUnlock()
 
 	for _, user := range users {
-		if user.Username == username {
+		if user.Username == username && user.Password == password {
 			return user, nil
 		}
 	}
-	return models.User{}, errors.New("user not found")
+	return models.User{}, errors.New("invalid credentials")
 }
