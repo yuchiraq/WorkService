@@ -22,12 +22,6 @@ func LoadUsers() error {
 
 	file, err := os.ReadFile(usersFile)
 	if err != nil {
-		if os.IsNotExist(err) {
-			users = []models.User{
-				{ID: "1", Username: "testuser", Password: "password", Name: "Test User"},
-			}
-			return saveUsers()
-		}
 		return err
 	}
 
