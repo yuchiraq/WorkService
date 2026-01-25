@@ -1,6 +1,7 @@
 package main
 
 import (
+	"html/template"
 	"log"
 	"strings"
 
@@ -22,7 +23,7 @@ func main() {
 	r := gin.Default()
 
 	// Add custom template functions
-	r.SetFuncMap(gin.H{
+	r.SetFuncMap(template.FuncMap{
 		"upper": strings.ToUpper,
 		"slice": func(s string, start, end int) string {
 			return s[start:end]
