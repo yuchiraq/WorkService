@@ -11,7 +11,6 @@ import (
 	"project/internal/storage"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 )
 
 // WorkersPage renders the list of workers with clickable cards.
@@ -243,26 +242,22 @@ func CreateWorker(c *gin.Context) {
 		return
 	}
 
+	userID, _ := c.Get("userID")
+	userName, _ := c.Get("userName")
+
 	newWorker := models.Worker{
-		ID:         uuid.New().String(),
-		Name:       c.PostForm("name"),
-		Position:   c.PostForm("position"),
-		Phone:      c.PostForm("phone"),
-		BirthDate:  c.PostForm("birth_date"),
-		HourlyRate: rate,
-		IsActive:   true,
+		Name:          c.PostForm("name"),
+		Position:      c.PostForm("position"),
+		Phone:         c.PostForm("phone"),
+		BirthDate:     c.PostForm("birth_date"),
+		HourlyRate:    rate,
+		CreatedBy:     userID.(string),
+		CreatedByName: userName.(string),
 	}
 
-	workers, err := storage.GetWorkers()
+	_, err = storage.CreateWorker(newWorker)
 	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to get workers: %v", err)
-		return
-	}
-
-	workers = append(workers, newWorker)
-
-	if err := storage.SaveWorkers(workers); err != nil {
-		c.String(http.StatusInternalServerError, "Failed to save worker: %v", err)
+		c.String(http.StatusInternalServerError, "Failed to create worker: %v", err)
 		return
 	}
 
@@ -381,37 +376,26 @@ func EditWorkerPage(c *gin.Context) {
 func UpdateWorker(c *gin.Context) {
 	workerID := c.Param("id")
 
+	worker, err := storage.GetWorkerByID(workerID)
+	if err != nil {
+		c.String(http.StatusNotFound, "Worker not found: %v", err)
+		return
+	}
+
 	rate, err := strconv.ParseFloat(c.PostForm("hourly_rate"), 64)
 	if err != nil {
 		c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
 		return
 	}
 
-	workers, err := storage.GetWorkers()
-	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
-		return
-	}
+	// Update fields from the form
+	worker.Name = c.PostForm("name")
+	worker.Position = c.PostForm("position")
+	worker.Phone = c.PostForm("phone")
+	worker.BirthDate = c.PostForm("birth_date")
+	worker.HourlyRate = rate
 
-	var workerFound bool
-	for i, w := range workers {
-		if w.ID == workerID {
-			workers[i].Name = c.PostForm("name")
-			workers[i].Position = c.PostForm("position")
-			workers[i].Phone = c.PostForm("phone")
-			workers[i].BirthDate = c.PostForm("birth_date")
-			workers[i].HourlyRate = rate
-			workerFound = true
-			break
-		}
-	}
-
-	if !workerFound {
-		c.String(http.StatusNotFound, "Worker with ID %s not found", workerID)
-		return
-	}
-
-	if err := storage.SaveWorkers(workers); err != nil {
+	if err := storage.UpdateWorker(worker); err != nil {
 		c.String(http.StatusInternalServerError, "Failed to save updated worker data: %v", err)
 		return
 	}
@@ -423,29 +407,8 @@ func UpdateWorker(c *gin.Context) {
 func DeleteWorker(c *gin.Context) {
 	workerID := c.Param("id")
 
-	workers, err := storage.GetWorkers()
-	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
-		return
-	}
-
-	var updatedWorkers []models.Worker
-	var workerFound bool
-	for _, worker := range workers {
-		if worker.ID != workerID {
-			updatedWorkers = append(updatedWorkers, worker)
-		} else {
-			workerFound = true
-		}
-	}
-
-	if !workerFound {
-		c.String(http.StatusNotFound, "Worker with ID %s not found to delete", workerID)
-		return
-	}
-
-	if err := storage.SaveWorkers(updatedWorkers); err != nil {
-		c.String(http.StatusInternalServerError, "Failed to save data after deleting worker: %v", err)
+	if err := storage.DeleteWorker(workerID); err != nil {
+		c.String(http.StatusInternalServerError, "Failed to delete worker: %v", err)
 		return
 	}
 
