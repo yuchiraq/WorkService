@@ -2,9 +2,7 @@ package main
 
 import (
 	"log"
-	"net/http"
 
-	"project/internal/api"
 	"project/internal/router"
 
 	"github.com/gin-gonic/gin"
@@ -13,33 +11,11 @@ import (
 func main() {
 	r := gin.Default()
 
-	// Serve static files
-	r.Static("/static", "./web/static")
-
-	// Load HTML templates
-	r.LoadHTMLGlob("web/templates/*")
-
-	// Redirect root to login
-	r.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/login")
-	})
-
-	// Login route
-	r.GET("/login", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "login.html", nil)
-	})
-
-	// API routes
-	apiGroup := r.Group("/api")
-	{
-		apiGroup.GET("/workers", api.GetWorkers)
-		apiGroup.POST("/workers", api.CreateWorker)
-	}
-
+	// Setup all routes from the router package
 	router.SetupRouter(r)
 
-	log.Println("Запуск HTTP-сервера на порту 8099")
+	log.Println("Starting HTTP server on port 8099")
 	if err := r.Run(":8099"); err != nil {
-		log.Fatalf("Ошибка запуска HTTP-сервера: %v", err)
+		log.Fatalf("Failed to start HTTP server: %v", err)
 	}
 }

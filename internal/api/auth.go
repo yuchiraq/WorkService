@@ -6,7 +6,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Login handles user login
+// Login handles user login.
 func Login(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"message": "Login endpoint"})
+	username := c.PostForm("username")
+	password := c.PostForm("password")
+
+	// Hardcoded credentials for demonstration
+	if username == "testuser" && password == "testpass" {
+		// In a real application, you would set a session cookie here.
+		c.Redirect(http.StatusFound, "/workers")
+		return
+	}
+
+	// On failure, redirect back to login with an error message
+	c.Redirect(http.StatusFound, "/login?error=Invalid+credentials")
+}
+
+// Dashboard renders the dashboard page.
+func Dashboard(c *gin.Context) {
+	c.HTML(http.StatusOK, "dashboard.html", nil)
 }

@@ -9,23 +9,49 @@ import (
 )
 
 func SetupRouter(r *gin.Engine) {
+	// Load all HTML templates, including partials
 	r.LoadHTMLGlob("web/templates/*")
 
-	// API group
+	// Serve static files (CSS, JS, images)
+	r.Static("/static", "./web/static")
+
+	// Redirect root to the login page
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/login")
+	})
+
+	// --- Web Pages ---
+
+	// Auth
+	r.GET("/login", func(c *gin.Context) {
+		c.HTML(http.StatusOK, "login.html", gin.H{"error": c.Query("error")})
+	})
+	r.POST("/login", api.Login)
+
+	// Dashboard
+	r.GET("/dashboard", api.Dashboard)
+
+	// Worker Pages
+	workerPages := r.Group("/workers")
+	{
+		workerPages.GET("/", func(c *gin.Context) {
+			c.HTML(http.StatusOK, "workers.html", nil)
+		})
+		workerPages.GET("/new", func(c *gin.Context) {
+			c.HTML(http.StatusOK, "add-worker.html", nil)
+		})
+	}
+
+	// --- API Endpoints ---
 	apiGroup := r.Group("/api")
 	{
 		// Ping test
 		apiGroup.GET("/ping", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"message": "pong",
-			})
+			c.JSON(http.StatusOK, gin.H{"message": "pong"})
 		})
 
 		// User routes
-		userRoutes := apiGroup.Group("/users")
-		{
-			userRoutes.POST("/", api.CreateUser)
-		}
+		apiGroup.POST("/users", api.CreateUser)
 
 		// Article routes
 		articleRoutes := apiGroup.Group("/articles")
@@ -34,24 +60,12 @@ func SetupRouter(r *gin.Engine) {
 			articleRoutes.GET("/:id", api.GetArticle)
 			articleRoutes.PUT("/:id", api.UpdateArticle)
 		}
-	}
 
-	// Web group
-	webGroup := r.Group("/web")
-	{
-		webGroup.GET("/login", func(c *gin.Context) {
-			c.HTML(http.StatusOK, "login.html", nil)
-		})
-		webGroup.POST("/login", api.Login)
-		// Dashboard route
-		webGroup.GET("/dashboard", api.Dashboard)
+		// Worker API routes
+		workerApiRoutes := apiGroup.Group("/workers")
+		{
+			workerApiRoutes.GET("/", api.GetWorkers)
+			workerApiRoutes.POST("/", api.CreateWorker)
+		}
 	}
-
-	// Workers pages
-	r.GET("/workers", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "workers.html", nil)
-	})
-	r.GET("/workers/new", func(c *gin.Context) {
-		c.HTML(http.StatusOK, "add-worker.html", nil)
-	})
 }

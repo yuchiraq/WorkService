@@ -1,41 +1,18 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Панель управления</title>
+    <title>Dashboard</title>
     <link rel="stylesheet" href="/static/css/styles.css">
 </head>
-<body class="dashboard-body">
-    <nav class="navbar">
-        <div class="navbar-brand">Панель</div>
-        <div class="navbar-links">
-            <a href="#">Профиль</a>
-            <a href="/web/login">Выход</a>
+<body>
+    {{ template "navigation.html" . }}
+
+    <div class="content">
+        <div class="container">
+            <h1>Dashboard</h1>
+            <p>Welcome to the dashboard!</p>
         </div>
-    </nav>
-    <div class="container">
-        <aside class="sidebar">
-            <nav class="sidebar-nav">
-                <ul>
-                    <li><a href="#" class="active">Главная</a></li>
-                    <li><a href="#">Статьи</a></li>
-                    <li><a href="#">Пользователи</a></li>
-                    <li><a href="#">Настройки</a></li>
-                </ul>
-            </nav>
-        </aside>
-        <main class="main-content">
-            <h1>Добро пожаловать, Admin!</h1>
-            <div class="card">
-                <h2>Статистика</h2>
-                <p>Здесь будет отображаться статистика сайта.</p>
-            </div>
-            <div class="card">
-                <h2>Последние действия</h2>
-                <p>Здесь будет лента последних действий.</p>
-            </div>
-        </main>
     </div>
 </body>
 </html>
