@@ -78,7 +78,7 @@ func WorkersPage(c *gin.Context) {
 </html>`
 
 	// Build the final HTML by replacing placeholders
-	sidebar := RenderSidebar("workers")
+	sidebar := RenderSidebar(c, "workers")
 	finalHTML := fmt.Sprintf(pageTemplate, workersGridHTML.String())
 	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, 1)
 
@@ -162,7 +162,7 @@ func WorkerProfilePage(c *gin.Context) {
 </html>`
 
 	// Build the final HTML by replacing placeholders
-	sidebar := RenderSidebar("workers")
+	sidebar := RenderSidebar(c, "workers")
 	finalHTML := pageTemplate
 	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, -1)
 	finalHTML = strings.Replace(finalHTML, "{{WORKER_NAME}}", template.HTMLEscapeString(worker.Name), -1)
@@ -228,7 +228,7 @@ func AddWorkerPage(c *gin.Context) {
 </body>
 </html>`
 
-	sidebar := RenderSidebar("workers")
+	sidebar := RenderSidebar(c, "workers")
 	finalHTML := strings.Replace(pageTemplate, "{{SIDEBAR_HTML}}", sidebar, 1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
@@ -359,7 +359,7 @@ func EditWorkerPage(c *gin.Context) {
 </body>
 </html>`
 
-	sidebar := RenderSidebar("workers")
+	sidebar := RenderSidebar(c, "workers")
 	finalHTML := pageTemplate
 	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, -1)
 	finalHTML = strings.Replace(finalHTML, "{{WORKER_ID}}", template.HTMLEscapeString(worker.ID), -1)

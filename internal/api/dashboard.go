@@ -35,7 +35,7 @@ func DashboardPage(c *gin.Context) {
 </html>`
 
 	// Generate the sidebar with the active page set to "dashboard"
-	sidebar := RenderSidebar("dashboard")
+	sidebar := RenderSidebar(c, "dashboard")
 
 	// Create the final HTML by injecting the username and sidebar
 	pageContent := fmt.Sprintf(pageTemplate, userName)
