@@ -29,6 +29,7 @@ func SetupRouter(r *gin.Engine) {
 
 	// Serve static files (CSS, JS, images)
 	r.Static("/static", "./web/static")
+    r.StaticFile("/favicon.ico", "./web/static/img/favicon.ico")
 
 	// --- Public Routes ---
 	// Redirect root to login page
