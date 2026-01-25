@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"project/internal/models"
@@ -25,8 +24,11 @@ func WorkersPage(c *gin.Context) {
 	for _, worker := range workers {
 		runes := []rune(worker.Name)
 		initials := ""
-		if len(runes) > 0 { initials = string(runes[0]) }
-		if len(runes) > 1 { initials = string(runes[0:2]) }
+		if len(runes) > 1 {
+			initials = string(runes[0:2])
+		} else if len(runes) > 0 {
+			initials = string(runes[0])
+		}
 
 		cardHTML := fmt.Sprintf(`
             <a href="/worker/%s" class="worker-card-link-wrapper">
@@ -39,8 +41,7 @@ func WorkersPage(c *gin.Context) {
                         </div>
                     </div>
                     <div class="worker-card-footer">
-                        <span class="btn btn-secondary">Редакт.</span>
-                        <span class="btn btn-danger">Удалить</span>
+                        <span class="btn btn-secondary">Просмотр</span>
                     </div>
                 </div>
             </a>`,
@@ -61,7 +62,7 @@ func WorkersPage(c *gin.Context) {
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <aside class="sidebar"> ... </aside>
+    {{SIDEBAR_HTML}}
     <div class="main-content">
         <div class="page-header">
             <h1>Работники</h1>
@@ -75,10 +76,10 @@ func WorkersPage(c *gin.Context) {
 </body>
 </html>`
 
-	// For simplicity, sidebar is static here. You could use a template replacement for it.
-	sidebarHTML := `... HTML ...` // assume this is populated
+	// Build the final HTML by replacing placeholders
+	sidebar := RenderSidebar("workers")
 	finalHTML := fmt.Sprintf(pageTemplate, workersGridHTML.String())
-    finalHTML = strings.Replace(finalHTML, "<aside class="sidebar"> ... </aside>", sidebarHTML, 1)
+	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, 1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
@@ -92,83 +93,84 @@ func WorkerProfilePage(c *gin.Context) {
 		return
 	}
 
-	// UTF-8 safe initials
 	runes := []rune(worker.Name)
 	initials := ""
-	if len(runes) > 0 { initials = string(runes[0]) }
-	if len(runes) > 1 { initials = string(runes[0:2]) }
+	if len(runes) > 1 {
+		initials = string(runes[0:2])
+	} else if len(runes) > 0 {
+		initials = string(runes[0])
+	}
 
-	// Format birth date if not empty
 	formattedBirthDate := "Не указана"
 	if worker.BirthDate != "" {
-		// This assumes date is in YYYY-MM-DD. A real app should parse and format it.
 		parts := strings.Split(worker.BirthDate, "-")
 		if len(parts) == 3 {
 			formattedBirthDate = fmt.Sprintf("%s.%s.%s", parts[2], parts[1], parts[0])
 		}
 	}
 
-    pageHTML := fmt.Sprintf(`
+	pageTemplate := `
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Профиль: %s</title>
+    <title>Профиль: {{WORKER_NAME}}</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body>
-    <aside class="sidebar"> ... </aside>
-    <div class="main-content">
+    {{SIDEBAR_HTML}}
+    <div class="main-content"> 
         <a href="/workers" class="back-link"><svg viewBox="0 0 16 16"><path d="M11.9,8.5H4.1l3.3,3.3c0.2,0.2,0.2,0.5,0,0.7s-0.5,0.2-0.7,0l-4-4C2.6,8.4,2.5,8.2,2.5,8s0.1-0.4,0.2-0.5l4-4c0.2-0.2,0.5-0.2,0.7,0s0.2,0.5,0,0.7L4.1,7.5H11.9c0.3,0,0.5,0.2,0.5,0.5S12.2,8.5,11.9,8.5z"/></svg>К списку работников</a>
 
         <div class="profile-header-container">
             <div class="profile-header">
-                <div class="worker-avatar">%s</div>
+                <div class="worker-avatar">{{INITIALS}}</div>
                 <div class="profile-header-info">
-                    <h1>Профиль: %s</h1>
-                    <p>%s</p>
+                    <h1>Профиль: {{WORKER_NAME}}</h1>
+                    <p>{{POSITION}}</p>
                 </div>
             </div>
             <div class="profile-actions">
                 <div class="status-badge active"><svg viewBox="0 0 16 16"><path d="M8,0C3.6,0,0,3.6,0,8s3.6,8,8,8s8-3.6,8-8S12.4,0,8,0z M7,11.4L3.6,8L5,6.6l2,2l4-4L12.4,6L7,11.4z"/></svg>Активен</div>
-                <a href="/workers/edit/%s" class="btn btn-secondary">Редактировать</a>
+                <a href="/workers/edit/{{WORKER_ID}}" class="btn btn-secondary">Редактировать</a>
             </div>
         </div>
 
         <ul class="profile-details">
-            <li><svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>Дата рождения: %s</li>
-            <li><svg viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg>%s</li>
-            <li><svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-.96.74-1.75 2.2-1.75 1.45 0 2.2.8 2.2 1.75h2c0-1.93-1.57-3.5-4.2-3.5-2.64 0-4.2 1.57-4.2 3.5 0 1.93 1.57 3.5 4.2 3.5 2.64 0 4.2-1.57 4.2-3.5h-2c0 .96-.75 1.75-2.2 1.75-1.45 0-2.2-.8-2.2-1.75 0-.96.75-1.75 2.2-1.75s2.2.8 2.2 1.75h2c0-1.93-1.57-3.5-4.2-3.5z"/></svg>Ставка: %.2f руб/час</li>
+            <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M6 8V7a4 4 0 118 0v1h2V7a6 6 0 10-12 0v1h2zm6 2H8v6h4v-6z"/></svg>Дата рождения: {{BIRTH_DATE}}</li>
+            <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>{{PHONE}}</li>
+            <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11a1 1 0 11-2 0v-2a1 1 0 112 0v2zm-1-4a1 1 0 01-1-1V7a1 1 0 112 0v1a1 1 0 01-1 1z"/></svg>Ставка: {{RATE}} руб/час</li>
         </ul>
 
         <div class="profile-grid">
             <div class="placeholder-card">
                  <div class="history-header"><h2>История назначений</h2></div>
-                 <div class="icon">...</div> <h3>Назначений нет</h3> <p>Для этого работника нет назначений.</p>
+                 <div class="icon"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M3 3a1 1 0 000 2v8a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 000-2H3zm11 1H6v2h8V4zm-8 4H4v2h2V8zm0 3H4v2h2v-2zm4-3h4v2h-4V8zm0 3h4v2h-4v-2z"/></svg></div>
+                 <h3>Назначений нет</h3>
+                 <p>Для этого работника нет назначений.</p>
             </div>
             <div class="placeholder-card">
                  <div class="history-header"><h2>История событий</h2></div>
-                 <div class="icon">...</div> <h3>Событий не найдено</h3> <p>Для этого работника еще не было зарегистрировано событий.</p>
+                 <div class="icon"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-1.707 1.707A1 1 0 003 15v1a1 1 0 001 1h12a1 1 0 001-1v-1a1 1 0 00-.293-.707L16 11.586V8a6 6 0 00-6-6zm0 14a2 2 0 110-4 2 2 0 010 4z"/></svg></div>
+                 <h3>Событий не найдено</h3>
+                 <p>Для этого работника еще не было зарегистрировано событий.</p>
             </div>
         </div>
     </div>
 </body>
-</html>`,
-        worker.Name,
-        strings.ToUpper(initials),
-        template.HTMLEscapeString(worker.Name),
-        template.HTMLEscapeString(worker.Position),
-        template.HTMLEscapeString(worker.ID),
-        template.HTMLEscapeString(formattedBirthDate),
-        template.HTMLEscapeString(worker.Phone),
-        worker.HourlyRate,
-    )
+</html>`
 
-    // For simplicity, sidebar is static here. You could use a template replacement for it.
-	sidebarHTML := `... HTML ...` // assume this is populated
-	finalHTML := strings.Replace(pageHTML, "<aside class="sidebar"> ... </aside>", sidebarHTML, 1)
+	// Build the final HTML by replacing placeholders
+	sidebar := RenderSidebar("workers")
+	finalHTML := pageTemplate
+	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, -1)
+	finalHTML = strings.Replace(finalHTML, "{{WORKER_NAME}}", template.HTMLEscapeString(worker.Name), -1)
+	finalHTML = strings.Replace(finalHTML, "{{INITIALS}}", template.HTMLEscapeString(strings.ToUpper(initials)), -1)
+	finalHTML = strings.Replace(finalHTML, "{{POSITION}}", template.HTMLEscapeString(worker.Position), -1)
+	finalHTML = strings.Replace(finalHTML, "{{WORKER_ID}}", template.HTMLEscapeString(worker.ID), -1)
+	finalHTML = strings.Replace(finalHTML, "{{BIRTH_DATE}}", template.HTMLEscapeString(formattedBirthDate), -1)
+	finalHTML = strings.Replace(finalHTML, "{{PHONE}}", template.HTMLEscapeString(worker.Phone), -1)
+	finalHTML = strings.Replace(finalHTML, "{{RATE}}", fmt.Sprintf("%.2f", worker.HourlyRate), -1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
-
-// Other functions remain unchanged ...

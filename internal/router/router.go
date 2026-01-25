@@ -10,6 +10,9 @@ func SetupRouter(r *gin.Engine) {
 	// Serve static files (CSS, JS, images)
 	r.Static("/static", "./web/static")
 
+	// Handle 404 Not Found errors
+	r.NoRoute(api.NotFoundPage)
+
 	// Auth routes
 	r.GET("/login", api.LoginPage)
 	r.POST("/login", api.Login)
@@ -24,7 +27,7 @@ func SetupRouter(r *gin.Engine) {
 
 		// Workers
 		authRequired.GET("/workers", api.WorkersPage)
-		authRequired.GET("/worker/:id", api.WorkerProfilePage) // New route
+		authRequired.GET("/worker/:id", api.WorkerProfilePage)
 		authRequired.GET("/workers/new", api.AddWorkerPage)
 		authRequired.POST("/workers/new", api.CreateWorker)
 		authRequired.GET("/workers/edit/:id", api.EditWorkerPage)
