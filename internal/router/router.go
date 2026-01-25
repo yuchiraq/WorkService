@@ -34,7 +34,7 @@ func SetupRouter(r *gin.Engine) {
 	// --- Public Routes ---
 	r.GET("/", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/login") })
 	r.GET("/login", func(c *gin.Context) {
-		r.LoadHTMLFiles("web/templates/login.html")
+		r.LoadHTMLFiles("web/templates/login.html") // Login page doesn't use the main layout
 		c.HTML(http.StatusOK, "login.html", gin.H{"error": c.Query("error")})
 	})
 	r.POST("/login", api.Login)
@@ -47,8 +47,8 @@ func SetupRouter(r *gin.Engine) {
 		authenticated.GET("/dashboard", func(c *gin.Context) {
 			session := sessions.Default(c)
 			userName := session.Get("userName")
-			r.LoadHTMLFiles("web/templates/layout.html", "web/templates/navigation.html", "web/templates/dashboard.html")
-			c.HTML(http.StatusOK, "layout.html", gin.H{
+			r.LoadHTMLFiles("web/templates/navigation.html", "web/templates/dashboard.html")
+			c.HTML(http.StatusOK, "navigation.html", gin.H{
 				"pageTitle": "Панель управления",
 				"active":    "dashboard",
 				"userName":  userName,
@@ -59,8 +59,8 @@ func SetupRouter(r *gin.Engine) {
 		authenticated.GET("/workers", func(c *gin.Context) {
 			workers, _ := storage.GetWorkers()
 			userName := sessions.Default(c).Get("userName")
-			r.LoadHTMLFiles("web/templates/layout.html", "web/templates/navigation.html", "web/templates/workers.html")
-			c.HTML(http.StatusOK, "layout.html", gin.H{
+			r.LoadHTMLFiles("web/templates/navigation.html", "web/templates/workers.html")
+			c.HTML(http.StatusOK, "navigation.html", gin.H{
 				"pageTitle": "Работники",
 				"active":    "workers",
 				"workers":   workers,
@@ -70,8 +70,8 @@ func SetupRouter(r *gin.Engine) {
 
 		authenticated.GET("/workers/new", func(c *gin.Context) {
 			userName := sessions.Default(c).Get("userName")
-			r.LoadHTMLFiles("web/templates/layout.html", "web/templates/navigation.html", "web/templates/add-worker.html")
-			c.HTML(http.StatusOK, "layout.html", gin.H{
+			r.LoadHTMLFiles("web/templates/navigation.html", "web/templates/add-worker.html")
+			c.HTML(http.StatusOK, "navigation.html", gin.H{
 				"pageTitle": "Добавить работника",
 				"active":    "workers",
 				"userName":  userName,
@@ -82,8 +82,8 @@ func SetupRouter(r *gin.Engine) {
 			workerID := c.Param("id")
 			worker, _ := storage.GetWorkerByID(workerID)
 			userName := sessions.Default(c).Get("userName")
-			r.LoadHTMLFiles("web/templates/layout.html", "web/templates/navigation.html", "web/templates/edit-worker.html")
-			c.HTML(http.StatusOK, "layout.html", gin.H{
+			r.LoadHTMLFiles("web/templates/navigation.html", "web/templates/edit-worker.html")
+			c.HTML(http.StatusOK, "navigation.html", gin.H{
 				"pageTitle": "Редактировать работника",
 				"active":    "workers",
 				"worker":    worker,
