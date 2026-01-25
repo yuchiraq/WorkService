@@ -5,7 +5,6 @@ import (
 	"errors"
 	"os"
 	"sync"
-	"time"
 
 	"project/internal/models"
 
@@ -37,7 +36,6 @@ func LoadWorkers() error {
 
 // saveWorkers writes the current state of the workers slice to the workers.json file.
 func saveWorkers() error {
-	// This function should be called with a Lock, not RLock
 	data, err := json.MarshalIndent(workers, "", "    ")
 	if err != nil {
 		return err
@@ -71,12 +69,10 @@ func CreateWorker(worker models.Worker) (models.Worker, error) {
 	defer workersMutex.Unlock()
 
 	worker.ID = uuid.New().String()
-	worker.CreatedAt = time.Now()
 
 	workers = append(workers, worker)
 
 	if err := saveWorkers(); err != nil {
-		// If saving fails, revert the addition to maintain consistency.
 		workers = workers[:len(workers)-1]
 		return models.Worker{}, err
 	}
@@ -92,12 +88,8 @@ func UpdateWorker(updatedWorker models.Worker) error {
 	for i, worker := range workers {
 		if worker.ID == updatedWorker.ID {
 			// Preserve original creation info
-			updatedWorker.CreatedAt = worker.CreatedAt
 			updatedWorker.CreatedBy = worker.CreatedBy
 			updatedWorker.CreatedByName = worker.CreatedByName
-
-			// Set new update info
-			updatedWorker.UpdatedAt = time.Now()
 
 			workers[i] = updatedWorker
 			return saveWorkers()

@@ -4,16 +4,28 @@
 
     <form action="/workers/edit/{{.worker.ID}}" method="POST" class="form-container">
         <div class="form-group">
-            <label for="firstName">Имя</label>
-            <input type="text" id="firstName" name="firstName" value="{{.worker.FirstName}}" required>
+            <label for="name">Полное имя</label>
+            <input type="text" id="name" name="name" value="{{.worker.Name}}" required>
         </div>
-        <div class="form-group">
-            <label for="lastName">Фамилия</label>
-            <input type="text" id="lastName" name="lastName" value="{{.worker.LastName}}" required>
-        </div>
+
         <div class="form-group">
             <label for="position">Должность</label>
             <input type="text" id="position" name="position" value="{{.worker.Position}}">
+        </div>
+
+        <div class="form-group">
+            <label for="phone">Телефон</label>
+            <input type="text" id="phone" name="phone" value="{{.worker.Phone}}">
+        </div>
+
+        <div class="form-group">
+            <label for="hourlyRate">Ставка в час</label>
+            <input type="number" step="0.01" id="hourlyRate" name="hourlyRate" value="{{.worker.HourlyRate}}">
+        </div>
+
+        <div class="form-group">
+            <label for="birthDate">Дата рождения</label>
+            <input type="date" id="birthDate" name="birthDate" value="{{.worker.BirthDate}}">
         </div>
 
         <div class="form-actions">
