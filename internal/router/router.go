@@ -9,6 +9,8 @@ import (
 )
 
 func SetupRouter(r *gin.Engine) {
+	r.LoadHTMLGlob("web/templates/*")
+
 	// API group
 	apiGroup := r.Group("/api")
 	{
@@ -19,6 +21,12 @@ func SetupRouter(r *gin.Engine) {
 			})
 		})
 
+		// User routes
+		userRoutes := apiGroup.Group("/users")
+		{
+			userRoutes.POST("/", api.CreateUser)
+		}
+
 		// Article routes
 		articleRoutes := apiGroup.Group("/articles")
 		{
@@ -28,9 +36,11 @@ func SetupRouter(r *gin.Engine) {
 		}
 	}
 
-	// Login route
-	r.POST("/login", api.Login)
-
-	// Dashboard route
-	r.GET("/dashboard", api.Dashboard)
+	// Web group
+	webGroup := r.Group("/web")
+	{
+		webGroup.POST("/login", api.Login)
+		// Dashboard route
+		webGroup.GET("/dashboard", api.Dashboard)
+	}
 }
