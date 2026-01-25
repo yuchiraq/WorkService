@@ -1,11 +1,8 @@
 package models
 
-import "gorm.io/gorm"
-
-// User represents a user of the system
+// User represents a user of the application
 type User struct {
-	gorm.Model
-	Login    string `json:"login" gorm:"unique"`
+	ID       int    `json:"id"`
+	Username string `json:"username"`
 	Password string `json:"password"`
-	Role     string `json:"role"` // Add Role field
 }

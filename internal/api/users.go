@@ -22,6 +22,7 @@ func CreateUser(c *gin.Context) {
 		return
 	}
 
+	user.ID = len(users) + 1
 	users = append(users, user)
 
 	if err := storage.WriteUsers(users); err != nil {
