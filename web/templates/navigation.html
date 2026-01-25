@@ -2,25 +2,26 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Управление работниками</title>
+    <title>Система Управления</title>
     <link rel="stylesheet" href="/static/css/styles.css">
+    <link rel="icon" href="/static/img/favicon.ico" type="image/x-icon">
 </head>
 <body>
-
     <div class="sidebar">
-        <h2>Меню</h2>
+        <h2>Управление</h2>
         <nav>
             <ul>
-                <li><a href="/dashboard">Главная</a></li>
-                <li><a href="/workers" class="active">Работники</a></li>
+                <!-- The 'active' class will be set dynamically by the template -->
+                <li><a href="/dashboard" {{if eq .active "dashboard"}}class="active"{{end}}>Главная</a></li>
+                <li><a href="/workers" {{if eq .active "workers"}}class="active"{{end}}>Работники</a></li>
             </ul>
         </nav>
         <a href="/logout" class="logout-btn">Выйти</a>
     </div>
 
-    <div class="content">
-        <!-- Content will be injected here -->
-    </div>
+    <main class="content">
+        {{template "content" .}}
+    </main>
 
 </body>
 </html>
