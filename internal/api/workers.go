@@ -18,23 +18,18 @@ func WorkersPage(c *gin.Context) {
 		return
 	}
 
-	// Use the new layout system
-	c.HTML(http.StatusOK, "layout.html", gin.H{
+	c.HTML(http.StatusOK, "workers.html", gin.H{
 		"title":       "Работники",
 		"workers":     workers,
-		"active_page": "workers", 
-		"user":        true, // Placeholder for logged-in user
-		"content":     "workers.html", // Specify which content to render
+		"active_page": "workers",
 	})
 }
 
 // AddWorkerPage displays the form to add a new worker.
 func AddWorkerPage(c *gin.Context) {
-	c.HTML(http.StatusOK, "layout.html", gin.H{
+	c.HTML(http.StatusOK, "add-worker.html", gin.H{
 		"title":       "Добавить работника",
 		"active_page": "workers",
-		"user":        true, 
-		"content":     "add-worker.html",
 	})
 }
 
@@ -47,12 +42,10 @@ func EditWorkerPage(c *gin.Context) {
 		return
 	}
 
-	c.HTML(http.StatusOK, "layout.html", gin.H{
+	c.HTML(http.StatusOK, "edit-worker.html", gin.H{
 		"title":       "Редактировать работника",
 		"worker":      worker,
 		"active_page": "workers",
-		"user":        true,
-		"content":     "edit-worker.html",
 	})
 }
 

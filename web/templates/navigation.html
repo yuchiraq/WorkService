@@ -1,0 +1,20 @@
+{{define "navigation.html"}}
+<aside class="sidebar">
+    <div class="sidebar-header">
+        <h2>Управление</h2>
+    </div>
+    <nav>
+        <ul>
+            <li class="{{if eq .active_page "dashboard"}}active{{end}}">
+                <a href="/dashboard">Главная</a>
+            </li>
+            <li class="{{if eq .active_page "workers"}}active{{end}}">
+                <a href="/workers">Работники</a>
+            </li>
+        </ul>
+    </nav>
+    <div class="sidebar-footer">
+        <a href="/logout">Выход</a>
+    </div>
+</aside>
+{{end}}
