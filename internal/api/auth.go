@@ -9,20 +9,28 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Login handles user login.
+// LoginPage renders the login page.
+func LoginPage(c *gin.Context) {
+	// This page does not use the main layout
+	c.HTML(http.StatusOK, "login.html", gin.H{
+		"title": "Вход",
+		"error": c.Query("error"),
+	})
+}
+
+// Login handles the authentication logic.
 func Login(c *gin.Context) {
-	session := sessions.Default(c)
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
-	// Find user in storage
-	user, err := storage.GetUserByUsername(username)
-	if err != nil || user.Password != password { // In a real app, compare hashed passwords
-		c.Redirect(http.StatusFound, "/login?error=Неверные учетные данные")
+	user, err := storage.ValidateUser(username, password)
+	if err != nil {
+		c.Redirect(http.StatusFound, "/login?error=Неверный логин или пароль")
 		return
 	}
 
-	// Set user session
+	// Set session
+	session := sessions.Default(c)
 	session.Set("userID", user.ID)
 	session.Set("userName", user.Name)
 	if err := session.Save(); err != nil {
@@ -36,10 +44,7 @@ func Login(c *gin.Context) {
 // Logout handles user logout.
 func Logout(c *gin.Context) {
 	session := sessions.Default(c)
-	session.Delete("userID")
-	session.Delete("userName")
-	if err := session.Save(); err != nil {
-		// Log the error, but still redirect
-	}
+	session.Clear()
+	_ = session.Save() // Try to save but ignore errors on logout
 	c.Redirect(http.StatusFound, "/login")
 }

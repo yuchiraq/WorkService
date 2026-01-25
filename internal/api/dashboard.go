@@ -7,12 +7,19 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// Dashboard handles the dashboard page
-func Dashboard(c *gin.Context) {
+// DashboardPage renders the main dashboard.
+func DashboardPage(c *gin.Context) {
 	session := sessions.Default(c)
 	userName := session.Get("userName")
+	userID := session.Get("userID")
 
-	c.HTML(http.StatusOK, "dashboard.html", gin.H{
-		"userName": userName,
+	c.HTML(http.StatusOK, "layout.html", gin.H{
+		"title":       "Панель управления",
+		"content":     "dashboard.html", // Specify content template
+		"active_page": "dashboard",
+		"user": gin.H{
+			"ID":   userID,
+			"Name": userName,
+		},
 	})
 }
