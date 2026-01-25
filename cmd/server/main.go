@@ -1,9 +1,7 @@
 package main
 
 import (
-	"html/template"
 	"log"
-	"strings"
 
 	"project/internal/router"
 	"project/internal/storage"
@@ -21,17 +19,6 @@ func main() {
 	}
 
 	r := gin.Default()
-
-	// Add custom template functions
-	r.SetFuncMap(template.FuncMap{
-		"upper": strings.ToUpper,
-		"slice": func(s string, start, end int) string {
-			return s[start:end]
-		},
-	})
-
-	// Use the simpler template loading method. This allows templates to be included in each other.
-	r.LoadHTMLGlob("web/templates/*.html")
 
 	// Setup all routes from the router package
 	router.SetupRouter(r)
