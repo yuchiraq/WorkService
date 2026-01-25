@@ -39,6 +39,9 @@ func SetupRouter(r *gin.Engine) {
 	// Web group
 	webGroup := r.Group("/web")
 	{
+		webGroup.GET("/login", func(c *gin.Context) {
+			c.HTML(http.StatusOK, "login.html", nil)
+		})
 		webGroup.POST("/login", api.Login)
 		// Dashboard route
 		webGroup.GET("/dashboard", api.Dashboard)
