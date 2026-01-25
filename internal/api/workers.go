@@ -9,15 +9,56 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GetWorkers handles the API request to retrieve all workers.
-func GetWorkers(c *gin.Context) {
+// WorkersPage displays the list of workers.
+func WorkersPage(c *gin.Context) {
 	workers, err := storage.GetWorkers()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve workers"})
+		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
 		return
 	}
-	c.JSON(http.StatusOK, workers)
+
+	c.HTML(http.StatusOK, "workers.html", gin.H{
+		"workers": workers,
+	})
 }
+
+// EditWorkerPage displays the form to edit an existing worker.
+func EditWorkerPage(c *gin.Context) {
+	workerID := c.Param("id")
+	worker, err := storage.GetWorkerByID(workerID)
+	if err != nil {
+		c.String(http.StatusNotFound, "Worker not found")
+		return
+	}
+
+	c.HTML(http.StatusOK, "edit-worker.html", gin.H{
+		"worker": worker,
+	})
+}
+
+// UpdateWorker handles the submission of the worker edit form.
+func UpdateWorker(c *gin.Context) {
+	workerID := c.Param("id")
+	var updatedWorker models.Worker
+
+	// Bind the form data to the struct
+	if err := c.ShouldBind(&updatedWorker); err != nil {
+		c.String(http.StatusBadRequest, "Invalid form data: %v", err)
+		return
+	}
+
+	updatedWorker.ID = workerID // Ensure the ID is set for the update
+
+	// In a real app, you would also update the 'UpdatedBy' fields, etc.
+
+	if err := storage.UpdateWorker(updatedWorker); err != nil {
+		c.String(http.StatusInternalServerError, "Failed to update worker: %v", err)
+		return
+	}
+
+	c.Redirect(http.StatusFound, "/workers")
+}
+
 
 // CreateWorker handles the API request to add a new worker.
 func CreateWorker(c *gin.Context) {
@@ -27,8 +68,6 @@ func CreateWorker(c *gin.Context) {
 		return
 	}
 
-	// In a real application, user info would come from the session/token.
-	// For demonstration, we're hardcoding it.
 	newWorker.CreatedBy = "u1"
 	newWorker.CreatedByName = "Admin"
 
@@ -50,5 +89,6 @@ func DeleteWorker(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Worker deleted successfully"})
+	// Redirect back to the workers list after deletion
+	c.Redirect(http.StatusFound, "/workers")
 }

@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"project/internal/api"
+	"project/internal/storage"
 
 	"github.com/gin-contrib/sessions"
 	"github.com/gin-contrib/sessions/cookie"
@@ -13,35 +14,27 @@ import (
 // Middleware to check if the user is authenticated
 func AuthRequired(c *gin.Context) {
 	session := sessions.Default(c)
-	user := session.Get("user")
-	if user == nil {
-		// User is not logged in, redirect to login page
+	userID := session.Get("userID")
+	if userID == nil {
 		c.Redirect(http.StatusFound, "/login?error=Требуется авторизация")
-		c.Abort() // Stop processing the request
+		c.Abort()
 		return
 	}
-	// User is authenticated, continue
 	c.Next()
 }
 
 func SetupRouter(r *gin.Engine) {
 	// Session management
-	store := cookie.NewStore([]byte("secret")) // Use a long, random secret key in a real app
+	store := cookie.NewStore([]byte("secret"))
 	r.Use(sessions.Sessions("mysession", store))
 
 	// Serve static files
 	r.Static("/static", "./web/static")
 
 	// --- Public Routes ---
-
-	// Redirect root to login
-	r.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusMovedPermanently, "/login")
-	})
-
-	// Login page
-	r.LoadHTMLFiles("web/templates/login.html")
+	r.GET("/", func(c *gin.Context) { c.Redirect(http.StatusMovedPermanently, "/login") })
 	r.GET("/login", func(c *gin.Context) {
+		r.LoadHTMLFiles("web/templates/login.html")
 		c.HTML(http.StatusOK, "login.html", gin.H{"error": c.Query("error")})
 	})
 	r.POST("/login", api.Login)
@@ -52,45 +45,68 @@ func SetupRouter(r *gin.Engine) {
 	{
 		// Dashboard
 		authenticated.GET("/dashboard", func(c *gin.Context) {
-			r.LoadHTMLFiles("web/templates/navigation.html", "web/templates/dashboard.html")
-			c.HTML(http.StatusOK, "navigation.html", gin.H{"active": "dashboard"})
+			session := sessions.Default(c)
+			userName := session.Get("userName")
+			r.LoadHTMLFiles("web/templates/layout.html", "web/templates/navigation.html", "web/templates/dashboard.html")
+			c.HTML(http.StatusOK, "layout.html", gin.H{
+				"pageTitle": "Панель управления",
+				"active":    "dashboard",
+				"userName":  userName,
+			})
 		})
 
 		// Worker Pages
 		authenticated.GET("/workers", func(c *gin.Context) {
-			r.LoadHTMLFiles("web/templates/navigation.html", "web/templates/workers.html")
-			c.HTML(http.StatusOK, "navigation.html", gin.H{"active": "workers"})
+			workers, _ := storage.GetWorkers()
+			userName := sessions.Default(c).Get("userName")
+			r.LoadHTMLFiles("web/templates/layout.html", "web/templates/navigation.html", "web/templates/workers.html")
+			c.HTML(http.StatusOK, "layout.html", gin.H{
+				"pageTitle": "Работники",
+				"active":    "workers",
+				"workers":   workers,
+				"userName":  userName,
+			})
 		})
+
 		authenticated.GET("/workers/new", func(c *gin.Context) {
-			r.LoadHTMLFiles("web/templates/navigation.html", "web/templates/add-worker.html")
-			c.HTML(http.StatusOK, "navigation.html", gin.H{"active": "workers"})
+			userName := sessions.Default(c).Get("userName")
+			r.LoadHTMLFiles("web/templates/layout.html", "web/templates/navigation.html", "web/templates/add-worker.html")
+			c.HTML(http.StatusOK, "layout.html", gin.H{
+				"pageTitle": "Добавить работника",
+				"active":    "workers",
+				"userName":  userName,
+			})
 		})
+
+		authenticated.GET("/workers/edit/:id", func(c *gin.Context) {
+			workerID := c.Param("id")
+			worker, _ := storage.GetWorkerByID(workerID)
+			userName := sessions.Default(c).Get("userName")
+			r.LoadHTMLFiles("web/templates/layout.html", "web/templates/navigation.html", "web/templates/edit-worker.html")
+			c.HTML(http.StatusOK, "layout.html", gin.H{
+				"pageTitle": "Редактировать работника",
+				"active":    "workers",
+				"worker":    worker,
+				"userName":  userName,
+			})
+		})
+		authenticated.POST("/workers/edit/:id", api.UpdateWorker)
+		authenticated.POST("/workers/delete/:id", api.DeleteWorker)
+
 
 		// Logout
 		authenticated.GET("/logout", api.Logout)
 	}
 
-	// --- API Endpoints (also authenticated) ---
+	// --- API Endpoints ---
 	apiGroup := r.Group("/api")
 	apiGroup.Use(AuthRequired)
 	{
-		// User routes
-		apiGroup.POST("/users", api.CreateUser)
-
-		// Article routes
-		articleRoutes := apiGroup.Group("/articles")
-		{
-			articleRoutes.POST("/", api.CreateArticle)
-			articleRoutes.GET("/:id", api.GetArticle)
-			articleRoutes.PUT("/:id", api.UpdateArticle)
-		}
-
 		// Worker API routes
 		workerApiRoutes := apiGroup.Group("/workers")
 		{
-			workerApiRoutes.GET("/", api.GetWorkers)
 			workerApiRoutes.POST("/", api.CreateWorker)
-			workerApiRoutes.DELETE("/:id", api.DeleteWorker)
+			workerApiRoutes.DELETE("/:id", api.DeleteWorker) // This is fine for an API
 		}
 	}
 }

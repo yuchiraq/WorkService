@@ -1,18 +1,21 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Dashboard</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
-</head>
-<body>
-    {{ template "navigation.html" . }}
+{{define "content"}}
+<div class="container">
+    <h1>Добро пожаловать, {{.userName}}!</h1>
+    <p>Это ваша панель управления. Здесь вы можете управлять работниками, проектами и другими аспектами вашей деятельности.</p>
 
-    <div class="content">
-        <div class="container">
-            <h1>Dashboard</h1>
-            <p>Welcome to the dashboard!</p>
+    <div class="stats">
+        <div class="stat-card">
+            <h2>Работники</h2>
+            <p>35</p>
+        </div>
+        <div class="stat-card">
+            <h2>Проекты</h2>
+            <p>12</p>
+        </div>
+        <div class="stat-card">
+            <h2>Задачи</h2>
+            <p>8</p>
         </div>
     </div>
-</body>
-</html>
+</div>
+{{end}}

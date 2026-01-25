@@ -1,76 +1,40 @@
 {{define "content"}}
 <div class="container">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-        <h1>Список работников</h1>
+    <div class="page-header">
+        <h1>Работники</h1>
         <a href="/workers/new" class="btn btn-primary">Добавить работника</a>
     </div>
 
-    <table id="workers-table">
-        <thead>
-            <tr>
-                <th>Имя</th>
-                <th>Должность</th>
-                <th>Дата приема</th>
-                <th>Статус</th>
-                <th>Действия</th>
-            </tr>
-        </thead>
-        <tbody>
-            <!-- Worker data will be dynamically inserted here -->
-        </tbody>
-    </table>
+    <div class="worker-list">
+        {{range .workers}}
+        <div class="worker-card">
+            <div class="worker-avatar">{{.FirstName | slice 0 1}}{{.LastName | slice 0 1}}</div>
+            <div class="worker-info">
+                <h3>{{.FirstName}} {{.LastName}}</h3>
+                <p>{{.Position}}</p>
+                <span>Ставка не указана</span>
+            </div>
+            <div class="worker-actions">
+                <a href="/workers/edit/{{.ID}}" class="btn btn-secondary">Редакт.</a>
+                <a href="#" class="btn btn-danger" onclick="confirmDelete('{{.ID}}'); return false;">Уволить</a>
+            </div>
+        </div>
+        {{else}}
+            <p>Работники не найдены. <a href="/workers/new">Добавьте первого!</a></p>
+        {{end}}
+    </div>
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        fetch('/api/workers')
-            .then(response => response.json())
-            .then(data => {
-                const tbody = document.querySelector('#workers-table tbody');
-                tbody.innerHTML = ''; // Clear existing rows
-
-                if (data && data.length) {
-                    data.forEach(worker => {
-                        const row = `
-                            <tr>
-                                <td>${worker.name}</td>
-                                <td>${worker.role}</td>
-                                <td>${new Date(worker.startDate).toLocaleDateString()}</td>
-                                <td>
-                                    <span class="status-badge ${worker.status === 'active' ? 'status-active' : 'status-dismissed'}">
-                                        ${worker.status}
-                                    </span>
-                                </td>
-                                <td>
-                                    <button class="btn btn-danger" onclick="deleteWorker('${worker.ID}')">Удалить</button>
-                                </td>
-                            </tr>
-                        `;
-                        tbody.innerHTML += row;
-                    });
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="5" style="text-align: center;">Нет данных о работниках</td></tr>';
-                }
-            });
-    });
-
-    function deleteWorker(id) {
-        if (!confirm('Вы уверены, что хотите удалить этого работника?')) {
-            return;
-        }
-
-        fetch(`/api/workers/${id}`, {
-            method: 'DELETE',
-        })
-        .then(response => {
-            if (response.ok) {
-                // Refresh the page to show the updated list
-                location.reload();
-            } else {
-                // Handle error
-                alert('Ошибка при удалении работника.');
-            }
-        });
+function confirmDelete(workerId) {
+    if (confirm("Вы уверены, что хотите уволить этого работника?")) {
+        // Create a form and submit it programmatically
+        let form = document.createElement('form');
+        form.method = 'POST';
+        form.action = '/workers/delete/' + workerId;
+        document.body.appendChild(form);
+        form.submit();
     }
+}
 </script>
 {{end}}
