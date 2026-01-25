@@ -49,11 +49,7 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 	header := `
 	<div class="sidebar-header">
 		<div class="logo">
-			<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-				<rect width="32" height="32" rx="8" fill="#FFD028"/>
-				<path d="M10 24V11.5C10 9.42857 12.6667 8 16 8C19.3333 8 22 9.42857 22 11.5V24" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round"/>
-				<path d="M13 24V15.5C13 14.1667 14.3333 13.5 16 13.5C17.6667 13.5 19 14.1667 19 15.5V24" stroke="#1A1A1A" stroke-width="2" stroke-linecap="round"/>
-			</svg>
+		<img src="/static/img/logo.svg" alt="logo"/>
 		</div>
 		<h2 class="company-name">АВАЮССТРОЙ</h2>
 	</div>`
