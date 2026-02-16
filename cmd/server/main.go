@@ -17,6 +17,9 @@ func main() {
 	if err := storage.LoadWorkers(); err != nil {
 		log.Fatalf("Failed to load workers: %v", err)
 	}
+	if err := storage.LoadObjects(); err != nil {
+		log.Fatalf("Failed to load objects: %v", err)
+	}
 
 	r := gin.Default()
 

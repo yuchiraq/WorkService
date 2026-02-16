@@ -332,7 +332,7 @@ nav li a svg {
     margin-bottom: 8px;
 }
 
-.form-group-edit input {
+.form-group-edit input, .form-group-edit select {
     width: 100%;
     padding: 12px;
     border: 1px solid var(--border-color);
@@ -356,6 +356,28 @@ nav li a svg {
     margin-top: 10px;
     padding-top: 20px;
     border-top: 1px solid var(--border-color);
+}
+
+
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th,
+.table td {
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.table th {
+    font-size: 13px;
+    color: var(--text-color-light);
+    text-transform: uppercase;
+    letter-spacing: .03em;
 }
 
 /* Modal for Delete Confirmation */

@@ -17,18 +17,20 @@ type navItem struct {
 
 // RenderSidebar generates the HTML for the sidebar, marking the specified page as active.
 func RenderSidebar(c *gin.Context, activePage string) string {
-	// Get user name from context
 	userNameValue, _ := c.Get("userName")
+	userStatusValue, _ := c.Get("userStatus")
 	userName := userNameValue.(string)
+	userStatus := userStatusValue.(string)
 
-	// Define navigation items
 	navItems := []navItem{
 		{PageID: "dashboard", Path: "/dashboard", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`, Label: "Панель управления"},
 		{PageID: "workers", Path: "/workers", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`, Label: "Работники"},
-		{PageID: "objects", Path: "#", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>`, Label: "Объекты"},
-		{PageID: "schedule", Path: "#", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`, Label: "Расписание"},
-		{PageID: "inventory", Path: "#", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>`, Label: "Инвентарь"},
-		{PageID: "reports", Path: "#", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>`, Label: "Отчеты"},
+		{PageID: "objects", Path: "/objects", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>`, Label: "Объекты"},
+		{PageID: "my-profile", Path: "/profile", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21a8 8 0 1 0-16 0"></path><circle cx="12" cy="7" r="4"></circle></svg>`, Label: "Мой профиль"},
+	}
+
+	if userStatus == "admin" {
+		navItems = append(navItems, navItem{PageID: "users", Path: "/users", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 11v6"></path><path d="M20 14h6"></path></svg>`, Label: "Пользователи"})
 	}
 
 	var itemsBuilder strings.Builder
@@ -45,7 +47,12 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 		firstRune, _ := utf8.DecodeRuneInString(userName)
 		userInitial = strings.ToUpper(string(firstRune))
 	}
-	
+
+	roleLabel := "Сотрудник"
+	if userStatus == "admin" {
+		roleLabel = "Администратор"
+	}
+
 	header := `
 	<div class="sidebar-header">
 		<div class="logo">
@@ -60,14 +67,14 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 			<div class="user-avatar"><span>%s</span></div>
 			<div class="user-info">
 				<span class="user-name">%s</span>
-				<span class="user-role">Программист</span>
+				<span class="user-role">%s</span>
 			</div>
 		</div>
 		<a href="/logout" class="logout-link">
 			<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
 			<span>Выйти</span>
 		</a>
-	</div>`, userInitial, userName)
+	</div>`, userInitial, userName, roleLabel)
 
 	return fmt.Sprintf(`
 	<aside class="sidebar">
