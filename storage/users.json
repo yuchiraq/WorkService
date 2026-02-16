@@ -1,8 +1,18 @@
 [
     {
-        "ID": "1",
-        "Username": "testuser",
-        "Password": "testpass",
-        "Name": "Test User"
+        "id": "1",
+        "username": "testuser",
+        "password": "testpass",
+        "name": "Test User",
+        "phone": "+7 (900) 000-00-01",
+        "status": "admin"
+    },
+    {
+        "id": "2",
+        "username": "manager",
+        "password": "manager123",
+        "name": "Иван Петров",
+        "phone": "+7 (900) 000-00-02",
+        "status": "user"
     }
 ]
