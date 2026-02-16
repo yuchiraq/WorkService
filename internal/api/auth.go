@@ -2,7 +2,6 @@ package api
 
 import (
 	"net/http"
-	"strings"
 	"time"
 
 	"project/internal/storage"
@@ -56,11 +55,9 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	// Set session cookie
-	cookieValue := user.ID + ":" + user.Username
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "session",
-		Value:    cookieValue,
+		Value:    user.ID,
 		Expires:  time.Now().Add(24 * time.Hour),
 		Path:     "/",
 		HttpOnly: true,
@@ -74,7 +71,7 @@ func Logout(c *gin.Context) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     "session",
 		Value:    "",
-		Expires:  time.Now().Add(-1 * time.Hour), // Set to a past time to delete
+		Expires:  time.Now().Add(-1 * time.Hour),
 		Path:     "/",
 		HttpOnly: true,
 	})
@@ -84,24 +81,36 @@ func Logout(c *gin.Context) {
 // AuthRequired is a middleware to ensure the user is authenticated.
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		cookie, err := c.Cookie("session")
-		if err != nil || cookie == "" {
+		userID, err := c.Cookie("session")
+		if err != nil || userID == "" {
 			c.Redirect(http.StatusFound, "/login")
 			c.Abort()
 			return
 		}
 
-		// Simple validation of the cookie value format
-		parts := strings.Split(cookie, ":")
-		if len(parts) != 2 {
+		user, err := storage.GetUserByID(userID)
+		if err != nil {
 			c.Redirect(http.StatusFound, "/login")
 			c.Abort()
 			return
 		}
 
-		// Set user info in context for other handlers to use
-		c.Set("userID", parts[0])
-		c.Set("userName", parts[1])
+		c.Set("userID", user.ID)
+		c.Set("userName", user.Name)
+		c.Set("userStatus", user.Status)
+
+		c.Next()
+	}
+}
+
+func AdminRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		statusValue, ok := c.Get("userStatus")
+		if !ok || statusValue.(string) != "admin" {
+			c.String(http.StatusForbidden, "Доступ запрещен")
+			c.Abort()
+			return
+		}
 
 		c.Next()
 	}
