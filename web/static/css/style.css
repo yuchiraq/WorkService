@@ -108,6 +108,18 @@ nav li a svg {
     border-top: 1px solid #333;
     padding-top: 20px;
 }
+
+.user-profile-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    border-radius: 8px;
+}
+
+.user-profile-link:hover {
+    background-color: var(--sidebar-hover-bg);
+}
+
 .user-profile {
     display: flex;
     align-items: center;
