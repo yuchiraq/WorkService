@@ -197,14 +197,14 @@ func renderTimesheetForm(c *gin.Context, entry models.TimesheetEntry, actionURL,
 <a href="/timesheets" class="back-link">← К табелю</a>
 <div class="page-header"><h1>{{TITLE}}</h1></div>
 <div class="card">
-<form action="{{ACTION_URL}}" method="POST" class="form-grid-edit">
+<form action="{{ACTION_URL}}" method="POST" class="form-grid-edit timesheet-form">
 <div class="form-group-edit form-group-name"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
 <div class="form-group-edit form-group-position"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
 <div class="form-group-edit form-group-phone"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
 <div class="form-group-edit form-group-rate"><label for="lunch_break_minutes">Обед</label><select id="lunch_break_minutes" name="lunch_break_minutes" required><option value="30"{{L30}}>30 минут</option><option value="60"{{L60}}>60 минут</option><option value="90"{{L90}}>90 минут</option></select></div>
-<div class="form-group-edit form-group-name"><label>Работники</label><div class="chips-grid">{{WORKER_CHECKS}}</div></div>
-<div class="form-group-edit form-group-position"><label>Объекты</label><div class="chips-grid">{{OBJECT_CHECKS}}</div></div>
-<div class="form-group-edit form-group-phone"><label for="notes">Комментарий</label><input id="notes" name="notes" type="text" value="{{NOTES}}" placeholder="Комментарий к смене"></div>
+<div class="form-group-edit timesheet-span-2"><label>Работники</label><div class="chips-grid">{{WORKER_CHECKS}}</div></div>
+<div class="form-group-edit timesheet-span-2"><label>Объекты</label><div class="chips-grid">{{OBJECT_CHECKS}}</div></div>
+<div class="form-group-edit timesheet-span-2"><label for="notes">Комментарий</label><input id="notes" name="notes" type="text" value="{{NOTES}}" placeholder="Комментарий к смене"></div>
 <div class="form-actions-edit"><button class="btn btn-primary" type="submit">{{SUBMIT}}</button><a href="/timesheets" class="btn btn-secondary">Отмена</a>{{DELETE_BUTTON}}</div>
 </form>
 </div>
