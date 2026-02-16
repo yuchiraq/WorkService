@@ -40,8 +40,9 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
     top: 0; 
     left: 0;
     display: flex; 
-    flex-direction: column; 
+    flex-direction: column;
     justify-content: space-between;
+    overflow: hidden;
     box-sizing: border-box;
     padding: 20px;
     z-index: 999;
@@ -78,6 +79,10 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
 }
 
 /* Sidebar Navigation */
+nav {
+    margin-bottom: 12px;
+}
+
 nav ul {
     list-style: none; 
     margin: 0; 
