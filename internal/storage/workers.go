@@ -51,7 +51,11 @@ func saveWorkers() error {
 func GetWorkers() ([]models.Worker, error) {
 	workersMutex.RLock()
 	defer workersMutex.RUnlock()
-	return workers, nil
+
+	workersCopy := make([]models.Worker, len(workers))
+	copy(workersCopy, workers)
+
+	return workersCopy, nil
 }
 
 // GetWorkerByID retrieves a single worker by their ID.
@@ -99,7 +103,6 @@ func UpdateWorker(updatedWorker models.Worker) error {
 
 	return errors.New("worker not found for update")
 }
-
 
 // DeleteWorker removes a worker from the list and saves the changes.
 func DeleteWorker(id string) error {
