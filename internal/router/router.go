@@ -34,15 +34,6 @@ func SetupRouter(r *gin.Engine) {
 		authRequired.POST("/objects/edit/:id", api.UpdateObject)
 		authRequired.POST("/objects/delete/:id", api.DeleteObject)
 
-		authRequired.GET("/timesheets", api.TimesheetsPage)
-		authRequired.GET("/timesheets/", api.TimesheetsPage)
-		authRequired.GET("/timesheet", api.TimesheetsPage)
-		authRequired.GET("/timesheets/new", api.AddTimesheetPage)
-		authRequired.POST("/timesheets/new", api.CreateTimesheet)
-		authRequired.GET("/timesheets/edit/:id", api.EditTimesheetPage)
-		authRequired.POST("/timesheets/edit/:id", api.UpdateTimesheet)
-		authRequired.POST("/timesheets/delete/:id", api.DeleteTimesheet)
-
 		authRequired.GET("/profile", api.ProfilePage)
 		authRequired.POST("/profile", api.UpdateProfile)
 	}

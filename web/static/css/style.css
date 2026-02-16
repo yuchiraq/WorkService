@@ -56,7 +56,6 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
 .sidebar-content {
     display: flex;
     flex-direction: column;
-    flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
     padding-right: 4px;
@@ -404,28 +403,6 @@ nav li a svg {
     color: var(--text-color-light);
     text-transform: uppercase;
     letter-spacing: .03em;
-}
-
-
-.chips-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 8px;
-}
-
-.check-chip {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 8px 10px;
-    background: #fff;
-}
-
-.check-chip input {
-    width: 16px;
-    height: 16px;
 }
 
 /* Modal for Delete Confirmation */
