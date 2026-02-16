@@ -52,6 +52,14 @@ h1, h2, h3, h4, h5, h6 { margin-top: 0; }
     padding: 30px; 
 }
 
+.sidebar-content {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
 /* Sidebar Header */
 .sidebar-header {
     display: flex;
@@ -108,6 +116,18 @@ nav li a svg {
     border-top: 1px solid #333;
     padding-top: 20px;
 }
+
+.user-profile-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    border-radius: 8px;
+}
+
+.user-profile-link:hover {
+    background-color: var(--sidebar-hover-bg);
+}
+
 .user-profile {
     display: flex;
     align-items: center;
@@ -196,6 +216,29 @@ nav li a svg {
 .worker-info h3 { margin: 0; font-size: 16px; font-weight: 600; }
 .worker-info p { margin: 0; color: var(--text-color-light); font-size: 14px; }
 .worker-card-footer { margin-top: auto; padding-top: 15px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 10px; }
+
+
+.workers-filters {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 16px;
+    margin: 20px 0 16px;
+    align-items: end;
+}
+
+.workers-filters .form-group {
+    margin-bottom: 0;
+}
+
+.filter-actions {
+    display: flex;
+    gap: 10px;
+}
+
+.workers-summary {
+    margin: 0 0 16px;
+    color: var(--text-color-light);
+}
 
 /* Login & Error Pages */
 .center-page {
@@ -309,7 +352,7 @@ nav li a svg {
     margin-bottom: 8px;
 }
 
-.form-group-edit input {
+.form-group-edit input, .form-group-edit select {
     width: 100%;
     padding: 12px;
     border: 1px solid var(--border-color);
@@ -333,6 +376,50 @@ nav li a svg {
     margin-top: 10px;
     padding-top: 20px;
     border-top: 1px solid var(--border-color);
+}
+
+
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.table th,
+.table td {
+    padding: 12px 10px;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.table th {
+    font-size: 13px;
+    color: var(--text-color-light);
+    text-transform: uppercase;
+    letter-spacing: .03em;
+}
+
+
+.chips-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 8px;
+}
+
+.check-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: #fff;
+}
+
+.check-chip input {
+    width: 16px;
+    height: 16px;
 }
 
 /* Modal for Delete Confirmation */
@@ -391,4 +478,15 @@ nav li a svg {
     color: var(--text-color-dark);
     text-decoration: none;
     cursor: pointer;
+}
+
+
+@media (max-width: 900px) {
+    .workers-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .filter-actions {
+        justify-content: flex-start;
+    }
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,47 @@ import (
 )
 
 // WorkersPage renders the list of workers with clickable cards.
+
+func filterWorkers(workers []models.Worker, searchQuery, positionFilter string) []models.Worker {
+	search := strings.ToLower(strings.TrimSpace(searchQuery))
+	position := strings.TrimSpace(positionFilter)
+
+	if search == "" && position == "" {
+		return workers
+	}
+
+	filtered := make([]models.Worker, 0, len(workers))
+	for _, worker := range workers {
+		nameMatch := search == "" || strings.Contains(strings.ToLower(worker.Name), search)
+		positionMatch := position == "" || worker.Position == position
+		if nameMatch && positionMatch {
+			filtered = append(filtered, worker)
+		}
+	}
+
+	return filtered
+}
+
+func uniquePositions(workers []models.Worker) []string {
+	positionsSet := make(map[string]struct{})
+	positions := make([]string, 0)
+
+	for _, worker := range workers {
+		position := strings.TrimSpace(worker.Position)
+		if position == "" {
+			continue
+		}
+		if _, exists := positionsSet[position]; exists {
+			continue
+		}
+		positionsSet[position] = struct{}{}
+		positions = append(positions, position)
+	}
+
+	sort.Strings(positions)
+	return positions
+}
+
 func WorkersPage(c *gin.Context) {
 	workers, err := storage.GetWorkers()
 	if err != nil {
@@ -21,8 +63,22 @@ func WorkersPage(c *gin.Context) {
 		return
 	}
 
+	searchQuery := c.Query("q")
+	selectedPosition := c.Query("position")
+	filteredWorkers := filterWorkers(workers, searchQuery, selectedPosition)
+	positions := uniquePositions(workers)
+
+	var positionOptionsHTML strings.Builder
+	for _, position := range positions {
+		selectedAttr := ""
+		if position == selectedPosition {
+			selectedAttr = " selected"
+		}
+		positionOptionsHTML.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, template.HTMLEscapeString(position), selectedAttr, template.HTMLEscapeString(position)))
+	}
+
 	var workersGridHTML strings.Builder
-	for _, worker := range workers {
+	for _, worker := range filteredWorkers {
 		runes := []rune(worker.Name)
 		initials := ""
 		if len(runes) > 1 {
@@ -71,6 +127,24 @@ func WorkersPage(c *gin.Context) {
         </div>
         <div class="card">
             <p>Просмотр, добавление, редактирование или увольнение работников.</p>
+            <form action="/workers" method="GET" class="workers-filters">
+                <div class="form-group">
+                    <label for="q">Поиск по Ф.И.О.</label>
+                    <input type="text" id="q" name="q" value="{{SEARCH_QUERY}}" placeholder="Например: Иванов">
+                </div>
+                <div class="form-group">
+                    <label for="position">Фильтр по должности</label>
+                    <select id="position" name="position">
+                        <option value="">Все должности</option>
+                        {{POSITION_OPTIONS}}
+                    </select>
+                </div>
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">Применить</button>
+                    <a href="/workers" class="btn btn-secondary">Сбросить</a>
+                </div>
+            </form>
+            <p class="workers-summary">Найдено: <strong>{{FILTERED_COUNT}}</strong> из <strong>{{TOTAL_COUNT}}</strong>.</p>
             <div class="workers-grid">%s</div>
         </div>
     </div>
@@ -81,6 +155,10 @@ func WorkersPage(c *gin.Context) {
 	sidebar := RenderSidebar(c, "workers")
 	finalHTML := fmt.Sprintf(pageTemplate, workersGridHTML.String())
 	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, 1)
+	finalHTML = strings.Replace(finalHTML, "{{SEARCH_QUERY}}", template.HTMLEscapeString(searchQuery), 1)
+	finalHTML = strings.Replace(finalHTML, "{{POSITION_OPTIONS}}", positionOptionsHTML.String(), 1)
+	finalHTML = strings.Replace(finalHTML, "{{FILTERED_COUNT}}", strconv.Itoa(len(filteredWorkers)), 1)
+	finalHTML = strings.Replace(finalHTML, "{{TOTAL_COUNT}}", strconv.Itoa(len(workers)), 1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
