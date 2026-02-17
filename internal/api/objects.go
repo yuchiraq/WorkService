@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"sort"
 	"strings"
 
 	"project/internal/models"
@@ -66,12 +67,14 @@ func ObjectsPage(c *gin.Context) {
 		if object.Status == "completed" {
 			statusClass = "warning"
 		}
-		cards.WriteString(fmt.Sprintf(`<article class="info-card object-card"><div class="info-card-header"><h3>%s</h3><span class="status-badge %s">%s</span></div><div class="details-list"><div class="detail-row"><span>Адрес</span><strong>%s</strong></div><div class="detail-row"><span>Ответственный</span><strong>%s</strong></div></div><div class="info-card-actions"><a class="btn btn-secondary" href="/objects/edit/%s" data-modal-url="/objects/edit/%s" data-modal-title="Редактировать объект" data-modal-return="/objects?tab=%s">Редактировать</a></div></article>`,
+		cards.WriteString(fmt.Sprintf(`<article class="info-card object-card"><div class="info-card-header"><h3><a class="entity-link" href="/object/%s">%s</a></h3><span class="status-badge %s">%s</span></div><div class="details-list"><div class="detail-row"><span>Адрес</span><strong>%s</strong></div><div class="detail-row"><span>Ответственный</span><strong>%s</strong></div></div><div class="info-card-actions"><a class="btn btn-secondary" href="/object/%s">Открыть</a><a class="btn btn-secondary" href="/objects/edit/%s" data-modal-url="/objects/edit/%s" data-modal-title="Редактировать объект" data-modal-return="/objects?tab=%s">Редактировать</a></div></article>`,
+			template.HTMLEscapeString(object.ID),
 			template.HTMLEscapeString(object.Name),
 			template.HTMLEscapeString(statusClass),
 			template.HTMLEscapeString(objectStatusLabel(object.Status)),
 			template.HTMLEscapeString(object.Address),
 			template.HTMLEscapeString(responsible),
+			template.HTMLEscapeString(object.ID),
 			template.HTMLEscapeString(object.ID),
 			template.HTMLEscapeString(object.ID),
 			template.HTMLEscapeString(selectedTab),
@@ -248,6 +251,79 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
 	final = strings.Replace(final, "{{DELETE_SECTION}}", deleteSection, 1)
 	final = strings.Replace(final, "{{OBJECT_ID}}", template.HTMLEscapeString(object.ID), -1)
 
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
+}
+
+func ObjectProfilePage(c *gin.Context) {
+	objectID := c.Param("id")
+	object, err := storage.GetObjectByID(objectID)
+	if err != nil {
+		c.String(http.StatusNotFound, "Object not found")
+		return
+	}
+
+	users, _ := storage.GetUsers()
+	responsible := "Не назначен"
+	for _, u := range users {
+		if u.ID == object.ResponsibleUserID {
+			responsible = u.Name
+			break
+		}
+	}
+
+	entries, _ := storage.GetTimesheets()
+	workersMap, _ := buildWorkersMap()
+	related := make([]models.TimesheetEntry, 0)
+	for _, entry := range entries {
+		for _, oid := range entry.ObjectIDs {
+			if oid == object.ID {
+				related = append(related, entry)
+				break
+			}
+		}
+	}
+	sort.Slice(related, func(i, j int) bool {
+		if related[i].Date == related[j].Date {
+			return related[i].StartTime > related[j].StartTime
+		}
+		return related[i].Date > related[j].Date
+	})
+
+	var assignments strings.Builder
+	if len(related) == 0 {
+		assignments.WriteString(`<div class="info-card"><p>По объекту пока нет назначений.</p></div>`)
+	} else {
+		for _, entry := range related {
+			commentHTML := ""
+			if strings.TrimSpace(entry.Notes) != "" {
+				commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
+			}
+			assignments.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s · %s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s</div></article>`, template.HTMLEscapeString(formatScheduleDateLabel(entry.Date)), template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)), joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"), commentHTML))
+		}
+	}
+
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Объект: {{OBJECT_NAME}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+{{SIDEBAR_HTML}}
+<div class="main-content">
+  <a href="/objects" class="back-link">← К списку объектов</a>
+  <div class="profile-header-container">
+    <div class="profile-header">
+      <div class="worker-avatar">🏗</div>
+      <div class="profile-header-info"><h1>{{OBJECT_NAME}}</h1><p>{{OBJECT_STATUS}}</p></div>
+    </div>
+    <div class="profile-actions"><a class="btn btn-secondary" href="/objects/edit/{{OBJECT_ID}}" data-modal-url="/objects/edit/{{OBJECT_ID}}" data-modal-title="Редактировать объект" data-modal-return="/object/{{OBJECT_ID}}">Редактировать</a></div>
+  </div>
+  <ul class="profile-details"><li><strong>Адрес:</strong> {{OBJECT_ADDRESS}}</li><li><strong>Ответственный:</strong> {{RESPONSIBLE}}</li></ul>
+  <div class="card"><div class="history-header"><h2>Назначения по объекту</h2></div><div class="schedule-vertical">{{ASSIGNMENTS}}</div></div>
+</div></body></html>`
+
+	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "objects"), 1)
+	final = strings.Replace(final, "{{OBJECT_NAME}}", template.HTMLEscapeString(object.Name), -1)
+	final = strings.Replace(final, "{{OBJECT_STATUS}}", template.HTMLEscapeString(objectStatusLabel(object.Status)), 1)
+	final = strings.Replace(final, "{{OBJECT_ADDRESS}}", template.HTMLEscapeString(object.Address), 1)
+	final = strings.Replace(final, "{{RESPONSIBLE}}", template.HTMLEscapeString(responsible), 1)
+	final = strings.Replace(final, "{{OBJECT_ID}}", template.HTMLEscapeString(object.ID), -1)
+	final = strings.Replace(final, "{{ASSIGNMENTS}}", assignments.String(), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
 

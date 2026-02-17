@@ -68,6 +68,21 @@ func joinMappedValues(ids []string, valuesMap map[string]string) string {
 	return strings.Join(names, ", ")
 }
 
+func joinMappedLinks(ids []string, valuesMap map[string]string, pathPrefix string) string {
+	items := make([]string, 0, len(ids))
+	for _, id := range ids {
+		name, exists := valuesMap[id]
+		if !exists {
+			continue
+		}
+		items = append(items, fmt.Sprintf(`<a class="entity-link" href="%s/%s">%s</a>`, template.HTMLEscapeString(pathPrefix), template.HTMLEscapeString(id), template.HTMLEscapeString(name)))
+	}
+	if len(items) == 0 {
+		return "—"
+	}
+	return strings.Join(items, ", ")
+}
+
 // SchedulePage shows assignment entries list (old "Табель" page renamed to "Расписание").
 
 func getScopedEntries(c *gin.Context, entries []models.TimesheetEntry) ([]models.TimesheetEntry, error) {
@@ -181,8 +196,8 @@ func SchedulePage(c *gin.Context) {
 				template.HTMLEscapeString(entry.StartTime),
 				template.HTMLEscapeString(entry.EndTime),
 				template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
-				joinMappedValues(entry.ObjectIDs, objectsMap),
-				joinMappedValues(entry.WorkerIDs, workersMap),
+				joinMappedLinks(entry.ObjectIDs, objectsMap, "/object"),
+				joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"),
 				commentHTML,
 				template.HTMLEscapeString(entry.ID),
 				template.HTMLEscapeString(entry.ID),
@@ -643,7 +658,7 @@ func TimesheetsPage(c *gin.Context) {
 				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
 				hours, _ := strconv.ParseFloat(hoursStr, 64)
 				total += hours
-				objects := joinMappedValues(entry.ObjectIDs, objectsMap)
+				objects := joinMappedLinks(entry.ObjectIDs, objectsMap, "/object")
 				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes)))
 			}
 			if len(details) == 0 {
@@ -652,7 +667,7 @@ func TimesheetsPage(c *gin.Context) {
 			}
 			cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
 		}
-		workerRows = append(workerRows, fmt.Sprintf(`<tr><th>%s</th>%s</tr>`, template.HTMLEscapeString(worker.Name), cells.String()))
+		workerRows = append(workerRows, fmt.Sprintf(`<tr><th><a class="entity-link" href="/worker/%s">%s</a></th>%s</tr>`, template.HTMLEscapeString(worker.ID), template.HTMLEscapeString(worker.Name), cells.String()))
 	}
 
 	rows := strings.Join(workerRows, "")

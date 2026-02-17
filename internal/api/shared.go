@@ -135,7 +135,7 @@ if(iframe){
 <div class="side-nav-overlay" data-nav-overlay></div>
 <aside class="side-nav" aria-label="Навигация">
   <div class="side-nav-brand"><img src="/static/img/logo.svg" alt="logo"><span>АВАЮССТРОЙ</span></div>
-  <div class="side-nav-user"><span class="user-avatar">%s</span><div><strong>%s</strong><small>%s</small></div></div>
+  <a class="side-nav-user" href="/profile"><span class="user-avatar">%s</span><div><strong>%s</strong><small>%s</small></div></a>
   <nav class="side-nav-links">%s</nav>
   <a class="btn btn-secondary side-nav-logout" href="/logout">Выйти</a>
 </aside>
