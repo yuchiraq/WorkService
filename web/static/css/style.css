@@ -582,7 +582,6 @@ textarea,
     z-index: 1000;
     background: rgba(0, 0, 0, 0.45);
 }
-.schedule-entry-main p { margin: 3px 0; }
 
 .modal-content {
     width: min(90%, 520px);
@@ -648,7 +647,6 @@ textarea,
     pointer-events: none;
     transition: opacity .24s ease, visibility .24s ease;
 }
-.selected-list li.empty { color: var(--text-secondary); justify-content: flex-start; }
 
 .action-modal.visible {
     opacity: 1;
@@ -665,7 +663,6 @@ textarea,
     box-shadow: 0 22px 70px rgba(0,0,0,.22);
     overflow: hidden;
 }
-.schedule-entry-main p { margin: 3px 0; }
 
 .action-modal-header {
     display: flex;
@@ -697,13 +694,8 @@ body.modal-open .mobile-menu-toggle {
     filter: blur(5px);
 }
 
-/* ---------- 11) Modal ---------- */
-.modal {
+.modal-form-layout .back-link {
     display: none;
-    position: fixed;
-    inset: 0;
-    z-index: 1000;
-    background: rgba(0, 0, 0, 0.45);
 }
 
 .modal-form-layout {

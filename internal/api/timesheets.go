@@ -194,7 +194,7 @@ func SchedulePage(c *gin.Context) {
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-<div class="page-header"><h1>Расписание</h1><form method="GET" action="/schedule" class="month-selector"><select id="month" name="month">{{MONTH_OPTIONS}}</select><button type="submit" class="btn btn-secondary">Показать</button></form><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule">Добавить назначение</a></div>
+<div class="page-header"><h1>Расписание</h1><form method="GET" action="/schedule" class="month-selector"><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select></form><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule">Добавить назначение</a></div>
 <div class="card"><div class="schedule-vertical">{{SCHEDULE_ROWS}}</div></div>
 </div>
 </body></html>`
@@ -667,8 +667,7 @@ func TimesheetsPage(c *gin.Context) {
 <div class="card">
   <form method="GET" action="/timesheets" class="month-selector">
     <label for="month">Месяц:</label>
-    <select id="month" name="month">{{MONTH_OPTIONS}}</select>
-    <button type="submit" class="btn btn-primary">Показать</button>
+    <select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select>
   </form>
   <div class="table-scroll"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}</tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div>

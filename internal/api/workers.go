@@ -322,7 +322,7 @@ func WorkerProfilePage(c *gin.Context) {
         <div class="profile-grid">
             <div class="placeholder-card">
                  <div class="history-header"><h2>История назначений</h2></div>
-                 <form method="GET" action="/worker/{{WORKER_ID}}" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month">{{MONTH_OPTIONS}}</select><button type="submit" class="btn btn-primary">Показать</button><span><strong>Итого часов:</strong> {{TOTAL_HOURS}}</span></form>
+                 <form method="GET" action="/worker/{{WORKER_ID}}" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select><span><strong>Итого часов:</strong> {{TOTAL_HOURS}}</span></form>
                  <div class="schedule-vertical">{{ASSIGNMENTS_BY_DAY}}</div>
             </div>
         </div>
