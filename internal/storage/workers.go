@@ -189,3 +189,61 @@ func ClearWorkerLinkByUserID(userID string) error {
 func DeleteWorkerByUserID(userID string) error {
 	return ClearWorkerLinkByUserID(userID)
 }
+
+// LinkWorkerToUser links a worker to a user and clears previous links for both sides.
+func LinkWorkerToUser(workerID, userID string) error {
+	workersMutex.Lock()
+	defer workersMutex.Unlock()
+
+	workerIndex := -1
+	for i, worker := range workers {
+		if worker.ID == workerID {
+			workerIndex = i
+			break
+		}
+	}
+	if workerIndex == -1 {
+		return errors.New("worker not found")
+	}
+
+	for i := range workers {
+		if workers[i].UserID == userID {
+			workers[i].UserID = ""
+		}
+	}
+	workers[workerIndex].UserID = userID
+	return saveWorkers()
+}
+
+// ClearWorkerLinkByUserID clears the worker-user link without deleting worker data.
+func ClearWorkerLinkByUserID(userID string) error {
+	workersMutex.Lock()
+	defer workersMutex.Unlock()
+
+	changed := false
+	for i := range workers {
+		if workers[i].UserID == userID {
+			workers[i].UserID = ""
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return saveWorkers()
+}
+
+// DeleteWorkerByUserID removes a worker linked to user account.
+func DeleteWorkerByUserID(userID string) error {
+	workersMutex.Lock()
+	defer workersMutex.Unlock()
+
+	for i, worker := range workers {
+		if worker.UserID == userID {
+			workers = append(workers[:i], workers[i+1:]...)
+			return saveWorkers()
+		}
+	}
+
+	return nil
+}

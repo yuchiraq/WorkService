@@ -317,6 +317,8 @@ func WorkerProfilePage(c *gin.Context) {
             <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11a1 1 0 11-2 0v-2a1 1 0 112 0v2zm-1-4a1 1 0 01-1-1V7a1 1 0 112 0v1a1 1 0 01-1 1z"/></svg>Ставка: {{RATE}} руб/час</li>
         </ul>
 
+        {{ASSIGNMENTS_SECTION}}
+
         <div class="profile-grid">
             <div class="placeholder-card">
                  <div class="history-header"><h2>История назначений</h2></div>
