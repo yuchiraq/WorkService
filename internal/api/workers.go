@@ -186,6 +186,7 @@ func WorkerProfilePage(c *gin.Context) {
 		selectedMonth = time.Now().Format("2006-01")
 	}
 
+	objectsMap, _ := buildObjectsMap()
 	entries, _ := storage.GetTimesheets()
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].Date == entries[j].Date {
@@ -222,9 +223,9 @@ func WorkerProfilePage(c *gin.Context) {
 		}
 		commentHTML := ""
 		if strings.TrimSpace(entry.Notes) != "" {
-			commentHTML = `<p><strong>Комментарий:</strong> ` + template.HTMLEscapeString(entry.Notes) + `</p>`
+			commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
 		}
-		workerAssignments.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical"><div class="schedule-entry-main"><p><strong>Время:</strong> %s - %s · %.2f ч</p>%s</div></div>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, commentHTML))
+		workerAssignments.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical structured-assignment"><div class="assignment-head"><strong>%s — %s</strong><span>%.2f ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div>%s</div></div>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, joinMappedValues(entry.ObjectIDs, objectsMap), commentHTML))
 	}
 	if workerAssignments.Len() == 0 {
 		workerAssignments.WriteString(`<p>Назначений за выбранный месяц нет.</p>`)

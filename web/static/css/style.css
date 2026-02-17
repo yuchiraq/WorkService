@@ -71,9 +71,6 @@
 /* ---------- 2) Base ---------- */
 * { box-sizing: border-box; }
 
-/* ---------- 2) Base ---------- */
-* { box-sizing: border-box; }
-
 body {
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -143,7 +140,7 @@ a { color: inherit; }
 .company-name {
     color: var(--text-primary);
     font-weight: 700;
-    font-size: 30px;
+    font-size: 24px;
     letter-spacing: -0.01em;
 }
 
@@ -185,32 +182,6 @@ nav li a svg,
 .worker-avatar {
     width: 36px;
     height: 36px;
-    display: inline-flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
-    margin-bottom: 18px;
-}
-
-.page-header h1 {
-    font-size: 28px;
-    letter-spacing: -0.02em;
-}
-
-.back-link {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    text-decoration: none;
-    margin-bottom: 16px;
-    color: var(--text-color-light);
-}
-
-.back-link:hover { color: var(--primary-color); }
-
-/* ---------- 5) Buttons ---------- */
-.btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -424,7 +395,7 @@ textarea,
     justify-content: space-between;
     align-items: flex-start;
     gap: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 .profile-header { display: flex; align-items: center; gap: 12px; }
 .profile-header-info h1 { margin-bottom: 2px; }
@@ -469,6 +440,8 @@ textarea,
     align-items: center;
     justify-content: center;
 }
+.filter-actions { display: flex; gap: 8px; }
+.workers-summary { color: var(--text-secondary); margin-bottom: 10px; }
 
 /* ---------- 10) Schedule / Timesheets ---------- */
 .month-selector {
@@ -478,6 +451,9 @@ textarea,
     gap: 8px;
     margin-bottom: 12px;
 }
+.profile-header { display: flex; align-items: center; gap: 12px; }
+.profile-header-info h1 { margin-bottom: 2px; }
+.profile-header-info p { color: var(--text-secondary); margin: 0; }
 
 .timesheet-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .timesheet-span-2,
@@ -554,6 +530,52 @@ textarea,
 }
 .schedule-entry-main p { margin: 3px 0; }
 
+
+.structured-assignment {
+    padding: 10px 12px;
+}
+
+.assignment-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+.selected-list li.empty { color: var(--text-secondary); justify-content: flex-start; }
+
+.assignment-head strong {
+    font-size: 15px;
+}
+
+.assignment-head span {
+    color: var(--text-secondary);
+    font-size: 13px;
+}
+
+.assignment-body {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+.schedule-entry-main p { margin: 3px 0; }
+
+.assignment-meta span,
+.assignment-note span {
+    display: block;
+    color: var(--text-secondary);
+    font-size: 12px;
+    margin-bottom: 2px;
+}
+
+.assignment-meta p,
+.assignment-note p {
+    margin: 0;
+    line-height: 1.4;
+}
+
 /* ---------- 11) Modal ---------- */
 .modal {
     display: none;
@@ -569,6 +591,10 @@ textarea,
     text-align: center;
     position: relative;
 }
+.center-card { width: min(100%, 460px); }
+.center-card h1 { font-size: 64px; margin-bottom: 6px; color: var(--primary); }
+.center-card h2 { font-size: 24px; margin-bottom: 8px; }
+.center-card p { color: var(--text-secondary); margin-bottom: 18px; }
 
 .close-button {
     position: absolute;
