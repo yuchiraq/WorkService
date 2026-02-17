@@ -253,7 +253,7 @@ body.nav-open .side-nav { transform: translateX(0); }
 .table td, .table th { padding: 10px 12px; }
 .table td:nth-child(2), .table td:nth-child(3), .table td:nth-child(4), .table td:last-child { font-family: ui-monospace, Menlo, monospace; }
 
-.workers-grid, .compact-grid { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.workers-grid, .compact-grid { display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .worker-card { padding: 16px; }
 .worker-card-link-wrapper { text-decoration: none; color: inherit; }
 .worker-card-header { display: flex; gap: 10px; }
@@ -365,8 +365,12 @@ p,li,label,td,th { line-height: 1.5; }
   padding: 6px;
 }
 
-.timesheet-matrix th,
-.timesheet-matrix td {
+.timesheet-matrix {
+  table-layout: fixed;
+}
+.timesheet-matrix thead th,
+.timesheet-matrix tbody td,
+.timesheet-matrix tbody th {
   vertical-align: middle;
   white-space: normal;
   text-align: center;
@@ -374,7 +378,12 @@ p,li,label,td,th { line-height: 1.5; }
 .timesheet-matrix th:first-child,
 .timesheet-matrix td:first-child {
   text-align: left;
-  min-width: 180px;
+  width: 200px;
+  min-width: 200px;
+}
+.timesheet-matrix tbody th {
+  padding: 10px 12px;
+  font-weight: 600;
 }
 .timesheet-card { padding: 22px; }
 .timesheet-table-wrap { overflow-x: visible; }
@@ -393,9 +402,25 @@ p,li,label,td,th { line-height: 1.5; }
   font-weight: 600;
 }
 .hours-cell.empty {
-  opacity: .55;
+  opacity: .78;
   font-weight: 500;
 }
+.empty-value { opacity: .72; }
+.timesheet-quick-add {
+  display: none;
+  margin-left: 6px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  color: #fff;
+  background: var(--accent-blue);
+  font-weight: 700;
+  line-height: 1;
+}
+.hours-cell.empty:hover .timesheet-quick-add { display: inline-flex; }
 .hours-tooltip {
   position: absolute;
   left: 50%;
@@ -441,6 +466,7 @@ p,li,label,td,th { line-height: 1.5; }
   .center-card { width: 100%; }
   .center-card h2 { font-size: 24px; }
   .form-grid, .form-grid-edit, .timesheet-form { grid-template-columns: 1fr; }
+  .workers-grid, .compact-grid { grid-template-columns: 1fr; }
   .btn { width: 100%; }
   .table-actions .btn, .filter-actions .btn { width: auto; }
   .action-modal-sheet { width: 100vw; height: 100vh; border-radius: 0; }
@@ -513,4 +539,8 @@ p,li,label,td,th { line-height: 1.5; }
 @media (max-width: 1023px) {
   .timesheet-table-wrap { overflow-x: auto; }
   .timesheet-matrix th, .timesheet-matrix td { white-space: nowrap; }
+}
+
+@media (max-width: 1200px) {
+  .workers-grid, .compact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

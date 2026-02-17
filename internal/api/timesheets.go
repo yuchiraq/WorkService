@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -459,7 +460,19 @@ function closeDeleteModal(){document.getElementById('deleteModal').style.display
 }
 
 func AddSchedulePage(c *gin.Context) {
-	renderScheduleForm(c, models.TimesheetEntry{Date: time.Now().Format("2006-01-02"), StartTime: "08:00", EndTime: "17:00", LunchBreakMinutes: 60}, "/schedule/new", "Новое назначение", "Сохранить", false)
+	entry := models.TimesheetEntry{Date: time.Now().Format("2006-01-02"), StartTime: "08:00", EndTime: "17:00", LunchBreakMinutes: 60}
+	if qDate := strings.TrimSpace(c.Query("date")); qDate != "" {
+		if _, err := time.Parse("2006-01-02", qDate); err == nil {
+			entry.Date = qDate
+		}
+	}
+	if workerID := strings.TrimSpace(c.Query("worker_id")); workerID != "" {
+		entry.WorkerIDs = []string{workerID}
+	}
+	if objectID := strings.TrimSpace(c.Query("object_id")); objectID != "" {
+		entry.ObjectIDs = []string{objectID}
+	}
+	renderScheduleForm(c, entry, "/schedule/new", "Новое назначение", "Сохранить", false)
 }
 
 func validateScheduleLinks(workerIDs, objectIDs []string) error {
@@ -718,7 +731,9 @@ func TimesheetsPage(c *gin.Context) {
 				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s · создал: %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(creator)))
 			}
 			if len(details) == 0 {
-				cells.WriteString(`<td class="hours-cell empty">—</td>`)
+				quickReturn := url.QueryEscape("/timesheets?month=" + selectedMonth)
+				quickURL := fmt.Sprintf("/schedule/new?date=%s&worker_id=%s&return=%s", template.URLQueryEscaper(date), template.URLQueryEscaper(worker.ID), quickReturn)
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><a class="timesheet-quick-add" href="%s" data-modal-url="%s" data-modal-title="Новое назначение" data-modal-return="/timesheets?month=%s">+</a></td>`, template.HTMLEscapeString(quickURL), template.HTMLEscapeString(quickURL), template.HTMLEscapeString(selectedMonth)))
 				continue
 			}
 			cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
