@@ -294,12 +294,6 @@ func WorkerProfilePage(c *gin.Context) {
                  <form method="GET" action="/worker/{{WORKER_ID}}" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month">{{MONTH_OPTIONS}}</select><button type="submit" class="btn btn-primary">Показать</button><span><strong>Итого часов:</strong> {{TOTAL_HOURS}}</span></form>
                  <div class="schedule-vertical">{{ASSIGNMENTS_BY_DAY}}</div>
             </div>
-            <div class="placeholder-card">
-                 <div class="history-header"><h2>История событий</h2></div>
-                 <div class="icon"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a6 6 0 00-6 6v3.586l-1.707 1.707A1 1 0 003 15v1a1 1 0 001 1h12a1 1 0 001-1v-1a1 1 0 00-.293-.707L16 11.586V8a6 6 0 00-6-6zm0 14a2 2 0 110-4 2 2 0 010 4z"/></svg></div>
-                 <h3>Событий не найдено</h3>
-                 <p>Для этого работника еще не было зарегистрировано событий.</p>
-            </div>
         </div>
     </div>
 </body>
