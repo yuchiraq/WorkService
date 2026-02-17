@@ -14,7 +14,7 @@ type navItem struct {
 	Label  string
 }
 
-// RenderSidebar keeps historical name, but renders top glass navigation.
+// RenderSidebar keeps historical name, but renders topbar with off-canvas navigation.
 func RenderSidebar(c *gin.Context, activePage string) string {
 	userNameValue, _ := c.Get("userName")
 	userStatusValue, _ := c.Get("userStatus")
@@ -36,12 +36,17 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 	}
 
 	var nav strings.Builder
+	pageTitle := "Раздел"
 	for _, item := range navItems {
 		class := "nav-link"
 		if item.PageID == activePage {
 			class += " active"
+			pageTitle = item.Label
 		}
 		nav.WriteString(fmt.Sprintf(`<a class="%s" href="%s">%s</a>`, class, item.Path, item.Label))
+	}
+	if activePage == "my-profile" {
+		pageTitle = "Мой профиль"
 	}
 
 	roleLabel := "Пользователь"
@@ -68,6 +73,7 @@ const iframe=document.getElementById('app-action-modal-iframe');
 const title=document.getElementById('app-action-modal-title');
 const closeBtn=document.querySelector('[data-modal-close]');
 const burger=document.querySelector('[data-mobile-nav-toggle]');
+const navOverlay=document.querySelector('[data-nav-overlay]');
 
 function closeModal(){
   if(!modal) return;
@@ -104,7 +110,8 @@ document.addEventListener('click',function(e){
 if(closeBtn) closeBtn.addEventListener('click',closeModal);
 if(modal) modal.addEventListener('click',function(e){ if(e.target===modal) closeModal();});
 if(burger) burger.addEventListener('click', function(){ body.classList.toggle('nav-open'); });
-document.querySelectorAll('.nav-links a').forEach(function(a){ a.addEventListener('click', closeNav); });
+if(navOverlay) navOverlay.addEventListener('click', closeNav);
+document.querySelectorAll('.side-nav-links a').forEach(function(a){ a.addEventListener('click', closeNav); });
 document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeModal(); closeNav(); }});
 if(iframe){
   iframe.addEventListener('load',function(){
@@ -119,18 +126,25 @@ if(iframe){
 	return fmt.Sprintf(`
 <header class="top-nav">
   <div class="container nav-inner">
-    <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню">☰</button>
-    <div class="brand"><img src="/static/img/logo.svg" alt="logo"><span>АВАЮССТРОЙ</span></div>
-    <nav class="nav-links">%s</nav>
-    <div class="nav-user"><span class="user-avatar">%s</span><div><strong>%s</strong><small>%s</small></div><a class="nav-link" href="/logout">Выйти</a></div>
+    <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню">
+      <span></span><span></span><span></span>
+    </button>
+    <h1 class="top-nav-title">%s</h1>
   </div>
 </header>
+<div class="side-nav-overlay" data-nav-overlay></div>
+<aside class="side-nav" aria-label="Навигация">
+  <div class="side-nav-brand"><img src="/static/img/logo.svg" alt="logo"><span>АВАЮССТРОЙ</span></div>
+  <div class="side-nav-user"><span class="user-avatar">%s</span><div><strong>%s</strong><small>%s</small></div></div>
+  <nav class="side-nav-links">%s</nav>
+  <a class="btn btn-secondary side-nav-logout" href="/logout">Выйти</a>
+</aside>
 <div class="action-modal" id="app-action-modal" aria-hidden="true">
   <div class="action-modal-sheet">
     <div class="action-modal-header"><h3 id="app-action-modal-title">Форма</h3><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button></div>
     <iframe id="app-action-modal-iframe" title="Форма"></iframe>
   </div>
-</div>%s%s`, nav.String(), userInitial, userName, roleLabel, csrfScript, uiScript)
+</div>%s%s`, pageTitle, userInitial, userName, roleLabel, nav.String(), csrfScript, uiScript)
 }
 
 func IsModalRequest(c *gin.Context) bool {
