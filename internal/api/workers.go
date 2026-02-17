@@ -66,8 +66,23 @@ func WorkersPage(c *gin.Context) {
 
 	searchQuery := c.Query("q")
 	selectedPosition := c.Query("position")
-	filteredWorkers := filterWorkers(workers, searchQuery, selectedPosition)
-	positions := uniquePositions(workers)
+	selectedTab := c.DefaultQuery("tab", "active")
+
+	scopedWorkers := make([]models.Worker, 0, len(workers))
+	for _, worker := range workers {
+		if selectedTab == "fired" {
+			if worker.IsFired {
+				scopedWorkers = append(scopedWorkers, worker)
+			}
+			continue
+		}
+		if !worker.IsFired {
+			scopedWorkers = append(scopedWorkers, worker)
+		}
+	}
+
+	filteredWorkers := filterWorkers(scopedWorkers, searchQuery, selectedPosition)
+	positions := uniquePositions(scopedWorkers)
 
 	var positionOptionsHTML strings.Builder
 	for _, position := range positions {
@@ -124,11 +139,16 @@ func WorkersPage(c *gin.Context) {
     <div class="main-content">
         <div class="page-header">
             <h1>Работники</h1>
-            <a href="/workers/new" class="btn btn-primary">Добавить работника</a>
+            <a href="/workers/new" class="btn btn-primary" data-modal-url="/workers/new" data-modal-title="Добавить работника" data-modal-return="/workers">Добавить работника</a>
         </div>
         <div class="card">
             <p>Просмотр, добавление, редактирование или увольнение работников.</p>
+            <div class="tab-switcher" style="margin-bottom:10px;display:flex;gap:8px;">
+                <a class="btn btn-secondary{{TAB_ACTIVE_CLASS}}" href="/workers?tab=active">Текущие</a>
+                <a class="btn btn-secondary{{TAB_FIRED_CLASS}}" href="/workers?tab=fired">Уволенные</a>
+            </div>
             <form action="/workers" method="GET" class="workers-filters">
+                <input type="hidden" name="tab" value="{{TAB}}">
                 <div class="form-group">
                     <label for="q">Поиск по Ф.И.О.</label>
                     <input type="text" id="q" name="q" value="{{SEARCH_QUERY}}" placeholder="Например: Иванов">
@@ -159,7 +179,17 @@ func WorkersPage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{SEARCH_QUERY}}", template.HTMLEscapeString(searchQuery), 1)
 	finalHTML = strings.Replace(finalHTML, "{{POSITION_OPTIONS}}", positionOptionsHTML.String(), 1)
 	finalHTML = strings.Replace(finalHTML, "{{FILTERED_COUNT}}", strconv.Itoa(len(filteredWorkers)), 1)
-	finalHTML = strings.Replace(finalHTML, "{{TOTAL_COUNT}}", strconv.Itoa(len(workers)), 1)
+	finalHTML = strings.Replace(finalHTML, "{{TOTAL_COUNT}}", strconv.Itoa(len(scopedWorkers)), 1)
+	finalHTML = strings.Replace(finalHTML, "{{TAB}}", template.HTMLEscapeString(selectedTab), 1)
+	tabActiveClass := ""
+	tabFiredClass := ""
+	if selectedTab == "fired" {
+		tabFiredClass = " active"
+	} else {
+		tabActiveClass = " active"
+	}
+	finalHTML = strings.Replace(finalHTML, "{{TAB_ACTIVE_CLASS}}", tabActiveClass, 1)
+	finalHTML = strings.Replace(finalHTML, "{{TAB_FIRED_CLASS}}", tabFiredClass, 1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
@@ -276,8 +306,8 @@ func WorkerProfilePage(c *gin.Context) {
                 </div>
             </div>
             <div class="profile-actions">
-                <div class="status-badge active"><svg viewBox="0 0 16 16"><path d="M8,0C3.6,0,0,3.6,0,8s3.6,8,8,8s8-3.6,8-8S12.4,0,8,0z M7,11.4L3.6,8L5,6.6l2,2l4-4L12.4,6L7,11.4z"/></svg>Активен</div>
-                <a href="/workers/edit/{{WORKER_ID}}" class="btn btn-secondary">Редактировать</a>
+                {{STATUS_BADGE}}
+                <a href="/workers/edit/{{WORKER_ID}}" class="btn btn-secondary" data-modal-url="/workers/edit/{{WORKER_ID}}" data-modal-title="Редактировать работника" data-modal-return="/worker/{{WORKER_ID}}">Редактировать</a>
             </div>
         </div>
 
@@ -308,9 +338,15 @@ func WorkerProfilePage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{INITIALS}}", template.HTMLEscapeString(strings.ToUpper(initials)), -1)
 	finalHTML = strings.Replace(finalHTML, "{{POSITION}}", template.HTMLEscapeString(worker.Position), -1)
 	finalHTML = strings.Replace(finalHTML, "{{WORKER_ID}}", template.HTMLEscapeString(worker.ID), -1)
+	finalHTML = strings.Replace(finalHTML, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
 	finalHTML = strings.Replace(finalHTML, "{{BIRTH_DATE}}", template.HTMLEscapeString(formattedBirthDate), -1)
 	finalHTML = strings.Replace(finalHTML, "{{PHONE}}", template.HTMLEscapeString(worker.Phone), -1)
 	finalHTML = strings.Replace(finalHTML, "{{RATE}}", fmt.Sprintf("%.2f", worker.HourlyRate), -1)
+	statusBadge := `<div class="status-badge active"><svg viewBox="0 0 16 16"><path d="M8,0C3.6,0,0,3.6,0,8s3.6,8,8,8s8-3.6,8-8S12.4,0,8,0z M7,11.4L3.6,8L5,6.6l2,2l4-4L12.4,6L7,11.4z"/></svg>Активен</div>`
+	if worker.IsFired {
+		statusBadge = `<div class="status-badge" style="background:#ffe9e9;color:#b42318;">Уволен</div>`
+	}
+	finalHTML = strings.Replace(finalHTML, "{{STATUS_BADGE}}", statusBadge, -1)
 	finalHTML = strings.Replace(finalHTML, "{{MONTH_OPTIONS}}", workerMonthOptions.String(), -1)
 	finalHTML = strings.Replace(finalHTML, "{{TOTAL_HOURS}}", fmt.Sprintf("%.2f", totalHours), -1)
 	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_BY_DAY}}", workerAssignments.String(), -1)
@@ -338,6 +374,7 @@ func AddWorkerPage(c *gin.Context) {
         <div class="card">
             <p>Заполните все поля для регистрации нового работника в системе.</p>
             <form action="/workers/new" method="POST">
+                {{CSRF_FIELD}}
                 <div class="form-grid">
                     <div class="form-group">
                         <label for="name">Ф.И.О.</label>
@@ -372,6 +409,15 @@ func AddWorkerPage(c *gin.Context) {
 
 	sidebar := RenderSidebar(c, "workers")
 	finalHTML := strings.Replace(pageTemplate, "{{SIDEBAR_HTML}}", sidebar, 1)
+	finalHTML = strings.Replace(finalHTML, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
+	if IsModalRequest(c) {
+		finalHTML = strings.Replace(finalHTML, sidebar, "", 1)
+		finalHTML = strings.Replace(finalHTML, `<body>`, `<body><div class="modal-form-layout">`, 1)
+		finalHTML = strings.Replace(finalHTML, `<a href="/workers" class="back-link"><svg viewBox="0 0 16 16"><path d="M11.9,8.5H4.1l3.3,3.3c0.2,0.2,0.2,0.5,0,0.7s-0.5,0.2-0.7,0l-4-4C2.6,8.4,2.5,8.2,2.5,8s0.1-0.4,0.2-0.5l4-4c0.2-0.2,0.5-0.2,0.7,0s0.2,0.5,0,0.7L4.1,7.5H11.9c0.3,0,0.5,0.2,0.5,0.5S12.2,8.5,11.9,8.5z"/></svg>К списку работников</a>`, "", 1)
+		finalHTML = strings.Replace(finalHTML, `<div class="main-content">`, `<div class="main-content modal-form-content">`, 1)
+		finalHTML = strings.Replace(finalHTML, `<div class="card">`, `<div class="card modal-form-card">`, 1)
+		finalHTML = strings.Replace(finalHTML, `</body>`, `</div></body>`, 1)
+	}
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
@@ -433,6 +479,7 @@ func EditWorkerPage(c *gin.Context) {
         <div class="card">
             <p>Здесь можно обновить информацию о работнике.</p>
             <form action="/workers/edit/{{WORKER_ID}}" method="POST" class="form-grid-edit">
+{{CSRF_FIELD}}
 
                 <div class="form-group-edit form-group-name">
                     <label for="name">Ф.И.О.</label>
@@ -475,6 +522,7 @@ func EditWorkerPage(c *gin.Context) {
             <h2>Подтверждение увольнения</h2>
             <p>Вы уверены, что хотите уволить этого работника? Это действие нельзя будет отменить.</p>
             <form action="/workers/delete/{{WORKER_ID}}" method="POST">
+                {{CSRF_FIELD}}
                 <div class="form-actions">
                     <button type="submit" class="btn btn-danger">Да, уволить</button>
                     <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Отмена</button>
@@ -505,11 +553,25 @@ func EditWorkerPage(c *gin.Context) {
 	finalHTML := pageTemplate
 	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, -1)
 	finalHTML = strings.Replace(finalHTML, "{{WORKER_ID}}", template.HTMLEscapeString(worker.ID), -1)
+	finalHTML = strings.Replace(finalHTML, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
 	finalHTML = strings.Replace(finalHTML, "{{WORKER_NAME}}", template.HTMLEscapeString(worker.Name), -1)
 	finalHTML = strings.Replace(finalHTML, "{{POSITION}}", template.HTMLEscapeString(worker.Position), -1)
 	finalHTML = strings.Replace(finalHTML, "{{PHONE}}", template.HTMLEscapeString(worker.Phone), -1)
 	finalHTML = strings.Replace(finalHTML, "{{BIRTH_DATE}}", template.HTMLEscapeString(worker.BirthDate), -1)
 	finalHTML = strings.Replace(finalHTML, "{{RATE}}", fmt.Sprintf("%.2f", worker.HourlyRate), -1)
+	statusBadge := `<div class="status-badge active"><svg viewBox="0 0 16 16"><path d="M8,0C3.6,0,0,3.6,0,8s3.6,8,8,8s8-3.6,8-8S12.4,0,8,0z M7,11.4L3.6,8L5,6.6l2,2l4-4L12.4,6L7,11.4z"/></svg>Активен</div>`
+	if worker.IsFired {
+		statusBadge = `<div class="status-badge" style="background:#ffe9e9;color:#b42318;">Уволен</div>`
+	}
+	finalHTML = strings.Replace(finalHTML, "{{STATUS_BADGE}}", statusBadge, -1)
+	if IsModalRequest(c) {
+		finalHTML = strings.Replace(finalHTML, sidebar, "", 1)
+		finalHTML = strings.Replace(finalHTML, `<body>`, `<body><div class="modal-form-layout">`, 1)
+		finalHTML = strings.Replace(finalHTML, `<a href="/worker/{{WORKER_ID}}" class="back-link"><svg viewBox="0 0 16 16"><path d="M11.9,8.5H4.1l3.3,3.3c0.2,0.2,0.2,0.5,0,0.7s-0.5,0.2-0.7,0l-4-4C2.6,8.4,2.5,8.2,2.5,8s0.1-0.4,0.2-0.5l4-4c0.2-0.2,0.5-0.2,0.7,0s0.2,0.5,0,0.7L4.1,7.5H11.9c0.3,0,0.5,0.2,0.5,0.5S12.2,8.5,11.9,8.5z"/></svg>Назад к профилю</a>`, "", 1)
+		finalHTML = strings.Replace(finalHTML, `<div class="main-content">`, `<div class="main-content modal-form-content">`, 1)
+		finalHTML = strings.Replace(finalHTML, `<div class="card">`, `<div class="card modal-form-card">`, 1)
+		finalHTML = strings.Replace(finalHTML, `</body>`, `</div></body>`, 1)
+	}
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
@@ -554,5 +616,5 @@ func DeleteWorker(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusFound, "/workers")
+	c.Redirect(http.StatusFound, "/workers?tab=fired")
 }

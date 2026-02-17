@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"sync"
+	"time"
 
 	"project/internal/models"
 
@@ -118,19 +119,75 @@ func UpdateWorker(updatedWorker models.Worker) error {
 	return errors.New("worker not found for update")
 }
 
-// DeleteWorker removes a worker from the list and saves the changes.
+// DeleteWorker marks worker as fired instead of physical deletion.
 func DeleteWorker(id string) error {
 	workersMutex.Lock()
 	defer workersMutex.Unlock()
 
 	for i, worker := range workers {
 		if worker.ID == id {
-			workers = append(workers[:i], workers[i+1:]...)
+			if workers[i].IsFired {
+				return nil
+			}
+			workers[i].IsFired = true
+			workers[i].FiredAt = time.Now().Format(time.RFC3339)
+			workers[i].UserID = ""
 			return saveWorkers()
 		}
 	}
 
-	return errors.New("worker not found for deletion")
+	return errors.New("worker not found for dismissal")
+}
+
+// LinkWorkerToUser links a worker to a user and clears previous links for both sides.
+func LinkWorkerToUser(workerID, userID string) error {
+	workersMutex.Lock()
+	defer workersMutex.Unlock()
+
+	workerIndex := -1
+	for i, worker := range workers {
+		if worker.ID == workerID {
+			workerIndex = i
+			break
+		}
+	}
+	if workerIndex == -1 {
+		return errors.New("worker not found")
+	}
+	if workers[workerIndex].IsFired {
+		return errors.New("cannot link dismissed worker")
+	}
+
+	for i := range workers {
+		if workers[i].UserID == userID {
+			workers[i].UserID = ""
+		}
+	}
+	workers[workerIndex].UserID = userID
+	return saveWorkers()
+}
+
+// ClearWorkerLinkByUserID clears the worker-user link without deleting worker data.
+func ClearWorkerLinkByUserID(userID string) error {
+	workersMutex.Lock()
+	defer workersMutex.Unlock()
+
+	changed := false
+	for i := range workers {
+		if workers[i].UserID == userID {
+			workers[i].UserID = ""
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return saveWorkers()
+}
+
+// DeleteWorkerByUserID unlinks user account without deleting worker history.
+func DeleteWorkerByUserID(userID string) error {
+	return ClearWorkerLinkByUserID(userID)
 }
 
 // LinkWorkerToUser links a worker to a user and clears previous links for both sides.

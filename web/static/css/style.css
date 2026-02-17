@@ -440,8 +440,6 @@ textarea,
     align-items: center;
     justify-content: center;
 }
-.filter-actions { display: flex; gap: 8px; }
-.workers-summary { color: var(--text-secondary); margin-bottom: 10px; }
 
 /* ---------- 10) Schedule / Timesheets ---------- */
 .month-selector {
@@ -451,9 +449,6 @@ textarea,
     gap: 8px;
     margin-bottom: 12px;
 }
-.profile-header { display: flex; align-items: center; gap: 12px; }
-.profile-header-info h1 { margin-bottom: 2px; }
-.profile-header-info p { color: var(--text-secondary); margin: 0; }
 
 .timesheet-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .timesheet-span-2,
@@ -534,6 +529,8 @@ textarea,
 .structured-assignment {
     padding: 10px 12px;
 }
+.filter-actions { display: flex; gap: 8px; }
+.workers-summary { color: var(--text-secondary); margin-bottom: 10px; }
 
 .assignment-head {
     display: flex;
@@ -544,7 +541,9 @@ textarea,
     padding-bottom: 6px;
     border-bottom: 1px solid var(--border);
 }
-.selected-list li.empty { color: var(--text-secondary); justify-content: flex-start; }
+.profile-header { display: flex; align-items: center; gap: 12px; }
+.profile-header-info h1 { margin-bottom: 2px; }
+.profile-header-info p { color: var(--text-secondary); margin: 0; }
 
 .assignment-head strong {
     font-size: 15px;
@@ -560,7 +559,6 @@ textarea,
     grid-template-columns: 1fr;
     gap: 8px;
 }
-.schedule-entry-main p { margin: 3px 0; }
 
 .assignment-meta span,
 .assignment-note span {
@@ -584,6 +582,7 @@ textarea,
     z-index: 1000;
     background: rgba(0, 0, 0, 0.45);
 }
+.schedule-entry-main p { margin: 3px 0; }
 
 .modal-content {
     width: min(90%, 520px);
@@ -591,10 +590,6 @@ textarea,
     text-align: center;
     position: relative;
 }
-.center-card { width: min(100%, 460px); }
-.center-card h1 { font-size: 64px; margin-bottom: 6px; color: var(--primary); }
-.center-card h2 { font-size: 24px; margin-bottom: 8px; }
-.center-card p { color: var(--text-secondary); margin-bottom: 18px; }
 
 .close-button {
     position: absolute;
@@ -603,6 +598,132 @@ textarea,
     font-size: 26px;
     color: var(--text-secondary);
     cursor: pointer;
+}
+
+
+.mobile-menu-toggle {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 220;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 82%, transparent);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    color: var(--text-primary);
+}
+
+.sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(14, 18, 28, 0.35);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 150;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity .25s ease, visibility .25s ease;
+}
+
+.action-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 1200;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 22px;
+    background: rgba(13, 18, 27, 0.25);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity .24s ease, visibility .24s ease;
+}
+.selected-list li.empty { color: var(--text-secondary); justify-content: flex-start; }
+
+.action-modal.visible {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.action-modal-sheet {
+    width: min(980px, 96vw);
+    height: min(88vh, 860px);
+    border: 1px solid color-mix(in srgb, var(--border), transparent 12%);
+    border-radius: 22px;
+    background: color-mix(in srgb, var(--surface-elev) 88%, transparent);
+    box-shadow: 0 22px 70px rgba(0,0,0,.22);
+    overflow: hidden;
+}
+.schedule-entry-main p { margin: 3px 0; }
+
+.action-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+}
+
+.action-modal-close {
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-muted);
+    cursor: pointer;
+}
+
+#app-action-modal-iframe {
+    border: 0;
+    width: 100%;
+    height: calc(100% - 56px);
+    background: var(--bg);
+}
+
+body.modal-open .main-content,
+body.modal-open .sidebar,
+body.modal-open .mobile-menu-toggle {
+    filter: blur(5px);
+}
+
+/* ---------- 11) Modal ---------- */
+.modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.45);
+}
+
+.modal-form-layout {
+    min-height: 100vh;
+    padding: 14px;
+    background: var(--bg);
+}
+
+.modal-form-content {
+    margin-left: 0;
+    padding: 0;
+}
+
+.modal-form-card {
+    border-radius: 16px;
+    box-shadow: none;
+}
+
+.modal-form-layout .back-link {
+    display: none;
 }
 
 /* ---------- 12) Center/Login pages ---------- */
@@ -624,15 +745,22 @@ textarea,
 }
 
 @media (max-width: 900px) {
-    .main-content { margin-left: 0; padding: 14px; }
+    .main-content { margin-left: 0; padding: 64px 14px 14px; }
+    .mobile-menu-toggle { display: inline-flex; }
 
     .sidebar {
-        position: static;
-        width: 100%;
-        height: auto;
-        border-right: 0;
-        border-bottom: 1px solid var(--border);
+        transform: translateX(-100%);
+        transition: transform .24s ease;
+        z-index: 200;
+        width: min(82vw, 320px);
+        border-right: 1px solid var(--border);
     }
+
+    body.sidebar-open .sidebar { transform: translateX(0); }
+    body.sidebar-open .sidebar-backdrop { opacity: 1; visibility: visible; }
+    body.sidebar-open .main-content { transform: translateX(min(70vw, 280px)); }
+    body.sidebar-open .mobile-menu-toggle { left: min(70vw, 280px); }
+    .main-content, .mobile-menu-toggle { transition: transform .24s ease, left .24s ease; }
 
     .form-grid,
     .form-grid-edit,
@@ -646,4 +774,8 @@ textarea,
 
     .profile-header-container { flex-direction: column; }
     .hours-tooltip { width: 220px; }
+
+    .action-modal { padding: 10px; }
+    .action-modal-sheet { width: 100%; height: 92vh; border-radius: 16px; }
 }
+

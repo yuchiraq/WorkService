@@ -28,11 +28,12 @@ func UsersPage(c *gin.Context) {
 
 	var rows strings.Builder
 	for _, user := range users {
-		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><div class="table-actions"><a href="/users/edit/%s" class="btn btn-secondary">Редактировать</a><form action="/users/delete/%s" method="POST" style="display:inline;"><button class="btn btn-danger" type="submit">Удалить</button></form></div></td></tr>`,
+		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><div class="table-actions"><a href="/users/edit/%s" class="btn btn-secondary" data-modal-url="/users/edit/%s" data-modal-title="Редактировать пользователя" data-modal-return="/users">Редактировать</a><form action="/users/delete/%s" method="POST" style="display:inline;"><button class="btn btn-danger" type="submit">Удалить</button></form></div></td></tr>`,
 			template.HTMLEscapeString(user.Name),
 			template.HTMLEscapeString(user.Username),
 			template.HTMLEscapeString(user.Phone),
 			template.HTMLEscapeString(userStatusLabel(user.Status)),
+			template.HTMLEscapeString(user.ID),
 			template.HTMLEscapeString(user.ID),
 			template.HTMLEscapeString(user.ID),
 		))
@@ -41,7 +42,7 @@ func UsersPage(c *gin.Context) {
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Пользователи</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-<div class="page-header"><h1>Пользователи</h1><a href="/users/new" class="btn btn-primary">Добавить пользователя</a></div>
+<div class="page-header"><h1>Пользователи</h1><a href="/users/new" class="btn btn-primary" data-modal-url="/users/new" data-modal-title="Новый пользователь" data-modal-return="/users">Добавить пользователя</a></div>
 <div class="card"><table class="table"><thead><tr><th>ФИО</th><th>Логин</th><th>Телефон</th><th>Статус</th><th>Действия</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div></body></html>`
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "users"), 1)
@@ -65,6 +66,9 @@ func userWorkerOptions(userID, selectedWorkerID string) (string, string, error) 
 	options.WriteString(`<option value="">Создать нового работника автоматически</option>`)
 	selectedLabel := "Автосоздание"
 	for _, worker := range workers {
+		if worker.IsFired {
+			continue
+		}
 		if worker.UserID != "" && worker.UserID != userID {
 			continue
 		}
@@ -104,13 +108,15 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 		workerField = `<label for="worker_id">Связанный работник</label><select id="worker_id" name="worker_id">` + workerOptions + `</select><small class="text-muted">Текущее значение: ` + template.HTMLEscapeString(selectedWorkerName) + `</small>`
 	}
 
+	isModal := IsModalRequest(c)
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
-{{SIDEBAR_HTML}}
-<div class="main-content">
-<a href="{{BACK_URL}}" class="back-link">← Назад</a>
+{{LAYOUT_START}}
+<div class="main-content{{MAIN_CONTENT_CLASS}}">
+{{BACK_LINK}}
 <div class="page-header"><h1>{{TITLE}}</h1></div>
-<div class="card">
+<div class="card{{CARD_CLASS}}">
 <form action="{{ACTION_URL}}" method="POST" class="form-grid-edit">
+{{CSRF_FIELD}}
 <div class="form-group-edit form-group-name"><label for="name">ФИО</label><input type="text" id="name" name="name" value="{{NAME}}" required></div>
 <div class="form-group-edit form-group-position"><label for="username">Логин</label><input type="text" id="username" name="username" value="{{USERNAME}}" required></div>
 <div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="password" id="password" name="password" value="" placeholder="Оставьте пустым, чтобы не менять"></div>
@@ -121,11 +127,30 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 </form>
 </div>
 </div>
+{{LAYOUT_END}}
 </body></html>`
 
-	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "users"), 1)
+	layoutStart := RenderSidebar(c, "users")
+	layoutEnd := ""
+	mainClass := ""
+	backLink := `<a href="{{BACK_URL}}" class="back-link">← Назад</a>`
+	cardClass := ""
+	if isModal {
+		layoutStart = `<div class="modal-form-layout">`
+		layoutEnd = `</div>`
+		mainClass = " modal-form-content"
+		backLink = ""
+		cardClass = " modal-form-card"
+	}
+
+	final := strings.Replace(page, "{{LAYOUT_START}}", layoutStart, 1)
+	final = strings.Replace(final, "{{LAYOUT_END}}", layoutEnd, 1)
+	final = strings.Replace(final, "{{MAIN_CONTENT_CLASS}}", mainClass, 1)
+	final = strings.Replace(final, "{{BACK_LINK}}", backLink, 1)
+	final = strings.Replace(final, "{{CARD_CLASS}}", cardClass, 1)
 	final = strings.Replace(final, "{{TITLE}}", template.HTMLEscapeString(title), -1)
 	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(actionURL), 1)
+	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
 	final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(user.Name), 1)
 	final = strings.Replace(final, "{{USERNAME}}", template.HTMLEscapeString(user.Username), 1)
 	final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(user.Phone), 1)
@@ -256,6 +281,7 @@ func ProfilePage(c *gin.Context) {
 {{SIDEBAR_HTML}}
 <div class="main-content"><div class="page-header"><h1>Мой профиль</h1></div>
 <div class="card"><form action="/profile" method="POST" class="form-grid-edit">
+{{CSRF_FIELD}}
 <div class="form-group-edit form-group-name"><label for="name">ФИО</label><input type="text" id="name" name="name" value="{{NAME}}" required></div>
 <div class="form-group-edit form-group-position"><label for="username">Логин</label><input type="text" id="username" name="username" value="{{USERNAME}}" required></div>
 <div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="password" id="password" name="password" value="" placeholder="Оставьте пустым, чтобы не менять"></div>

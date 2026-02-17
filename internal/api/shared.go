@@ -61,6 +61,82 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 		roleLabel = "Администратор"
 	}
 
+	uiScript := `<script>
+(function(){
+  const body = document.body;
+  const sidebar = document.querySelector('.sidebar');
+  const menuBtn = document.querySelector('[data-mobile-menu-toggle]');
+  const menuBackdrop = document.querySelector('[data-sidebar-backdrop]');
+  const modal = document.getElementById('app-action-modal');
+  const modalIframe = document.getElementById('app-action-modal-iframe');
+  const modalTitle = document.getElementById('app-action-modal-title');
+  const modalClose = document.querySelector('[data-modal-close]');
+
+  function closeSidebar(){ body.classList.remove('sidebar-open'); }
+  function openSidebar(){ body.classList.add('sidebar-open'); }
+  function closeModal(){
+    if (!modal) return;
+    modal.classList.remove('visible');
+    body.classList.remove('modal-open');
+    if (modalIframe) { modalIframe.removeAttribute('src'); modalIframe.removeAttribute('data-return-path'); }
+  }
+
+  if (menuBtn && sidebar) {
+    menuBtn.addEventListener('click', function(){
+      if (body.classList.contains('sidebar-open')) closeSidebar(); else openSidebar();
+    });
+  }
+  if (menuBackdrop) {
+    menuBackdrop.addEventListener('click', closeSidebar);
+  }
+  document.querySelectorAll('.sidebar a').forEach(function(link){
+    link.addEventListener('click', function(){ if (window.innerWidth <= 900) closeSidebar(); });
+  });
+
+	function openModal(url, title, returnPath){
+	    if (!modal || !modalIframe) {
+	      window.location.href = url;
+	      return;
+	    }
+	    try {
+	      const u = new URL(url, window.location.origin);
+	      if (!u.searchParams.has('modal')) u.searchParams.set('modal', '1');
+	      url = u.pathname + u.search;
+	    } catch (_) {}
+	    modal.classList.add('visible');
+    body.classList.add('modal-open');
+    modalTitle.textContent = title || 'Форма';
+    modalIframe.setAttribute('data-return-path', returnPath || window.location.pathname);
+    modalIframe.src = url;
+  }
+
+  document.addEventListener('click', function(event){
+    const trigger = event.target.closest('[data-modal-url]');
+    if (!trigger) return;
+    event.preventDefault();
+    openModal(trigger.getAttribute('data-modal-url'), trigger.getAttribute('data-modal-title'), trigger.getAttribute('data-modal-return'));
+  });
+
+  if (modalClose) modalClose.addEventListener('click', closeModal);
+  if (modal) {
+    modal.addEventListener('click', function(event){ if (event.target === modal) closeModal(); });
+  }
+  document.addEventListener('keydown', function(event){ if (event.key === 'Escape') { closeModal(); closeSidebar(); } });
+
+  if (modalIframe) {
+    modalIframe.addEventListener('load', function(){
+      const returnPath = modalIframe.getAttribute('data-return-path');
+      let href = '';
+      try { href = modalIframe.contentWindow.location.pathname; } catch (_) { return; }
+      if (returnPath && href === returnPath) {
+        closeModal();
+        window.location.reload();
+      }
+    });
+  }
+})();
+</script>`
+
 	header := `
 	<div class="sidebar-header">
 		<div class="logo">
@@ -87,11 +163,31 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 	</div>`, userInitial, userName, roleLabel)
 
 	return fmt.Sprintf(`
-	<aside class="sidebar">
-		<div class="sidebar-content">
+		<button class="mobile-menu-toggle" type="button" data-mobile-menu-toggle aria-label="Открыть меню">☰</button>
+		<div class="sidebar-backdrop" data-sidebar-backdrop></div>
+		<aside class="sidebar">
+			<div class="sidebar-content">
+				%s
+				<nav><ul>%s</ul></nav>
+			</div>
 			%s
-			<nav><ul>%s</ul></nav>
-		</div>
-		%s
-	</aside>%s`, header, itemsBuilder.String(), footer, csrfScript)
+		</aside>
+		<div class="action-modal" id="app-action-modal" aria-hidden="true">
+			<div class="action-modal-sheet">
+				<div class="action-modal-header"><h3 id="app-action-modal-title">Форма</h3><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button></div>
+				<iframe id="app-action-modal-iframe" title="Форма"></iframe>
+			</div>
+		</div>%s%s`, header, itemsBuilder.String(), footer, csrfScript, uiScript)
+}
+
+func IsModalRequest(c *gin.Context) bool {
+	return c.Query("modal") == "1"
+}
+
+func CSRFHiddenInput(c *gin.Context) string {
+	csrfToken, _ := c.Get("csrfToken")
+	if token, ok := csrfToken.(string); ok && token != "" {
+		return `<input type="hidden" name="_csrf_token" value="` + token + `">`
+	}
+	return ""
 }

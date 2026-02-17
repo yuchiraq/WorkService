@@ -177,13 +177,14 @@ func SchedulePage(c *gin.Context) {
 			if strings.TrimSpace(entry.Notes) != "" {
 				commentHTML = `<p><strong>Комментарий:</strong> ` + template.HTMLEscapeString(entry.Notes) + `</p>`
 			}
-			scheduleRows.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical"><div class="schedule-entry-main"><p><strong>Объекты:</strong> %s</p><p><strong>Работники:</strong> %s</p><p><strong>Время:</strong> %s - %s · %s ч</p>%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary">Редактировать</a></div></div>`,
+			scheduleRows.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical"><div class="schedule-entry-main"><p><strong>Объекты:</strong> %s</p><p><strong>Работники:</strong> %s</p><p><strong>Время:</strong> %s - %s · %s ч</p>%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></div>`,
 				joinMappedValues(entry.ObjectIDs, objectsMap),
 				joinMappedValues(entry.WorkerIDs, workersMap),
 				template.HTMLEscapeString(entry.StartTime),
 				template.HTMLEscapeString(entry.EndTime),
 				template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
 				commentHTML,
+				template.HTMLEscapeString(entry.ID),
 				template.HTMLEscapeString(entry.ID),
 			))
 		}
@@ -193,7 +194,7 @@ func SchedulePage(c *gin.Context) {
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-<div class="page-header"><h1>Расписание</h1><form method="GET" action="/schedule" class="month-selector"><select id="month" name="month">{{MONTH_OPTIONS}}</select><button type="submit" class="btn btn-secondary">Показать</button></form><a class="btn btn-primary" href="/schedule/new">Добавить назначение</a></div>
+<div class="page-header"><h1>Расписание</h1><form method="GET" action="/schedule" class="month-selector"><select id="month" name="month">{{MONTH_OPTIONS}}</select><button type="submit" class="btn btn-secondary">Показать</button></form><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule">Добавить назначение</a></div>
 <div class="card"><div class="schedule-vertical">{{SCHEDULE_ROWS}}</div></div>
 </div>
 </body></html>`
@@ -248,17 +249,25 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 	}
 
 	if c.GetString("userStatus") != "admin" {
-		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil {
+		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
 			workers = []models.Worker{ownWorker}
+		} else {
+			workers = []models.Worker{}
 		}
 	}
 
 	workerItems := make([][2]string, 0, len(workers))
 	for _, worker := range workers {
+		if worker.IsFired {
+			continue
+		}
 		workerItems = append(workerItems, [2]string{worker.ID, worker.Name})
 	}
 	objectItems := make([][2]string, 0, len(objects))
 	for _, object := range objects {
+		if object.Status != "in_progress" {
+			continue
+		}
 		objectItems = append(objectItems, [2]string{object.ID, object.Name})
 	}
 
@@ -291,17 +300,19 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 	}
 
 	deleteBtn := ""
+	isModal := IsModalRequest(c)
 	if isEdit {
 		deleteBtn = `<button type="button" class="btn btn-danger" onclick="showDeleteModal()">Удалить</button>`
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
-{{SIDEBAR_HTML}}
-<div class="main-content">
-<a href="/schedule" class="back-link">← К расписанию</a>
+{{LAYOUT_START}}
+<div class="main-content{{MAIN_CONTENT_CLASS}}">
+{{BACK_LINK}}
 <div class="page-header"><h1>{{TITLE}}</h1></div>
-<div class="card">
+<div class="card{{CARD_CLASS}}">
 <form action="{{ACTION_URL}}" method="POST" class="form-grid-edit timesheet-form">
+{{CSRF_FIELD}}
 <div class="form-group-edit"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
 <div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
 <div class="form-group-edit"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
@@ -324,8 +335,9 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 </form>
 </div>
 </div>
+{{LAYOUT_END}}
 
-<div id="deleteModal" class="modal" style="display:none;"><div class="modal-content"><span class="close-button" onclick="closeDeleteModal()">&times;</span><h2>Удалить назначение?</h2><p>Действие нельзя отменить.</p><form action="/schedule/delete/{{ID}}" method="POST"><div class="form-actions"><button class="btn btn-danger" type="submit">Удалить</button><button class="btn btn-secondary" type="button" onclick="closeDeleteModal()">Отмена</button></div></form></div></div>
+<div id="deleteModal" class="modal" style="display:none;"><div class="modal-content"><span class="close-button" onclick="closeDeleteModal()">&times;</span><h2>Удалить назначение?</h2><p>Действие нельзя отменить.</p><form action="/schedule/delete/{{ID}}" method="POST">{{CSRF_FIELD}}<div class="form-actions"><button class="btn btn-danger" type="submit">Удалить</button><button class="btn btn-secondary" type="button" onclick="closeDeleteModal()">Отмена</button></div></form></div></div>
 <script>
 function removeSelection(button){
   const li = button.closest('li');
@@ -352,9 +364,28 @@ function closeDeleteModal(){document.getElementById('deleteModal').style.display
 </script>
 </body></html>`
 
+	layoutStart := RenderSidebar(c, "schedule")
+	layoutEnd := ""
+	mainClass := ""
+	backLink := `<a href="/schedule" class="back-link">← К расписанию</a>`
+	cardClass := ""
+	if isModal {
+		layoutStart = `<div class="modal-form-layout">`
+		layoutEnd = `</div>`
+		mainClass = " modal-form-content"
+		backLink = ""
+		cardClass = " modal-form-card"
+	}
+
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "schedule"), 1)
+	final = strings.Replace(final, "{{LAYOUT_START}}", layoutStart, 1)
+	final = strings.Replace(final, "{{LAYOUT_END}}", layoutEnd, 1)
+	final = strings.Replace(final, "{{MAIN_CONTENT_CLASS}}", mainClass, 1)
+	final = strings.Replace(final, "{{BACK_LINK}}", backLink, 1)
+	final = strings.Replace(final, "{{CARD_CLASS}}", cardClass, 1)
 	final = strings.Replace(final, "{{TITLE}}", template.HTMLEscapeString(title), -1)
 	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(actionURL), 1)
+	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
 	final = strings.Replace(final, "{{DATE}}", template.HTMLEscapeString(entry.Date), 1)
 	final = strings.Replace(final, "{{START_TIME}}", template.HTMLEscapeString(entry.StartTime), 1)
 	final = strings.Replace(final, "{{END_TIME}}", template.HTMLEscapeString(entry.EndTime), 1)
@@ -378,6 +409,39 @@ func AddSchedulePage(c *gin.Context) {
 	renderScheduleForm(c, models.TimesheetEntry{Date: time.Now().Format("2006-01-02"), StartTime: "08:00", EndTime: "17:00", LunchBreakMinutes: 60}, "/schedule/new", "Новое назначение", "Сохранить", false)
 }
 
+func validateScheduleLinks(workerIDs, objectIDs []string) error {
+	workers, err := storage.GetWorkers()
+	if err != nil {
+		return err
+	}
+	workerMap := map[string]models.Worker{}
+	for _, w := range workers {
+		workerMap[w.ID] = w
+	}
+	for _, wid := range workerIDs {
+		w, ok := workerMap[wid]
+		if !ok || w.IsFired {
+			return fmt.Errorf("нельзя назначить уволенного или несуществующего работника")
+		}
+	}
+
+	objects, err := storage.GetObjects()
+	if err != nil {
+		return err
+	}
+	objMap := map[string]models.Object{}
+	for _, o := range objects {
+		objMap[o.ID] = o
+	}
+	for _, oid := range objectIDs {
+		o, ok := objMap[oid]
+		if !ok || o.Status != "in_progress" {
+			return fmt.Errorf("нельзя назначить объект, который не в работе")
+		}
+	}
+	return nil
+}
+
 func CreateScheduleEntry(c *gin.Context) {
 	lunch, _ := strconv.Atoi(c.PostForm("lunch_break_minutes"))
 	entry := models.TimesheetEntry{
@@ -395,6 +459,10 @@ func CreateScheduleEntry(c *gin.Context) {
 			entry.WorkerIDs = []string{worker.ID}
 		}
 		entry.UserMark = "Создано пользователем " + c.GetString("userName")
+	}
+	if err := validateScheduleLinks(entry.WorkerIDs, entry.ObjectIDs); err != nil {
+		c.String(http.StatusBadRequest, err.Error())
+		return
 	}
 	if _, err := storage.CreateTimesheet(entry); err != nil {
 		c.String(http.StatusBadRequest, "Failed to create schedule entry: %v", err)
@@ -469,6 +537,10 @@ func UpdateScheduleEntry(c *gin.Context) {
 		entry.UserMark = "Обновлено пользователем " + c.GetString("userName")
 	}
 
+	if err := validateScheduleLinks(entry.WorkerIDs, entry.ObjectIDs); err != nil {
+		c.String(http.StatusBadRequest, err.Error())
+		return
+	}
 	if err := storage.UpdateTimesheet(entry); err != nil {
 		c.String(http.StatusBadRequest, "Failed to update schedule entry: %v", err)
 		return
