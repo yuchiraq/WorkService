@@ -147,7 +147,8 @@ func WorkersPage(c *gin.Context) {
                 <a class="btn btn-secondary{{TAB_ACTIVE_CLASS}}" href="/workers?tab=active">Текущие</a>
                 <a class="btn btn-secondary{{TAB_FIRED_CLASS}}" href="/workers?tab=fired">Уволенные</a>
             </div>
-            <form action="/workers" method="GET" class="workers-filters">
+            <button type="button" class="btn btn-secondary workers-search-toggle{{FILTER_TOGGLE_ACTIVE}}" data-search-toggle aria-expanded="{{FILTER_EXPANDED}}">Поиск и фильтры</button>
+            <form action="/workers" method="GET" class="workers-filters{{FILTERS_CLASS}}" data-search-panel>
                 <input type="hidden" name="tab" value="{{TAB}}">
                 <div class="form-group">
                     <label for="q">Поиск по Ф.И.О.</label>
@@ -162,13 +163,27 @@ func WorkersPage(c *gin.Context) {
                 </div>
                 <div class="filter-actions">
                     <button type="submit" class="btn btn-primary">Применить</button>
-                    <a href="/workers" class="btn btn-secondary">Сбросить</a>
+                    <a href="/workers?tab={{TAB}}" class="btn btn-secondary">Сбросить</a>
                 </div>
             </form>
             <p class="workers-summary">Найдено: <strong>{{FILTERED_COUNT}}</strong> из <strong>{{TOTAL_COUNT}}</strong>.</p>
             <div class="workers-grid">%s</div>
         </div>
     </div>
+
+    <script>
+      (function(){
+        const toggle=document.querySelector('[data-search-toggle]');
+        const panel=document.querySelector('[data-search-panel]');
+        if(!toggle||!panel) return;
+        toggle.addEventListener('click', function(){
+          panel.classList.toggle('is-open');
+          const expanded=panel.classList.contains('is-open');
+          toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+          toggle.classList.toggle('active', expanded);
+        });
+      })();
+    </script>
 </body>
 </html>`
 
@@ -178,9 +193,21 @@ func WorkersPage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, 1)
 	finalHTML = strings.Replace(finalHTML, "{{SEARCH_QUERY}}", template.HTMLEscapeString(searchQuery), 1)
 	finalHTML = strings.Replace(finalHTML, "{{POSITION_OPTIONS}}", positionOptionsHTML.String(), 1)
+	filtersOpen := strings.TrimSpace(searchQuery) != "" || strings.TrimSpace(selectedPosition) != ""
+	filtersClass := ""
+	filterExpanded := "false"
+	filterToggleActive := ""
+	if filtersOpen {
+		filtersClass = " is-open"
+		filterExpanded = "true"
+		filterToggleActive = " active"
+	}
+	finalHTML = strings.Replace(finalHTML, "{{FILTERS_CLASS}}", filtersClass, 1)
+	finalHTML = strings.Replace(finalHTML, "{{FILTER_EXPANDED}}", filterExpanded, 1)
+	finalHTML = strings.Replace(finalHTML, "{{FILTER_TOGGLE_ACTIVE}}", filterToggleActive, 1)
 	finalHTML = strings.Replace(finalHTML, "{{FILTERED_COUNT}}", strconv.Itoa(len(filteredWorkers)), 1)
 	finalHTML = strings.Replace(finalHTML, "{{TOTAL_COUNT}}", strconv.Itoa(len(scopedWorkers)), 1)
-	finalHTML = strings.Replace(finalHTML, "{{TAB}}", template.HTMLEscapeString(selectedTab), 1)
+	finalHTML = strings.Replace(finalHTML, "{{TAB}}", template.HTMLEscapeString(selectedTab), -1)
 	tabActiveClass := ""
 	tabFiredClass := ""
 	if selectedTab == "fired" {
@@ -255,7 +282,11 @@ func WorkerProfilePage(c *gin.Context) {
 		if strings.TrimSpace(entry.Notes) != "" {
 			commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
 		}
-		workerAssignments.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical structured-assignment"><div class="assignment-head"><strong>%s — %s</strong><span>%.2f ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div>%s</div></div>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, joinMappedValues(entry.ObjectIDs, objectsMap), commentHTML))
+		creatorHTML := ""
+		if strings.TrimSpace(entry.CreatedByName) != "" {
+			creatorHTML = `<div class="assignment-meta"><span>Создал</span><p>` + template.HTMLEscapeString(entry.CreatedByName) + `</p></div>`
+		}
+		workerAssignments.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical structured-assignment"><div class="assignment-head"><strong>%s — %s</strong><span>%.2f ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div>%s%s</div></div>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, joinMappedLinks(entry.ObjectIDs, objectsMap, "/object"), creatorHTML, commentHTML))
 	}
 	if workerAssignments.Len() == 0 {
 		workerAssignments.WriteString(`<p>Назначений за выбранный месяц нет.</p>`)
