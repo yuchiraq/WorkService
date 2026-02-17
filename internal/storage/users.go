@@ -10,6 +10,8 @@ import (
 
 	"project/internal/models"
 
+	"golang.org/x/crypto/bcrypt"
+
 	"github.com/google/uuid"
 )
 
@@ -43,6 +45,10 @@ func normalizeUsers() {
 		users[i].Name = strings.TrimSpace(users[i].Name)
 		users[i].Phone = strings.TrimSpace(users[i].Phone)
 		users[i].Status = normalizeUserStatus(users[i].Status)
+		hashed, err := hashPasswordIfNeeded(users[i].Password)
+		if err == nil {
+			users[i].Password = hashed
+		}
 	}
 
 	if len(users) > 0 && users[0].Status == "user" {
@@ -57,6 +63,21 @@ func normalizeUserStatus(status string) string {
 	default:
 		return "user"
 	}
+}
+
+func isPasswordHash(password string) bool {
+	return strings.HasPrefix(password, "$2a$") || strings.HasPrefix(password, "$2b$") || strings.HasPrefix(password, "$2y$")
+}
+
+func hashPasswordIfNeeded(password string) (string, error) {
+	if isPasswordHash(password) {
+		return password, nil
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return "", err
+	}
+	return string(hash), nil
 }
 
 // saveUsers writes the current users slice.
@@ -112,7 +133,10 @@ func ValidateUser(username, password string) (models.User, error) {
 	defer usersMutex.RUnlock()
 
 	for _, user := range users {
-		if user.Username == username && user.Password == password {
+		if user.Username != username {
+			continue
+		}
+		if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(password)) == nil {
 			return user, nil
 		}
 	}
@@ -142,6 +166,11 @@ func CreateUser(user models.User) (models.User, error) {
 	if usernameExists(user.Username, "") {
 		return models.User{}, errors.New("username already exists")
 	}
+	hashed, err := hashPasswordIfNeeded(user.Password)
+	if err != nil {
+		return models.User{}, err
+	}
+	user.Password = hashed
 
 	user.ID = uuid.New().String()
 	users = append(users, user)
@@ -167,6 +196,11 @@ func UpdateUser(updatedUser models.User) error {
 	if usernameExists(updatedUser.Username, updatedUser.ID) {
 		return errors.New("username already exists")
 	}
+	hashed, err := hashPasswordIfNeeded(updatedUser.Password)
+	if err != nil {
+		return err
+	}
+	updatedUser.Password = hashed
 
 	for i, user := range users {
 		if user.ID == updatedUser.ID {

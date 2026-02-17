@@ -15,7 +15,7 @@ func SetupRouter(r *gin.Engine) {
 	r.GET("/logout", api.Logout)
 
 	authRequired := r.Group("/")
-	authRequired.Use(api.AuthRequired())
+	authRequired.Use(api.AuthRequired(), api.CSRFMiddleware())
 	{
 		authRequired.GET("/dashboard", api.DashboardPage)
 
@@ -69,6 +69,8 @@ func SetupRouter(r *gin.Engine) {
 		adminRequired.GET("/users/edit/:id", api.EditUserPage)
 		adminRequired.POST("/users/edit/:id", api.UpdateUser)
 		adminRequired.POST("/users/delete/:id", api.DeleteUser)
+		adminRequired.GET("/settings", api.SettingsPage)
+		adminRequired.POST("/settings/backup", api.CreateBackup)
 	}
 
 	r.GET("/", func(c *gin.Context) {

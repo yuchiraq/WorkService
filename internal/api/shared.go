@@ -32,6 +32,7 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 
 	if userStatus == "admin" {
 		navItems = append(navItems, navItem{PageID: "users", Path: "/users", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 11v6"></path><path d="M20 14h6"></path></svg>`, Label: "Пользователи"})
+		navItems = append(navItems, navItem{PageID: "settings", Path: "/settings", Icon: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`, Label: "Настройки"})
 	}
 
 	var itemsBuilder strings.Builder
@@ -50,6 +51,12 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 	}
 
 	roleLabel := "Пользователь"
+
+	csrfToken, _ := c.Get("csrfToken")
+	csrfScript := ""
+	if token, ok := csrfToken.(string); ok && token != "" {
+		csrfScript = fmt.Sprintf(`<script>(function(){const t=%q;document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(f){if(f.querySelector('input[name="_csrf_token"]')) return; var i=document.createElement('input'); i.type='hidden'; i.name='_csrf_token'; i.value=t; f.appendChild(i);});})();</script>`, token)
+	}
 	if userStatus == "admin" {
 		roleLabel = "Администратор"
 	}
@@ -86,5 +93,5 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 			<nav><ul>%s</ul></nav>
 		</div>
 		%s
-	</aside>`, header, itemsBuilder.String(), footer)
+	</aside>%s`, header, itemsBuilder.String(), footer, csrfScript)
 }

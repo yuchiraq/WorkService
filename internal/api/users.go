@@ -113,7 +113,7 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 <form action="{{ACTION_URL}}" method="POST" class="form-grid-edit">
 <div class="form-group-edit form-group-name"><label for="name">ФИО</label><input type="text" id="name" name="name" value="{{NAME}}" required></div>
 <div class="form-group-edit form-group-position"><label for="username">Логин</label><input type="text" id="username" name="username" value="{{USERNAME}}" required></div>
-<div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="text" id="password" name="password" value="{{PASSWORD}}" required></div>
+<div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="password" id="password" name="password" value="" placeholder="Оставьте пустым, чтобы не менять"></div>
 <div class="form-group-edit form-group-rate"><label for="phone">Контактный номер</label><input type="tel" id="phone" name="phone" value="{{PHONE}}"></div>
 <div class="form-group-edit form-group-rate">{{STATUS_FIELD}}</div>
 <div class="form-group-edit form-group-rate">{{WORKER_FIELD}}</div>
@@ -128,7 +128,6 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(actionURL), 1)
 	final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(user.Name), 1)
 	final = strings.Replace(final, "{{USERNAME}}", template.HTMLEscapeString(user.Username), 1)
-	final = strings.Replace(final, "{{PASSWORD}}", template.HTMLEscapeString(user.Password), 1)
 	final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(user.Phone), 1)
 	final = strings.Replace(final, "{{STATUS_FIELD}}", statusField, 1)
 	final = strings.Replace(final, "{{WORKER_FIELD}}", workerField, 1)
@@ -195,7 +194,10 @@ func UpdateUser(c *gin.Context) {
 
 	user.Name = c.PostForm("name")
 	user.Username = c.PostForm("username")
-	user.Password = c.PostForm("password")
+	newPassword := c.PostForm("password")
+	if newPassword != "" {
+		user.Password = newPassword
+	}
 	user.Phone = c.PostForm("phone")
 	user.Status = c.PostForm("status")
 	selectedWorkerID := c.PostForm("worker_id")
@@ -256,7 +258,7 @@ func ProfilePage(c *gin.Context) {
 <div class="card"><form action="/profile" method="POST" class="form-grid-edit">
 <div class="form-group-edit form-group-name"><label for="name">ФИО</label><input type="text" id="name" name="name" value="{{NAME}}" required></div>
 <div class="form-group-edit form-group-position"><label for="username">Логин</label><input type="text" id="username" name="username" value="{{USERNAME}}" required></div>
-<div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="text" id="password" name="password" value="{{PASSWORD}}" required></div>
+<div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="password" id="password" name="password" value="" placeholder="Оставьте пустым, чтобы не менять"></div>
 <div class="form-group-edit form-group-rate"><label for="phone">Контактный номер</label><input type="tel" id="phone" name="phone" value="{{PHONE}}"></div>
 <div class="form-actions-edit"><button type="submit" class="btn btn-primary">Сохранить</button></div>
 </form></div></div>
@@ -264,7 +266,6 @@ func ProfilePage(c *gin.Context) {
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "my-profile"), 1)
 	final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(user.Name), 1)
 	final = strings.Replace(final, "{{USERNAME}}", template.HTMLEscapeString(user.Username), 1)
-	final = strings.Replace(final, "{{PASSWORD}}", template.HTMLEscapeString(user.Password), 1)
 	final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(user.Phone), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
@@ -279,7 +280,10 @@ func UpdateProfile(c *gin.Context) {
 
 	user.Name = c.PostForm("name")
 	user.Username = c.PostForm("username")
-	user.Password = c.PostForm("password")
+	newPassword := c.PostForm("password")
+	if newPassword != "" {
+		user.Password = newPassword
+	}
 	user.Phone = c.PostForm("phone")
 
 	if err := storage.UpdateUser(user); err != nil {
