@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"project/internal/models"
 	"project/internal/storage"
@@ -14,6 +16,47 @@ import (
 )
 
 // WorkersPage renders the list of workers with clickable cards.
+
+func filterWorkers(workers []models.Worker, searchQuery, positionFilter string) []models.Worker {
+	search := strings.ToLower(strings.TrimSpace(searchQuery))
+	position := strings.TrimSpace(positionFilter)
+
+	if search == "" && position == "" {
+		return workers
+	}
+
+	filtered := make([]models.Worker, 0, len(workers))
+	for _, worker := range workers {
+		nameMatch := search == "" || strings.Contains(strings.ToLower(worker.Name), search)
+		positionMatch := position == "" || worker.Position == position
+		if nameMatch && positionMatch {
+			filtered = append(filtered, worker)
+		}
+	}
+
+	return filtered
+}
+
+func uniquePositions(workers []models.Worker) []string {
+	positionsSet := make(map[string]struct{})
+	positions := make([]string, 0)
+
+	for _, worker := range workers {
+		position := strings.TrimSpace(worker.Position)
+		if position == "" {
+			continue
+		}
+		if _, exists := positionsSet[position]; exists {
+			continue
+		}
+		positionsSet[position] = struct{}{}
+		positions = append(positions, position)
+	}
+
+	sort.Strings(positions)
+	return positions
+}
+
 func WorkersPage(c *gin.Context) {
 	workers, err := storage.GetWorkers()
 	if err != nil {
@@ -21,8 +64,22 @@ func WorkersPage(c *gin.Context) {
 		return
 	}
 
+	searchQuery := c.Query("q")
+	selectedPosition := c.Query("position")
+	filteredWorkers := filterWorkers(workers, searchQuery, selectedPosition)
+	positions := uniquePositions(workers)
+
+	var positionOptionsHTML strings.Builder
+	for _, position := range positions {
+		selectedAttr := ""
+		if position == selectedPosition {
+			selectedAttr = " selected"
+		}
+		positionOptionsHTML.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, template.HTMLEscapeString(position), selectedAttr, template.HTMLEscapeString(position)))
+	}
+
 	var workersGridHTML strings.Builder
-	for _, worker := range workers {
+	for _, worker := range filteredWorkers {
 		runes := []rune(worker.Name)
 		initials := ""
 		if len(runes) > 1 {
@@ -71,6 +128,24 @@ func WorkersPage(c *gin.Context) {
         </div>
         <div class="card">
             <p>Просмотр, добавление, редактирование или увольнение работников.</p>
+            <form action="/workers" method="GET" class="workers-filters">
+                <div class="form-group">
+                    <label for="q">Поиск по Ф.И.О.</label>
+                    <input type="text" id="q" name="q" value="{{SEARCH_QUERY}}" placeholder="Например: Иванов">
+                </div>
+                <div class="form-group">
+                    <label for="position">Фильтр по должности</label>
+                    <select id="position" name="position">
+                        <option value="">Все должности</option>
+                        {{POSITION_OPTIONS}}
+                    </select>
+                </div>
+                <div class="filter-actions">
+                    <button type="submit" class="btn btn-primary">Применить</button>
+                    <a href="/workers" class="btn btn-secondary">Сбросить</a>
+                </div>
+            </form>
+            <p class="workers-summary">Найдено: <strong>{{FILTERED_COUNT}}</strong> из <strong>{{TOTAL_COUNT}}</strong>.</p>
             <div class="workers-grid">%s</div>
         </div>
     </div>
@@ -81,6 +156,10 @@ func WorkersPage(c *gin.Context) {
 	sidebar := RenderSidebar(c, "workers")
 	finalHTML := fmt.Sprintf(pageTemplate, workersGridHTML.String())
 	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, 1)
+	finalHTML = strings.Replace(finalHTML, "{{SEARCH_QUERY}}", template.HTMLEscapeString(searchQuery), 1)
+	finalHTML = strings.Replace(finalHTML, "{{POSITION_OPTIONS}}", positionOptionsHTML.String(), 1)
+	finalHTML = strings.Replace(finalHTML, "{{FILTERED_COUNT}}", strconv.Itoa(len(filteredWorkers)), 1)
+	finalHTML = strings.Replace(finalHTML, "{{TOTAL_COUNT}}", strconv.Itoa(len(workers)), 1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
@@ -101,6 +180,51 @@ func WorkerProfilePage(c *gin.Context) {
 	} else if len(runes) > 0 {
 		initials = string(runes[0])
 	}
+
+	selectedMonth := c.Query("month")
+	if selectedMonth == "" {
+		selectedMonth = time.Now().Format("2006-01")
+	}
+
+	entries, _ := storage.GetTimesheets()
+	totalHours := 0.0
+	var assignmentCards strings.Builder
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Date, selectedMonth+"-") {
+			continue
+		}
+		matched := false
+		for _, wid := range entry.WorkerIDs {
+			if wid == worker.ID {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			continue
+		}
+		hoursVal, _ := strconv.ParseFloat(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes), 64)
+		totalHours += hoursVal
+		assignmentCards.WriteString(fmt.Sprintf(`<div class="info-card"><div class="info-card-header"><h3>%s</h3><span class="status-badge active">%s-%s</span></div><p><strong>Часы:</strong> %.2f</p><p><strong>Комментарий:</strong> %s</p><p><strong>Пометка:</strong> %s</p></div>`, template.HTMLEscapeString(entry.Date), template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(entry.UserMark)))
+	}
+	if assignmentCards.Len() == 0 {
+		assignmentCards.WriteString(`<div class="info-card"><p>Назначений за выбранный месяц нет.</p></div>`)
+	}
+
+	monthNames := []string{"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"}
+	var workerMonthOptions strings.Builder
+	for i := -12; i <= 12; i++ {
+		m := time.Now().AddDate(0, i, 0)
+		val := m.Format("2006-01")
+		sel := ""
+		if val == selectedMonth {
+			sel = " selected"
+		}
+		label := fmt.Sprintf("%s %d", monthNames[int(m.Month())-1], m.Year())
+		workerMonthOptions.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, template.HTMLEscapeString(val), sel, template.HTMLEscapeString(label)))
+	}
+
+	assignmentsSection := fmt.Sprintf(`<div class="card" style="margin-top:20px;"><div class="page-header"><h2>Назначения за месяц</h2></div><form method="GET" action="/worker/%s" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month">%s</select><button type="submit" class="btn btn-primary">Показать</button><span><strong>Итого часов:</strong> %.2f</span></form><div class="compact-grid">%s</div></div>`, template.HTMLEscapeString(worker.ID), workerMonthOptions.String(), totalHours, assignmentCards.String())
 
 	formattedBirthDate := "Не указана"
 	if worker.BirthDate != "" {
@@ -143,6 +267,8 @@ func WorkerProfilePage(c *gin.Context) {
             <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11a1 1 0 11-2 0v-2a1 1 0 112 0v2zm-1-4a1 1 0 01-1-1V7a1 1 0 112 0v1a1 1 0 01-1 1z"/></svg>Ставка: {{RATE}} руб/час</li>
         </ul>
 
+        {{ASSIGNMENTS_SECTION}}
+
         <div class="profile-grid">
             <div class="placeholder-card">
                  <div class="history-header"><h2>История назначений</h2></div>
@@ -172,6 +298,7 @@ func WorkerProfilePage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{BIRTH_DATE}}", template.HTMLEscapeString(formattedBirthDate), -1)
 	finalHTML = strings.Replace(finalHTML, "{{PHONE}}", template.HTMLEscapeString(worker.Phone), -1)
 	finalHTML = strings.Replace(finalHTML, "{{RATE}}", fmt.Sprintf("%.2f", worker.HourlyRate), -1)
+	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_SECTION}}", assignmentsSection, -1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
