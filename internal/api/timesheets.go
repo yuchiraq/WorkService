@@ -68,6 +68,21 @@ func joinMappedValues(ids []string, valuesMap map[string]string) string {
 	return strings.Join(names, ", ")
 }
 
+func joinMappedLinks(ids []string, valuesMap map[string]string, pathPrefix string) string {
+	items := make([]string, 0, len(ids))
+	for _, id := range ids {
+		name, exists := valuesMap[id]
+		if !exists {
+			continue
+		}
+		items = append(items, fmt.Sprintf(`<a class="entity-link" href="%s/%s">%s</a>`, template.HTMLEscapeString(pathPrefix), template.HTMLEscapeString(id), template.HTMLEscapeString(name)))
+	}
+	if len(items) == 0 {
+		return "—"
+	}
+	return strings.Join(items, ", ")
+}
+
 // SchedulePage shows assignment entries list (old "Табель" page renamed to "Расписание").
 
 func getScopedEntries(c *gin.Context, entries []models.TimesheetEntry) ([]models.TimesheetEntry, error) {
@@ -175,14 +190,14 @@ func SchedulePage(c *gin.Context) {
 			}
 			commentHTML := ""
 			if strings.TrimSpace(entry.Notes) != "" {
-				commentHTML = `<p><strong>Комментарий:</strong> ` + template.HTMLEscapeString(entry.Notes) + `</p>`
+				commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
 			}
-			scheduleRows.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical"><div class="schedule-entry-main"><p><strong>Объекты:</strong> %s</p><p><strong>Работники:</strong> %s</p><p><strong>Время:</strong> %s - %s · %s ч</p>%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></div>`,
-				joinMappedValues(entry.ObjectIDs, objectsMap),
-				joinMappedValues(entry.WorkerIDs, workersMap),
+			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></article>`,
 				template.HTMLEscapeString(entry.StartTime),
 				template.HTMLEscapeString(entry.EndTime),
 				template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
+				joinMappedLinks(entry.ObjectIDs, objectsMap, "/object"),
+				joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"),
 				commentHTML,
 				template.HTMLEscapeString(entry.ID),
 				template.HTMLEscapeString(entry.ID),
@@ -643,7 +658,7 @@ func TimesheetsPage(c *gin.Context) {
 				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
 				hours, _ := strconv.ParseFloat(hoursStr, 64)
 				total += hours
-				objects := joinMappedValues(entry.ObjectIDs, objectsMap)
+				objects := joinMappedLinks(entry.ObjectIDs, objectsMap, "/object")
 				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes)))
 			}
 			if len(details) == 0 {
@@ -652,7 +667,7 @@ func TimesheetsPage(c *gin.Context) {
 			}
 			cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
 		}
-		workerRows = append(workerRows, fmt.Sprintf(`<tr><th>%s</th>%s</tr>`, template.HTMLEscapeString(worker.Name), cells.String()))
+		workerRows = append(workerRows, fmt.Sprintf(`<tr><th><a class="entity-link" href="/worker/%s">%s</a></th>%s</tr>`, template.HTMLEscapeString(worker.ID), template.HTMLEscapeString(worker.Name), cells.String()))
 	}
 
 	rows := strings.Join(workerRows, "")
@@ -664,12 +679,12 @@ func TimesheetsPage(c *gin.Context) {
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Табель</h1><a class="btn btn-secondary" href="/schedule">К расписанию</a></div>
-<div class="card">
+<div class="card timesheet-card">
   <form method="GET" action="/timesheets" class="month-selector">
     <label for="month">Месяц:</label>
     <select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select>
   </form>
-  <div class="table-scroll"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}</tr></thead><tbody>{{ROWS}}</tbody></table></div>
+  <div class="table-scroll timesheet-table-wrap"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}</tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div>
 </div></body></html>`
 
