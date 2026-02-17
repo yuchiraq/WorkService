@@ -440,6 +440,8 @@ textarea,
     align-items: center;
     justify-content: center;
 }
+.filter-actions { display: flex; gap: 8px; }
+.workers-summary { color: var(--text-secondary); margin-bottom: 10px; }
 
 /* ---------- 10) Schedule / Timesheets ---------- */
 .month-selector {
@@ -449,6 +451,9 @@ textarea,
     gap: 8px;
     margin-bottom: 12px;
 }
+.profile-header { display: flex; align-items: center; gap: 12px; }
+.profile-header-info h1 { margin-bottom: 2px; }
+.profile-header-info p { color: var(--text-secondary); margin: 0; }
 
 .timesheet-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .timesheet-span-2,
@@ -539,6 +544,7 @@ textarea,
     padding-bottom: 6px;
     border-bottom: 1px solid var(--border);
 }
+.selected-list li.empty { color: var(--text-secondary); justify-content: flex-start; }
 
 .assignment-head strong {
     font-size: 15px;
@@ -554,6 +560,7 @@ textarea,
     grid-template-columns: 1fr;
     gap: 8px;
 }
+.schedule-entry-main p { margin: 3px 0; }
 
 .assignment-meta span,
 .assignment-note span {
@@ -584,6 +591,10 @@ textarea,
     text-align: center;
     position: relative;
 }
+.center-card { width: min(100%, 460px); }
+.center-card h1 { font-size: 64px; margin-bottom: 6px; color: var(--primary); }
+.center-card h2 { font-size: 24px; margin-bottom: 8px; }
+.center-card p { color: var(--text-secondary); margin-bottom: 18px; }
 
 .close-button {
     position: absolute;
