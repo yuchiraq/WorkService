@@ -85,6 +85,18 @@ func joinMappedLinks(ids []string, valuesMap map[string]string, pathPrefix strin
 
 // SchedulePage shows assignment entries list (old "Табель" page renamed to "Расписание").
 
+func cleanIDList(ids []string) []string {
+	clean := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		clean = append(clean, id)
+	}
+	return clean
+}
+
 func getScopedEntries(c *gin.Context, entries []models.TimesheetEntry) ([]models.TimesheetEntry, error) {
 	if c.GetString("userStatus") == "admin" {
 		return entries, nil
@@ -192,12 +204,17 @@ func SchedulePage(c *gin.Context) {
 			if strings.TrimSpace(entry.Notes) != "" {
 				commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
 			}
-			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></article>`,
+			creatorHTML := ""
+			if strings.TrimSpace(entry.CreatedByName) != "" {
+				creatorHTML = `<div class="assignment-meta"><span>Создал</span><p>` + template.HTMLEscapeString(entry.CreatedByName) + `</p></div>`
+			}
+			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></article>`,
 				template.HTMLEscapeString(entry.StartTime),
 				template.HTMLEscapeString(entry.EndTime),
 				template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
 				joinMappedLinks(entry.ObjectIDs, objectsMap, "/object"),
 				joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"),
+				creatorHTML,
 				commentHTML,
 				template.HTMLEscapeString(entry.ID),
 				template.HTMLEscapeString(entry.ID),
@@ -323,6 +340,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 <div class="card{{CARD_CLASS}}">
 <form action="{{ACTION_URL}}" method="POST" class="form-grid-edit timesheet-form">
 {{CSRF_FIELD}}
+<input type="hidden" name="return_to" value="{{RETURN_TO}}">
 <div class="form-group-edit"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
 <div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
 <div class="form-group-edit"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
@@ -399,6 +417,10 @@ function closeDeleteModal(){document.getElementById('deleteModal').style.display
 	mainClass := ""
 	backLink := `<a href="/schedule" class="back-link">← К расписанию</a>`
 	cardClass := ""
+	returnTo := c.DefaultQuery("return", "/schedule")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/schedule"
+	}
 	if isModal {
 		layoutStart = `<div class="modal-form-layout">`
 		layoutEnd = `</div>`
@@ -416,6 +438,7 @@ function closeDeleteModal(){document.getElementById('deleteModal').style.display
 	final = strings.Replace(final, "{{TITLE}}", template.HTMLEscapeString(title), -1)
 	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(actionURL), 1)
 	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
+	final = strings.Replace(final, "{{RETURN_TO}}", template.HTMLEscapeString(returnTo), 1)
 	final = strings.Replace(final, "{{DATE}}", template.HTMLEscapeString(entry.Date), 1)
 	final = strings.Replace(final, "{{START_TIME}}", template.HTMLEscapeString(entry.StartTime), 1)
 	final = strings.Replace(final, "{{END_TIME}}", template.HTMLEscapeString(entry.EndTime), 1)
@@ -479,9 +502,11 @@ func CreateScheduleEntry(c *gin.Context) {
 		StartTime:         c.PostForm("start_time"),
 		EndTime:           c.PostForm("end_time"),
 		LunchBreakMinutes: lunch,
-		WorkerIDs:         c.PostFormArray("worker_ids"),
-		ObjectIDs:         c.PostFormArray("object_ids"),
+		WorkerIDs:         cleanIDList(c.PostFormArray("worker_ids")),
+		ObjectIDs:         cleanIDList(c.PostFormArray("object_ids")),
 		Notes:             c.PostForm("notes"),
+		CreatedByID:       c.GetString("userID"),
+		CreatedByName:     c.GetString("userName"),
 	}
 
 	if c.GetString("userStatus") != "admin" {
@@ -498,7 +523,11 @@ func CreateScheduleEntry(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Failed to create schedule entry: %v", err)
 		return
 	}
-	c.Redirect(http.StatusFound, "/schedule")
+	returnTo := c.PostForm("return_to")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/schedule"
+	}
+	c.Redirect(http.StatusFound, returnTo)
 }
 
 func EditSchedulePage(c *gin.Context) {
@@ -557,8 +586,8 @@ func UpdateScheduleEntry(c *gin.Context) {
 	entry.StartTime = c.PostForm("start_time")
 	entry.EndTime = c.PostForm("end_time")
 	entry.LunchBreakMinutes = lunch
-	entry.WorkerIDs = c.PostFormArray("worker_ids")
-	entry.ObjectIDs = c.PostFormArray("object_ids")
+	entry.WorkerIDs = cleanIDList(c.PostFormArray("worker_ids"))
+	entry.ObjectIDs = cleanIDList(c.PostFormArray("object_ids"))
 	entry.Notes = c.PostForm("notes")
 	if c.GetString("userStatus") != "admin" {
 		if worker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil {
@@ -575,7 +604,11 @@ func UpdateScheduleEntry(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Failed to update schedule entry: %v", err)
 		return
 	}
-	c.Redirect(http.StatusFound, "/schedule")
+	returnTo := c.PostForm("return_to")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/schedule"
+	}
+	c.Redirect(http.StatusFound, returnTo)
 }
 
 func DeleteScheduleEntry(c *gin.Context) {
@@ -606,7 +639,11 @@ func DeleteScheduleEntry(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Failed to delete schedule entry: %v", err)
 		return
 	}
-	c.Redirect(http.StatusFound, "/schedule")
+	returnTo := c.PostForm("return_to")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/schedule"
+	}
+	c.Redirect(http.StatusFound, returnTo)
 }
 
 // TimesheetsPage is new табель matrix by workers/dates with per-cell hover details.
@@ -674,7 +711,11 @@ func TimesheetsPage(c *gin.Context) {
 				hours, _ := strconv.ParseFloat(hoursStr, 64)
 				total += hours
 				objects := joinMappedLinks(entry.ObjectIDs, objectsMap, "/object")
-				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes)))
+				creator := strings.TrimSpace(entry.CreatedByName)
+				if creator == "" {
+					creator = "—"
+				}
+				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s · создал: %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(creator)))
 			}
 			if len(details) == 0 {
 				cells.WriteString(`<td class="hours-cell empty">—</td>`)

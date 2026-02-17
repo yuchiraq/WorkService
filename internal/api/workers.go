@@ -282,7 +282,11 @@ func WorkerProfilePage(c *gin.Context) {
 		if strings.TrimSpace(entry.Notes) != "" {
 			commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
 		}
-		workerAssignments.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical structured-assignment"><div class="assignment-head"><strong>%s — %s</strong><span>%.2f ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div>%s</div></div>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, joinMappedLinks(entry.ObjectIDs, objectsMap, "/object"), commentHTML))
+		creatorHTML := ""
+		if strings.TrimSpace(entry.CreatedByName) != "" {
+			creatorHTML = `<div class="assignment-meta"><span>Создал</span><p>` + template.HTMLEscapeString(entry.CreatedByName) + `</p></div>`
+		}
+		workerAssignments.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical structured-assignment"><div class="assignment-head"><strong>%s — %s</strong><span>%.2f ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div>%s%s</div></div>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, joinMappedLinks(entry.ObjectIDs, objectsMap, "/object"), creatorHTML, commentHTML))
 	}
 	if workerAssignments.Len() == 0 {
 		workerAssignments.WriteString(`<p>Назначений за выбранный месяц нет.</p>`)

@@ -84,7 +84,7 @@ function closeModal(){
 function closeNav(){ body.classList.remove('nav-open'); }
 function openModal(url,t,ret){
   if(!modal||!iframe){ window.location.href=url; return; }
-  try{ const u=new URL(url,window.location.origin); if(!u.searchParams.has('modal')) u.searchParams.set('modal','1'); url=u.pathname+u.search; }catch(_){ }
+  try{ const u=new URL(url,window.location.origin); if(!u.searchParams.has('modal')) u.searchParams.set('modal','1'); if(ret && !u.searchParams.has('return')) u.searchParams.set('return', ret); url=u.pathname+u.search; }catch(_){ }
   modal.classList.add('visible');
   body.classList.add('modal-open');
   title.textContent=t||'Форма';
@@ -139,7 +139,7 @@ if(iframe){
   <nav class="side-nav-links">%s</nav>
   <a class="btn btn-secondary side-nav-logout" href="/logout">Выйти</a>
 </aside>
-<a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule" aria-label="Создать назначение">+</a>
+<div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение">+</a></div>
 <div class="action-modal" id="app-action-modal" aria-hidden="true">
   <div class="action-modal-sheet">
     <div class="action-modal-header"><h3 id="app-action-modal-title">Форма</h3><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button></div>

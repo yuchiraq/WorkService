@@ -54,9 +54,9 @@ func DashboardPage(c *gin.Context) {
             <h1>Добро пожаловать, %s!</h1>
         </div>
         <div class="workers-grid dashboard-stats">
-            <div class="metric"><div class="label">Назначений сегодня</div><div class="value">%d</div></div>
-            <div class="metric"><div class="label">Рабочих в штате</div><div class="value">%d</div></div>
-            <div class="metric"><div class="label">Объектов в работе</div><div class="value">%d</div></div>
+            <a class="metric metric-link" href="/schedule"><div class="label">Назначений сегодня</div><div class="value">%d</div></a>
+            <a class="metric metric-link" href="/workers"><div class="label">Рабочих в штате</div><div class="value">%d</div></a>
+            <a class="metric metric-link" href="/objects"><div class="label">Объектов в работе</div><div class="value">%d</div></a>
         </div>
         <div class="card">
             <p>Вы находитесь в системе управления работами.</p>

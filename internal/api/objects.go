@@ -163,6 +163,7 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
         <div class="card{{CARD_CLASS}}">
             <form action="{{ACTION_URL}}" method="POST" class="form-grid-edit">
 {{CSRF_FIELD}}
+                <input type="hidden" name="return_to" value="{{RETURN_TO}}">
                 <div class="form-group-edit form-group-name">
                     <label for="name">Название</label>
                     <input type="text" id="name" name="name" value="{{OBJECT_NAME}}" required>
@@ -224,6 +225,10 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
 	tab := c.DefaultQuery("tab", "active")
 	backLink := `<a href="/objects?tab=` + template.HTMLEscapeString(tab) + `" class="back-link">← К списку объектов</a>`
 	cardClass := ""
+	returnTo := c.DefaultQuery("return", "/objects")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/objects"
+	}
 	if isModal {
 		layoutStart = `<div class="modal-form-layout">`
 		layoutEnd = `</div>`
@@ -241,6 +246,7 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
 	final = strings.Replace(final, "{{TITLE}}", template.HTMLEscapeString(title), -1)
 	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(actionURL), 1)
 	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
+	final = strings.Replace(final, "{{RETURN_TO}}", template.HTMLEscapeString(returnTo), 1)
 	final = strings.Replace(final, "{{OBJECT_NAME}}", template.HTMLEscapeString(object.Name), 1)
 	final = strings.Replace(final, "{{OBJECT_ADDRESS}}", template.HTMLEscapeString(object.Address), 1)
 	final = strings.Replace(final, "{{RESPONSIBLE_OPTIONS}}", responsibleOptions.String(), 1)
@@ -298,7 +304,11 @@ func ObjectProfilePage(c *gin.Context) {
 			if strings.TrimSpace(entry.Notes) != "" {
 				commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
 			}
-			assignments.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s · %s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s</div></article>`, template.HTMLEscapeString(formatScheduleDateLabel(entry.Date)), template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)), joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"), commentHTML))
+			creatorHTML := ""
+			if strings.TrimSpace(entry.CreatedByName) != "" {
+				creatorHTML = `<div class="assignment-meta"><span>Создал</span><p>` + template.HTMLEscapeString(entry.CreatedByName) + `</p></div>`
+			}
+			assignments.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s · %s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s%s</div></article>`, template.HTMLEscapeString(formatScheduleDateLabel(entry.Date)), template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)), joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"), creatorHTML, commentHTML))
 		}
 	}
 
@@ -346,7 +356,11 @@ func CreateObject(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Failed to create object: %v", err)
 		return
 	}
-	c.Redirect(http.StatusFound, "/objects")
+	returnTo := c.PostForm("return_to")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/objects"
+	}
+	c.Redirect(http.StatusFound, returnTo)
 }
 
 func EditObjectPage(c *gin.Context) {
@@ -378,7 +392,11 @@ func UpdateObject(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Failed to update object: %v", err)
 		return
 	}
-	c.Redirect(http.StatusFound, "/objects")
+	returnTo := c.PostForm("return_to")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/objects"
+	}
+	c.Redirect(http.StatusFound, returnTo)
 }
 
 func DeleteObject(c *gin.Context) {
@@ -386,5 +404,9 @@ func DeleteObject(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Failed to delete object: %v", err)
 		return
 	}
-	c.Redirect(http.StatusFound, "/objects")
+	returnTo := c.PostForm("return_to")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/objects"
+	}
+	c.Redirect(http.StatusFound, returnTo)
 }
