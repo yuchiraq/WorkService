@@ -51,7 +51,11 @@ func saveWorkers() error {
 func GetWorkers() ([]models.Worker, error) {
 	workersMutex.RLock()
 	defer workersMutex.RUnlock()
-	return workers, nil
+
+	workersCopy := make([]models.Worker, len(workers))
+	copy(workersCopy, workers)
+
+	return workersCopy, nil
 }
 
 // GetWorkerByID retrieves a single worker by their ID.
@@ -65,6 +69,20 @@ func GetWorkerByID(id string) (models.Worker, error) {
 		}
 	}
 	return models.Worker{}, errors.New("worker not found")
+}
+
+// GetWorkerByUserID retrieves a worker linked to a user account.
+func GetWorkerByUserID(userID string) (models.Worker, error) {
+	workersMutex.RLock()
+	defer workersMutex.RUnlock()
+
+	for _, worker := range workers {
+		if worker.UserID == userID {
+			return worker, nil
+		}
+	}
+
+	return models.Worker{}, errors.New("worker not found for user")
 }
 
 // CreateWorker adds a new worker to the list and saves it.
@@ -100,7 +118,6 @@ func UpdateWorker(updatedWorker models.Worker) error {
 	return errors.New("worker not found for update")
 }
 
-
 // DeleteWorker removes a worker from the list and saves the changes.
 func DeleteWorker(id string) error {
 	workersMutex.Lock()
@@ -114,4 +131,62 @@ func DeleteWorker(id string) error {
 	}
 
 	return errors.New("worker not found for deletion")
+}
+
+// LinkWorkerToUser links a worker to a user and clears previous links for both sides.
+func LinkWorkerToUser(workerID, userID string) error {
+	workersMutex.Lock()
+	defer workersMutex.Unlock()
+
+	workerIndex := -1
+	for i, worker := range workers {
+		if worker.ID == workerID {
+			workerIndex = i
+			break
+		}
+	}
+	if workerIndex == -1 {
+		return errors.New("worker not found")
+	}
+
+	for i := range workers {
+		if workers[i].UserID == userID {
+			workers[i].UserID = ""
+		}
+	}
+	workers[workerIndex].UserID = userID
+	return saveWorkers()
+}
+
+// ClearWorkerLinkByUserID clears the worker-user link without deleting worker data.
+func ClearWorkerLinkByUserID(userID string) error {
+	workersMutex.Lock()
+	defer workersMutex.Unlock()
+
+	changed := false
+	for i := range workers {
+		if workers[i].UserID == userID {
+			workers[i].UserID = ""
+			changed = true
+		}
+	}
+	if !changed {
+		return nil
+	}
+	return saveWorkers()
+}
+
+// DeleteWorkerByUserID removes a worker linked to user account.
+func DeleteWorkerByUserID(userID string) error {
+	workersMutex.Lock()
+	defer workersMutex.Unlock()
+
+	for i, worker := range workers {
+		if worker.UserID == userID {
+			workers = append(workers[:i], workers[i+1:]...)
+			return saveWorkers()
+		}
+	}
+
+	return nil
 }
