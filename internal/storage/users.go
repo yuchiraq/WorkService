@@ -177,3 +177,17 @@ func UpdateUser(updatedUser models.User) error {
 
 	return errors.New("user not found for update")
 }
+
+func DeleteUser(id string) error {
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	for i, user := range users {
+		if user.ID == id {
+			users = append(users[:i], users[i+1:]...)
+			return saveUsers()
+		}
+	}
+
+	return errors.New("user not found for deletion")
+}

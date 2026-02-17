@@ -28,11 +28,12 @@ func UsersPage(c *gin.Context) {
 
 	var rows strings.Builder
 	for _, user := range users {
-		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a href="/users/edit/%s" class="btn btn-secondary">Редактировать</a></td></tr>`,
+		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><div class="table-actions"><a href="/users/edit/%s" class="btn btn-secondary">Редактировать</a><form action="/users/delete/%s" method="POST" style="display:inline;"><button class="btn btn-danger" type="submit">Удалить</button></form></div></td></tr>`,
 			template.HTMLEscapeString(user.Name),
 			template.HTMLEscapeString(user.Username),
 			template.HTMLEscapeString(user.Phone),
 			template.HTMLEscapeString(userStatusLabel(user.Status)),
+			template.HTMLEscapeString(user.ID),
 			template.HTMLEscapeString(user.ID),
 		))
 	}
@@ -105,9 +106,20 @@ func CreateUser(c *gin.Context) {
 		Phone:    c.PostForm("phone"),
 		Status:   c.PostForm("status"),
 	}
-	if _, err := storage.CreateUser(newUser); err != nil {
+	createdUser, err := storage.CreateUser(newUser)
+	if err != nil {
 		c.String(http.StatusBadRequest, "Failed to create user: %v", err)
 		return
+	}
+	if createdUser.Status == "user" {
+		_, _ = storage.CreateWorker(models.Worker{
+			Name:          createdUser.Name,
+			Position:      "Сотрудник",
+			Phone:         createdUser.Phone,
+			CreatedBy:     c.GetString("userID"),
+			CreatedByName: c.GetString("userName"),
+			UserID:        createdUser.ID,
+		})
 	}
 	c.Redirect(http.StatusFound, "/users")
 }
@@ -136,6 +148,20 @@ func UpdateUser(c *gin.Context) {
 
 	if err := storage.UpdateUser(user); err != nil {
 		c.String(http.StatusBadRequest, "Failed to update user: %v", err)
+		return
+	}
+	c.Redirect(http.StatusFound, "/users")
+}
+
+func DeleteUser(c *gin.Context) {
+	userID := c.Param("id")
+	if userID == c.GetString("userID") {
+		c.String(http.StatusBadRequest, "Нельзя удалить текущего пользователя")
+		return
+	}
+	_ = storage.DeleteWorkerByUserID(userID)
+	if err := storage.DeleteUser(userID); err != nil {
+		c.String(http.StatusBadRequest, "Failed to delete user: %v", err)
 		return
 	}
 	c.Redirect(http.StatusFound, "/users")

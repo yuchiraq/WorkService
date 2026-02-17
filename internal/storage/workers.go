@@ -71,6 +71,20 @@ func GetWorkerByID(id string) (models.Worker, error) {
 	return models.Worker{}, errors.New("worker not found")
 }
 
+// GetWorkerByUserID retrieves a worker linked to a user account.
+func GetWorkerByUserID(userID string) (models.Worker, error) {
+	workersMutex.RLock()
+	defer workersMutex.RUnlock()
+
+	for _, worker := range workers {
+		if worker.UserID == userID {
+			return worker, nil
+		}
+	}
+
+	return models.Worker{}, errors.New("worker not found for user")
+}
+
 // CreateWorker adds a new worker to the list and saves it.
 func CreateWorker(worker models.Worker) (models.Worker, error) {
 	workersMutex.Lock()
@@ -117,4 +131,19 @@ func DeleteWorker(id string) error {
 	}
 
 	return errors.New("worker not found for deletion")
+}
+
+// DeleteWorkerByUserID removes a worker linked to user account.
+func DeleteWorkerByUserID(userID string) error {
+	workersMutex.Lock()
+	defer workersMutex.Unlock()
+
+	for i, worker := range workers {
+		if worker.UserID == userID {
+			workers = append(workers[:i], workers[i+1:]...)
+			return saveWorkers()
+		}
+	}
+
+	return nil
 }

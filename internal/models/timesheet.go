@@ -10,4 +10,5 @@ type TimesheetEntry struct {
 	WorkerIDs         []string `json:"workerIds"`
 	ObjectIDs         []string `json:"objectIds"`
 	Notes             string   `json:"notes,omitempty"`
+	UserMark          string   `json:"userMark,omitempty"`
 }

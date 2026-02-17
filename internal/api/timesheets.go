@@ -68,6 +68,43 @@ func joinMappedValues(ids []string, valuesMap map[string]string) string {
 }
 
 // SchedulePage shows assignment entries list (old "Табель" page renamed to "Расписание").
+
+func getScopedEntries(c *gin.Context, entries []models.TimesheetEntry) ([]models.TimesheetEntry, error) {
+	if c.GetString("userStatus") == "admin" {
+		return entries, nil
+	}
+	worker, err := storage.GetWorkerByUserID(c.GetString("userID"))
+	if err != nil {
+		return []models.TimesheetEntry{}, nil
+	}
+	filtered := make([]models.TimesheetEntry, 0)
+	for _, entry := range entries {
+		for _, wid := range entry.WorkerIDs {
+			if wid == worker.ID {
+				filtered = append(filtered, entry)
+				break
+			}
+		}
+	}
+	return filtered, nil
+}
+
+func monthOptionsHTML(selectedMonth string) string {
+	monthNames := []string{"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"}
+	now := time.Now()
+	var b strings.Builder
+	for i := -12; i <= 12; i++ {
+		m := now.AddDate(0, i, 0)
+		value := m.Format("2006-01")
+		selected := ""
+		if value == selectedMonth {
+			selected = " selected"
+		}
+		label := fmt.Sprintf("%s %d", monthNames[int(m.Month())-1], m.Year())
+		b.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, template.HTMLEscapeString(value), selected, template.HTMLEscapeString(label)))
+	}
+	return b.String()
+}
 func SchedulePage(c *gin.Context) {
 	entries, err := storage.GetTimesheets()
 	if err != nil {
@@ -75,9 +112,20 @@ func SchedulePage(c *gin.Context) {
 		return
 	}
 
+	entries, err = getScopedEntries(c, entries)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to scope schedule entries: %v", err)
+		return
+	}
+
 	workersMap, err := buildWorkersMap()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
+		return
+	}
+	entries, err = getScopedEntries(c, entries)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to scope timesheet entries: %v", err)
 		return
 	}
 	objectsMap, err := buildObjectsMap()
@@ -98,6 +146,7 @@ func SchedulePage(c *gin.Context) {
             <p><strong>Работники:</strong> %s</p>
             <p><strong>Объекты:</strong> %s</p>
             <p><strong>Комментарий:</strong> %s</p>
+            <p><strong>Пометка:</strong> %s</p>
             <div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary">Редактировать</a></div>
         </div>`,
 			template.HTMLEscapeString(entry.Date),
@@ -108,6 +157,7 @@ func SchedulePage(c *gin.Context) {
 			joinMappedValues(entry.WorkerIDs, workersMap),
 			joinMappedValues(entry.ObjectIDs, objectsMap),
 			template.HTMLEscapeString(entry.Notes),
+			template.HTMLEscapeString(entry.UserMark),
 			template.HTMLEscapeString(entry.ID),
 		))
 	}
@@ -171,6 +221,12 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 		return
 	}
 
+	if c.GetString("userStatus") != "admin" {
+		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil {
+			workers = []models.Worker{ownWorker}
+		}
+	}
+
 	workerItems := make([][2]string, 0, len(workers))
 	for _, worker := range workers {
 		workerItems = append(workerItems, [2]string{worker.ID, worker.Name})
@@ -196,8 +252,10 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 		entry.LunchBreakMinutes = 60
 	}
 
-	l30, l60, l90 := "", "", ""
+	l0, l30, l60, l90 := "", "", "", ""
 	switch entry.LunchBreakMinutes {
+	case 0:
+		l0 = " selected"
 	case 30:
 		l30 = " selected"
 	case 90:
@@ -221,7 +279,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 <div class="form-group-edit"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
 <div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
 <div class="form-group-edit"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
-<div class="form-group-edit"><label for="lunch_break_minutes">Обед</label><select id="lunch_break_minutes" name="lunch_break_minutes" required><option value="30"{{L30}}>30 минут</option><option value="60"{{L60}}>60 минут</option><option value="90"{{L90}}>90 минут</option></select></div>
+<div class="form-group-edit"><label for="lunch_break_minutes">Обед</label><select id="lunch_break_minutes" name="lunch_break_minutes" required><option value="0"{{L0}}>Без обеда</option><option value="30"{{L30}}>30 минут</option><option value="60"{{L60}}>60 минут</option><option value="90"{{L90}}>90 минут</option></select></div>
 
 <div class="form-group-edit timesheet-span-2">
   <label>Работники</label>
@@ -274,6 +332,7 @@ function closeDeleteModal(){document.getElementById('deleteModal').style.display
 	final = strings.Replace(final, "{{DATE}}", template.HTMLEscapeString(entry.Date), 1)
 	final = strings.Replace(final, "{{START_TIME}}", template.HTMLEscapeString(entry.StartTime), 1)
 	final = strings.Replace(final, "{{END_TIME}}", template.HTMLEscapeString(entry.EndTime), 1)
+	final = strings.Replace(final, "{{L0}}", l0, 1)
 	final = strings.Replace(final, "{{L30}}", l30, 1)
 	final = strings.Replace(final, "{{L60}}", l60, 1)
 	final = strings.Replace(final, "{{L90}}", l90, 1)
@@ -304,6 +363,13 @@ func CreateScheduleEntry(c *gin.Context) {
 		ObjectIDs:         c.PostFormArray("object_ids"),
 		Notes:             c.PostForm("notes"),
 	}
+
+	if c.GetString("userStatus") != "admin" {
+		if worker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil {
+			entry.WorkerIDs = []string{worker.ID}
+		}
+		entry.UserMark = "Создано пользователем " + c.GetString("userName")
+	}
 	if _, err := storage.CreateTimesheet(entry); err != nil {
 		c.String(http.StatusBadRequest, "Failed to create schedule entry: %v", err)
 		return
@@ -317,6 +383,24 @@ func EditSchedulePage(c *gin.Context) {
 		c.String(http.StatusNotFound, "Schedule entry not found")
 		return
 	}
+	if c.GetString("userStatus") != "admin" {
+		worker, err := storage.GetWorkerByUserID(c.GetString("userID"))
+		if err != nil {
+			c.String(http.StatusForbidden, "Нет привязанного работника")
+			return
+		}
+		allowed := false
+		for _, wid := range entry.WorkerIDs {
+			if wid == worker.ID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			c.String(http.StatusForbidden, "Доступ запрещен")
+			return
+		}
+	}
 	renderScheduleForm(c, entry, "/schedule/edit/"+entry.ID, "Редактирование назначения", "Сохранить изменения", true)
 }
 
@@ -326,6 +410,24 @@ func UpdateScheduleEntry(c *gin.Context) {
 		c.String(http.StatusNotFound, "Schedule entry not found")
 		return
 	}
+	if c.GetString("userStatus") != "admin" {
+		worker, err := storage.GetWorkerByUserID(c.GetString("userID"))
+		if err != nil {
+			c.String(http.StatusForbidden, "Нет привязанного работника")
+			return
+		}
+		allowed := false
+		for _, wid := range entry.WorkerIDs {
+			if wid == worker.ID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			c.String(http.StatusForbidden, "Доступ запрещен")
+			return
+		}
+	}
 	lunch, _ := strconv.Atoi(c.PostForm("lunch_break_minutes"))
 	entry.Date = c.PostForm("date")
 	entry.StartTime = c.PostForm("start_time")
@@ -334,6 +436,12 @@ func UpdateScheduleEntry(c *gin.Context) {
 	entry.WorkerIDs = c.PostFormArray("worker_ids")
 	entry.ObjectIDs = c.PostFormArray("object_ids")
 	entry.Notes = c.PostForm("notes")
+	if c.GetString("userStatus") != "admin" {
+		if worker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil {
+			entry.WorkerIDs = []string{worker.ID}
+		}
+		entry.UserMark = "Обновлено пользователем " + c.GetString("userName")
+	}
 
 	if err := storage.UpdateTimesheet(entry); err != nil {
 		c.String(http.StatusBadRequest, "Failed to update schedule entry: %v", err)
@@ -343,6 +451,29 @@ func UpdateScheduleEntry(c *gin.Context) {
 }
 
 func DeleteScheduleEntry(c *gin.Context) {
+	entry, err := storage.GetTimesheetByID(c.Param("id"))
+	if err != nil {
+		c.String(http.StatusNotFound, "Schedule entry not found")
+		return
+	}
+	if c.GetString("userStatus") != "admin" {
+		worker, err := storage.GetWorkerByUserID(c.GetString("userID"))
+		if err != nil {
+			c.String(http.StatusForbidden, "Нет привязанного работника")
+			return
+		}
+		allowed := false
+		for _, wid := range entry.WorkerIDs {
+			if wid == worker.ID {
+				allowed = true
+				break
+			}
+		}
+		if !allowed {
+			c.String(http.StatusForbidden, "Доступ запрещен")
+			return
+		}
+	}
 	if err := storage.DeleteTimesheet(c.Param("id")); err != nil {
 		c.String(http.StatusBadRequest, "Failed to delete schedule entry: %v", err)
 		return
@@ -438,15 +569,16 @@ func TimesheetsPage(c *gin.Context) {
 <div class="card">
   <form method="GET" action="/timesheets" class="month-selector">
     <label for="month">Месяц:</label>
-    <input type="month" id="month" name="month" value="{{MONTH}}">
+    <select id="month" name="month">{{MONTH_OPTIONS}}</select>
     <button type="submit" class="btn btn-primary">Показать</button>
   </form>
   <div class="table-scroll"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}</tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div>
 </div></body></html>`
 
+	monthOptions := monthOptionsHTML(selectedMonth)
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "timesheets"), 1)
-	final = strings.Replace(final, "{{MONTH}}", template.HTMLEscapeString(selectedMonth), 1)
+	final = strings.Replace(final, "{{MONTH_OPTIONS}}", monthOptions, 1)
 	final = strings.Replace(final, "{{HEADERS}}", headers.String(), 1)
 	final = strings.Replace(final, "{{ROWS}}", rows, 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))

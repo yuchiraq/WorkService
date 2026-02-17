@@ -68,6 +68,7 @@ func SetupRouter(r *gin.Engine) {
 		adminRequired.POST("/users/new", api.CreateUser)
 		adminRequired.GET("/users/edit/:id", api.EditUserPage)
 		adminRequired.POST("/users/edit/:id", api.UpdateUser)
+		adminRequired.POST("/users/delete/:id", api.DeleteUser)
 	}
 
 	r.GET("/", func(c *gin.Context) {

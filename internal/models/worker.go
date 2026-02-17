@@ -10,4 +10,5 @@ type Worker struct {
 	BirthDate     string  `json:"birthDate,omitempty"`
 	CreatedBy     string  `json:"createdBy"`
 	CreatedByName string  `json:"createdByName"`
+	UserID        string  `json:"userId,omitempty"`
 }

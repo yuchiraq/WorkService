@@ -67,7 +67,7 @@ func normalizeTimesheet(entry *models.TimesheetEntry) {
 
 func normalizeLunchBreak(minutes int) int {
 	switch minutes {
-	case 30, 60, 90:
+	case 0, 30, 60, 90:
 		return minutes
 	default:
 		return 60
