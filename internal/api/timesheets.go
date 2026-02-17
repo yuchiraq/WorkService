@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -105,6 +106,16 @@ func monthOptionsHTML(selectedMonth string) string {
 	}
 	return b.String()
 }
+func formatScheduleDateLabel(date string) string {
+	t, err := time.Parse("2006-01-02", date)
+	if err != nil {
+		return template.HTMLEscapeString(date)
+	}
+	weekdays := []string{"воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"}
+	months := []string{"января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"}
+	return fmt.Sprintf("%s, %d %s %d", weekdays[int(t.Weekday())], t.Day(), months[int(t.Month())-1], t.Year())
+}
+
 func SchedulePage(c *gin.Context) {
 	entries, err := storage.GetTimesheets()
 	if err != nil {
@@ -118,14 +129,22 @@ func SchedulePage(c *gin.Context) {
 		return
 	}
 
+	selectedMonth := c.Query("month")
+	if selectedMonth == "" {
+		selectedMonth = time.Now().Format("2006-01")
+	}
+
+	filteredEntries := make([]models.TimesheetEntry, 0, len(entries))
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Date, selectedMonth+"-") {
+			filteredEntries = append(filteredEntries, entry)
+		}
+	}
+	entries = filteredEntries
+
 	workersMap, err := buildWorkersMap()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
-		return
-	}
-	entries, err = getScopedEntries(c, entries)
-	if err != nil {
-		c.String(http.StatusInternalServerError, "Failed to scope timesheet entries: %v", err)
 		return
 	}
 	objectsMap, err := buildObjectsMap()
@@ -134,47 +153,54 @@ func SchedulePage(c *gin.Context) {
 		return
 	}
 
-	var cards strings.Builder
-	for _, entry := range entries {
-		cards.WriteString(fmt.Sprintf(`<div class="info-card">
-            <div class="info-card-header">
-                <h3>%s</h3>
-                <span class="status-badge active">%s–%s</span>
-            </div>
-            <p><strong>Обед:</strong> %d мин</p>
-            <p><strong>Часы:</strong> %s</p>
-            <p><strong>Работники:</strong> %s</p>
-            <p><strong>Объекты:</strong> %s</p>
-            <p><strong>Комментарий:</strong> %s</p>
-            <p><strong>Пометка:</strong> %s</p>
-            <div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary">Редактировать</a></div>
-        </div>`,
-			template.HTMLEscapeString(entry.Date),
-			template.HTMLEscapeString(entry.StartTime),
-			template.HTMLEscapeString(entry.EndTime),
-			entry.LunchBreakMinutes,
-			template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
-			joinMappedValues(entry.WorkerIDs, workersMap),
-			joinMappedValues(entry.ObjectIDs, objectsMap),
-			template.HTMLEscapeString(entry.Notes),
-			template.HTMLEscapeString(entry.UserMark),
-			template.HTMLEscapeString(entry.ID),
-		))
-	}
-	if cards.Len() == 0 {
-		cards.WriteString(`<div class="info-card"><p>Записей расписания пока нет.</p></div>`)
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Date == entries[j].Date {
+			return entries[i].StartTime < entries[j].StartTime
+		}
+		return entries[i].Date > entries[j].Date
+	})
+
+	var scheduleRows strings.Builder
+	if len(entries) == 0 {
+		scheduleRows.WriteString(`<div class="info-card"><p>Записей за выбранный месяц нет.</p></div>`)
+	} else {
+		currentDate := ""
+		for _, entry := range entries {
+			if entry.Date != currentDate {
+				if currentDate != "" {
+					scheduleRows.WriteString(`</div></div>`)
+				}
+				currentDate = entry.Date
+				scheduleRows.WriteString(fmt.Sprintf(`<div class="schedule-day-group"><h3>%s</h3><div class="schedule-day-list">`, template.HTMLEscapeString(formatScheduleDateLabel(entry.Date))))
+			}
+			commentHTML := ""
+			if strings.TrimSpace(entry.Notes) != "" {
+				commentHTML = `<p><strong>Комментарий:</strong> ` + template.HTMLEscapeString(entry.Notes) + `</p>`
+			}
+			scheduleRows.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical"><div class="schedule-entry-main"><p><strong>Объекты:</strong> %s</p><p><strong>Работники:</strong> %s</p><p><strong>Время:</strong> %s - %s · %s ч</p>%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary">Редактировать</a></div></div>`,
+				joinMappedValues(entry.ObjectIDs, objectsMap),
+				joinMappedValues(entry.WorkerIDs, workersMap),
+				template.HTMLEscapeString(entry.StartTime),
+				template.HTMLEscapeString(entry.EndTime),
+				template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
+				commentHTML,
+				template.HTMLEscapeString(entry.ID),
+			))
+		}
+		scheduleRows.WriteString(`</div></div>`)
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-<div class="page-header"><h1>Расписание</h1><a class="btn btn-primary" href="/schedule/new">Добавить назначение</a></div>
-<div class="card"><div class="compact-grid">{{CARDS}}</div></div>
+<div class="page-header"><h1>Расписание</h1><form method="GET" action="/schedule" class="month-selector"><select id="month" name="month">{{MONTH_OPTIONS}}</select><button type="submit" class="btn btn-secondary">Показать</button></form><a class="btn btn-primary" href="/schedule/new">Добавить назначение</a></div>
+<div class="card"><div class="schedule-vertical">{{SCHEDULE_ROWS}}</div></div>
 </div>
 </body></html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "schedule"), 1)
-	final = strings.Replace(final, "{{CARDS}}", cards.String(), 1)
+	final = strings.Replace(final, "{{MONTH_OPTIONS}}", monthOptionsHTML(selectedMonth), 1)
+	final = strings.Replace(final, "{{SCHEDULE_ROWS}}", scheduleRows.String(), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
 

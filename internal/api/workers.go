@@ -187,8 +187,16 @@ func WorkerProfilePage(c *gin.Context) {
 	}
 
 	entries, _ := storage.GetTimesheets()
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Date == entries[j].Date {
+			return entries[i].StartTime < entries[j].StartTime
+		}
+		return entries[i].Date > entries[j].Date
+	})
+
 	totalHours := 0.0
-	var assignmentCards strings.Builder
+	var workerAssignments strings.Builder
+	currentDate := ""
 	for _, entry := range entries {
 		if !strings.HasPrefix(entry.Date, selectedMonth+"-") {
 			continue
@@ -205,10 +213,23 @@ func WorkerProfilePage(c *gin.Context) {
 		}
 		hoursVal, _ := strconv.ParseFloat(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes), 64)
 		totalHours += hoursVal
-		assignmentCards.WriteString(fmt.Sprintf(`<div class="info-card"><div class="info-card-header"><h3>%s</h3><span class="status-badge active">%s-%s</span></div><p><strong>Часы:</strong> %.2f</p><p><strong>Комментарий:</strong> %s</p><p><strong>Пометка:</strong> %s</p></div>`, template.HTMLEscapeString(entry.Date), template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(entry.UserMark)))
+		if entry.Date != currentDate {
+			if currentDate != "" {
+				workerAssignments.WriteString(`</div></div>`)
+			}
+			currentDate = entry.Date
+			workerAssignments.WriteString(fmt.Sprintf(`<div class="schedule-day-group"><h3>%s</h3><div class="schedule-day-list">`, template.HTMLEscapeString(formatScheduleDateLabel(entry.Date))))
+		}
+		commentHTML := ""
+		if strings.TrimSpace(entry.Notes) != "" {
+			commentHTML = `<p><strong>Комментарий:</strong> ` + template.HTMLEscapeString(entry.Notes) + `</p>`
+		}
+		workerAssignments.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical"><div class="schedule-entry-main"><p><strong>Время:</strong> %s - %s · %.2f ч</p>%s</div></div>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, commentHTML))
 	}
-	if assignmentCards.Len() == 0 {
-		assignmentCards.WriteString(`<div class="info-card"><p>Назначений за выбранный месяц нет.</p></div>`)
+	if workerAssignments.Len() == 0 {
+		workerAssignments.WriteString(`<p>Назначений за выбранный месяц нет.</p>`)
+	} else {
+		workerAssignments.WriteString(`</div></div>`)
 	}
 
 	monthNames := []string{"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"}
@@ -223,8 +244,6 @@ func WorkerProfilePage(c *gin.Context) {
 		label := fmt.Sprintf("%s %d", monthNames[int(m.Month())-1], m.Year())
 		workerMonthOptions.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, template.HTMLEscapeString(val), sel, template.HTMLEscapeString(label)))
 	}
-
-	assignmentsSection := fmt.Sprintf(`<div class="card" style="margin-top:20px;"><div class="page-header"><h2>Назначения за месяц</h2></div><form method="GET" action="/worker/%s" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month">%s</select><button type="submit" class="btn btn-primary">Показать</button><span><strong>Итого часов:</strong> %.2f</span></form><div class="compact-grid">%s</div></div>`, template.HTMLEscapeString(worker.ID), workerMonthOptions.String(), totalHours, assignmentCards.String())
 
 	formattedBirthDate := "Не указана"
 	if worker.BirthDate != "" {
@@ -272,9 +291,8 @@ func WorkerProfilePage(c *gin.Context) {
         <div class="profile-grid">
             <div class="placeholder-card">
                  <div class="history-header"><h2>История назначений</h2></div>
-                 <div class="icon"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M3 3a1 1 0 000 2v8a1 1 0 001 1h12a1 1 0 001-1V5a1 1 0 000-2H3zm11 1H6v2h8V4zm-8 4H4v2h2V8zm0 3H4v2h2v-2zm4-3h4v2h-4V8zm0 3h4v2h-4v-2z"/></svg></div>
-                 <h3>Назначений нет</h3>
-                 <p>Для этого работника нет назначений.</p>
+                 <form method="GET" action="/worker/{{WORKER_ID}}" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month">{{MONTH_OPTIONS}}</select><button type="submit" class="btn btn-primary">Показать</button><span><strong>Итого часов:</strong> {{TOTAL_HOURS}}</span></form>
+                 <div class="schedule-vertical">{{ASSIGNMENTS_BY_DAY}}</div>
             </div>
             <div class="placeholder-card">
                  <div class="history-header"><h2>История событий</h2></div>
@@ -298,7 +316,9 @@ func WorkerProfilePage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{BIRTH_DATE}}", template.HTMLEscapeString(formattedBirthDate), -1)
 	finalHTML = strings.Replace(finalHTML, "{{PHONE}}", template.HTMLEscapeString(worker.Phone), -1)
 	finalHTML = strings.Replace(finalHTML, "{{RATE}}", fmt.Sprintf("%.2f", worker.HourlyRate), -1)
-	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_SECTION}}", assignmentsSection, -1)
+	finalHTML = strings.Replace(finalHTML, "{{MONTH_OPTIONS}}", workerMonthOptions.String(), -1)
+	finalHTML = strings.Replace(finalHTML, "{{TOTAL_HOURS}}", fmt.Sprintf("%.2f", totalHours), -1)
+	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_BY_DAY}}", workerAssignments.String(), -1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }

@@ -678,3 +678,36 @@ nav li a svg {
         font-size: 11px;
     }
 }
+
+.schedule-vertical {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.schedule-day-group h3 {
+    margin: 0 0 10px;
+    font-size: 22px;
+}
+
+.schedule-day-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.schedule-entry-vertical {
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 12px;
+}
+
+.schedule-entry-main p {
+    margin: 4px 0;
+}
+
+.text-muted { color: var(--text-color-light); font-size: 12px; }

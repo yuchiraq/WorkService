@@ -49,6 +49,36 @@ func UsersPage(c *gin.Context) {
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
 
+func userWorkerOptions(userID, selectedWorkerID string) (string, string, error) {
+	workers, err := storage.GetWorkers()
+	if err != nil {
+		return "", "", err
+	}
+
+	if selectedWorkerID == "" {
+		if linkedWorker, err := storage.GetWorkerByUserID(userID); err == nil {
+			selectedWorkerID = linkedWorker.ID
+		}
+	}
+
+	var options strings.Builder
+	options.WriteString(`<option value="">Создать нового работника автоматически</option>`)
+	selectedLabel := "Автосоздание"
+	for _, worker := range workers {
+		if worker.UserID != "" && worker.UserID != userID {
+			continue
+		}
+		selected := ""
+		if worker.ID == selectedWorkerID {
+			selected = " selected"
+			selectedLabel = worker.Name
+		}
+		options.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, template.HTMLEscapeString(worker.ID), selected, template.HTMLEscapeString(worker.Name)))
+	}
+
+	return options.String(), selectedLabel, nil
+}
+
 func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLabel string, adminEditable bool) {
 	statusAdmin := ""
 	statusUser := ""
@@ -63,6 +93,17 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 		statusField = `<label for="status">Статус</label><select id="status" name="status"><option value="user"` + statusUser + `>Пользователь</option><option value="admin"` + statusAdmin + `>Админ</option></select>`
 	}
 
+	workerOptions, selectedWorkerName, err := userWorkerOptions(user.ID, "")
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
+		return
+	}
+
+	workerField := `<input type="hidden" name="worker_id" value="">`
+	if user.Status != "admin" || user.ID == "" {
+		workerField = `<label for="worker_id">Связанный работник</label><select id="worker_id" name="worker_id">` + workerOptions + `</select><small class="text-muted">Текущее значение: ` + template.HTMLEscapeString(selectedWorkerName) + `</small>`
+	}
+
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
@@ -75,6 +116,7 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 <div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="text" id="password" name="password" value="{{PASSWORD}}" required></div>
 <div class="form-group-edit form-group-rate"><label for="phone">Контактный номер</label><input type="tel" id="phone" name="phone" value="{{PHONE}}"></div>
 <div class="form-group-edit form-group-rate">{{STATUS_FIELD}}</div>
+<div class="form-group-edit form-group-rate">{{WORKER_FIELD}}</div>
 <div class="form-actions-edit"><button type="submit" class="btn btn-primary">{{SUBMIT_LABEL}}</button><a href="{{BACK_URL}}" class="btn btn-secondary">Отмена</a></div>
 </form>
 </div>
@@ -89,6 +131,7 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 	final = strings.Replace(final, "{{PASSWORD}}", template.HTMLEscapeString(user.Password), 1)
 	final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(user.Phone), 1)
 	final = strings.Replace(final, "{{STATUS_FIELD}}", statusField, 1)
+	final = strings.Replace(final, "{{WORKER_FIELD}}", workerField, 1)
 	final = strings.Replace(final, "{{SUBMIT_LABEL}}", template.HTMLEscapeString(submitLabel), 1)
 	final = strings.Replace(final, "{{BACK_URL}}", "/users", -1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
@@ -106,20 +149,30 @@ func CreateUser(c *gin.Context) {
 		Phone:    c.PostForm("phone"),
 		Status:   c.PostForm("status"),
 	}
+	selectedWorkerID := c.PostForm("worker_id")
+
 	createdUser, err := storage.CreateUser(newUser)
 	if err != nil {
 		c.String(http.StatusBadRequest, "Failed to create user: %v", err)
 		return
 	}
 	if createdUser.Status == "user" {
-		_, _ = storage.CreateWorker(models.Worker{
-			Name:          createdUser.Name,
-			Position:      "Сотрудник",
-			Phone:         createdUser.Phone,
-			CreatedBy:     c.GetString("userID"),
-			CreatedByName: c.GetString("userName"),
-			UserID:        createdUser.ID,
-		})
+		if selectedWorkerID != "" {
+			if err := storage.LinkWorkerToUser(selectedWorkerID, createdUser.ID); err != nil {
+				_ = storage.DeleteUser(createdUser.ID)
+				c.String(http.StatusBadRequest, "Failed to link worker: %v", err)
+				return
+			}
+		} else {
+			_, _ = storage.CreateWorker(models.Worker{
+				Name:          createdUser.Name,
+				Position:      "Сотрудник",
+				Phone:         createdUser.Phone,
+				CreatedBy:     c.GetString("userID"),
+				CreatedByName: c.GetString("userName"),
+				UserID:        createdUser.ID,
+			})
+		}
 	}
 	c.Redirect(http.StatusFound, "/users")
 }
@@ -145,10 +198,32 @@ func UpdateUser(c *gin.Context) {
 	user.Password = c.PostForm("password")
 	user.Phone = c.PostForm("phone")
 	user.Status = c.PostForm("status")
+	selectedWorkerID := c.PostForm("worker_id")
 
 	if err := storage.UpdateUser(user); err != nil {
 		c.String(http.StatusBadRequest, "Failed to update user: %v", err)
 		return
+	}
+	if user.Status == "user" {
+		if selectedWorkerID != "" {
+			if err := storage.LinkWorkerToUser(selectedWorkerID, user.ID); err != nil {
+				c.String(http.StatusBadRequest, "Failed to link worker: %v", err)
+				return
+			}
+		} else {
+			if _, err := storage.GetWorkerByUserID(user.ID); err != nil {
+				_, _ = storage.CreateWorker(models.Worker{
+					Name:          user.Name,
+					Position:      "Сотрудник",
+					Phone:         user.Phone,
+					CreatedBy:     c.GetString("userID"),
+					CreatedByName: c.GetString("userName"),
+					UserID:        user.ID,
+				})
+			}
+		}
+	} else {
+		_ = storage.ClearWorkerLinkByUserID(user.ID)
 	}
 	c.Redirect(http.StatusFound, "/users")
 }
@@ -159,7 +234,7 @@ func DeleteUser(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Нельзя удалить текущего пользователя")
 		return
 	}
-	_ = storage.DeleteWorkerByUserID(userID)
+	_ = storage.ClearWorkerLinkByUserID(userID)
 	if err := storage.DeleteUser(userID); err != nil {
 		c.String(http.StatusBadRequest, "Failed to delete user: %v", err)
 		return
