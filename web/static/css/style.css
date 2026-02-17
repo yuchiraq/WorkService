@@ -529,6 +529,8 @@ textarea,
 .structured-assignment {
     padding: 10px 12px;
 }
+.filter-actions { display: flex; gap: 8px; }
+.workers-summary { color: var(--text-secondary); margin-bottom: 10px; }
 
 .assignment-head {
     display: flex;
@@ -539,6 +541,9 @@ textarea,
     padding-bottom: 6px;
     border-bottom: 1px solid var(--border);
 }
+.profile-header { display: flex; align-items: center; gap: 12px; }
+.profile-header-info h1 { margin-bottom: 2px; }
+.profile-header-info p { color: var(--text-secondary); margin: 0; }
 
 .assignment-head strong {
     font-size: 15px;
@@ -689,6 +694,9 @@ body.modal-open .mobile-menu-toggle {
     filter: blur(5px);
 }
 
+.modal-form-layout .back-link {
+    display: none;
+}
 
 .modal-form-layout {
     min-height: 100vh;
