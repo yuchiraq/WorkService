@@ -62,8 +62,13 @@ func ObjectsPage(c *gin.Context) {
 		if responsible == "" {
 			responsible = "Не назначен"
 		}
-		cards.WriteString(fmt.Sprintf(`<div class="info-card"><div class="info-card-header"><h3>%s</h3><span class="status-badge active">%s</span></div><p><strong>Адрес:</strong> %s</p><p><strong>Ответственный:</strong> %s</p><div class="info-card-actions"><a class="btn btn-secondary" href="/objects/edit/%s" data-modal-url="/objects/edit/%s" data-modal-title="Редактировать объект" data-modal-return="/objects?tab=%s">Редактировать</a></div></div>`,
+		statusClass := "active"
+		if object.Status == "completed" {
+			statusClass = "warning"
+		}
+		cards.WriteString(fmt.Sprintf(`<article class="info-card object-card"><div class="info-card-header"><h3>%s</h3><span class="status-badge %s">%s</span></div><div class="details-list"><div class="detail-row"><span>Адрес</span><strong>%s</strong></div><div class="detail-row"><span>Ответственный</span><strong>%s</strong></div></div><div class="info-card-actions"><a class="btn btn-secondary" href="/objects/edit/%s" data-modal-url="/objects/edit/%s" data-modal-title="Редактировать объект" data-modal-return="/objects?tab=%s">Редактировать</a></div></article>`,
 			template.HTMLEscapeString(object.Name),
+			template.HTMLEscapeString(statusClass),
 			template.HTMLEscapeString(objectStatusLabel(object.Status)),
 			template.HTMLEscapeString(object.Address),
 			template.HTMLEscapeString(responsible),
