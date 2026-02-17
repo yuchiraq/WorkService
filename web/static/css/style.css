@@ -500,3 +500,68 @@ p,li,label,td,th { line-height: 1.5; }
   .timesheet-table-wrap { overflow-x: auto; }
   .timesheet-matrix th, .timesheet-matrix td { white-space: nowrap; }
 }
+
+
+.profile-header-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.profile-header { display: flex; gap: 12px; align-items: center; }
+.profile-header-info h1 { margin: 0; font-size: clamp(24px, 3vw, 32px); }
+.profile-header-info p { margin: 4px 0 0; color: var(--text-secondary); }
+.profile-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.profile-details {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+.profile-details li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.profile-details svg { width: 16px; height: 16px; opacity: .75; flex-shrink: 0; }
+.profile-grid { display: grid; gap: 14px; }
+.history-header h2 { margin: 0 0 10px; }
+
+.object-card .info-card-header { margin-bottom: 12px; }
+.details-list { display: grid; gap: 8px; }
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface-strong), transparent 10%);
+}
+.detail-row span { color: var(--text-secondary); }
+.detail-row strong { text-align: right; }
+
+@media (min-width: 1024px) {
+  .side-nav { transform: translateX(0); width: 280px; }
+  .side-nav-overlay { display: none; }
+  .mobile-nav-toggle { display: none; }
+  .top-nav { left: 280px; }
+  .nav-inner { grid-template-columns: 1fr; }
+  .main-content { margin-left: 300px; margin-right: 24px; max-width: calc(100% - 324px); }
+  .container { max-width: none; }
+}
+
+@media (max-width: 1023px) {
+  .timesheet-table-wrap { overflow-x: auto; }
+  .timesheet-matrix th, .timesheet-matrix td { white-space: nowrap; }
+}
