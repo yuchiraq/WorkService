@@ -1,0 +1,9 @@
+[
+    {
+        "id": "1",
+        "name": "ЖК Север",
+        "status": "in_progress",
+        "address": "г. Самара, ул. Центральная, 10",
+        "responsibleUserId": "1"
+    }
+]
