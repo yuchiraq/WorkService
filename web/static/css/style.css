@@ -711,3 +711,144 @@ nav li a svg {
 }
 
 .text-muted { color: var(--text-color-light); font-size: 12px; }
+
+/* ===============================
+   iOS 18 inspired glass redesign
+   =============================== */
+:root {
+    --bg-color: #eef3ff;
+    --sidebar-bg: rgba(18, 24, 38, 0.58);
+    --card-bg: rgba(255, 255, 255, 0.55);
+    --primary-color: #0a84ff;
+    --primary-hover-color: #0073eb;
+    --text-color-dark: #0f172a;
+    --text-color-light: #5b6475;
+    --border-color: rgba(255, 255, 255, 0.45);
+    --danger-color: #ff3b30;
+    --danger-hover-color: #e1342b;
+}
+
+body {
+    background:
+        radial-gradient(1200px 600px at 10% -20%, rgba(10, 132, 255, 0.18), transparent 60%),
+        radial-gradient(1000px 500px at 95% 10%, rgba(167, 139, 250, 0.18), transparent 55%),
+        linear-gradient(180deg, #f7f9ff 0%, #edf2ff 100%);
+    color: var(--text-color-dark);
+}
+
+.sidebar {
+    background: var(--sidebar-bg);
+    border-right: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(24px) saturate(145%);
+    -webkit-backdrop-filter: blur(24px) saturate(145%);
+    box-shadow: 0 8px 34px rgba(15, 23, 42, 0.26);
+}
+
+.main-content {
+    padding: 22px;
+}
+
+.card,
+.worker-card,
+.placeholder-card,
+.modal-content,
+.info-card {
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.65), rgba(255, 255, 255, 0.4));
+    border: 1px solid var(--border-color);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08);
+}
+
+.page-header {
+    margin-bottom: 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.page-header h1 {
+    margin: 0;
+    font-size: 28px;
+    letter-spacing: -0.02em;
+}
+
+.btn {
+    border-radius: 999px;
+    padding: 10px 16px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+}
+
+.btn-primary {
+    background: linear-gradient(180deg, #36a3ff 0%, #0a84ff 100%);
+    box-shadow: 0 8px 18px rgba(10, 132, 255, 0.28);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.56);
+    border: 1px solid rgba(255, 255, 255, 0.75);
+}
+
+.form-grid-edit {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas: none;
+    gap: 14px;
+}
+
+.form-grid-edit .form-group-edit,
+.form-grid-edit .form-actions-edit,
+.form-group-name,
+.form-group-position,
+.form-group-phone,
+.form-group-birthdate,
+.form-group-rate {
+    grid-area: auto;
+}
+
+.form-actions-edit {
+    grid-column: 1 / -1;
+    margin-top: 6px;
+    padding-top: 14px;
+}
+
+input,
+select,
+textarea,
+.form-group-edit input,
+.form-group-edit select,
+.form-group input,
+.form-group select {
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.8);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.table {
+    border-collapse: separate;
+    border-spacing: 0 8px;
+}
+
+.table tr {
+    background: rgba(255, 255, 255, 0.5);
+}
+
+.table td,
+.table th {
+    border-bottom: none;
+}
+
+.schedule-entry-vertical {
+    background: rgba(255, 255, 255, 0.52);
+    border: 1px solid rgba(255, 255, 255, 0.64);
+}
+
+@media (max-width: 900px) {
+    .form-grid-edit {
+        grid-template-columns: 1fr;
+    }
+
+    .main-content {
+        padding: 14px;
+    }
+}
