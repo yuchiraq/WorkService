@@ -175,14 +175,14 @@ func SchedulePage(c *gin.Context) {
 			}
 			commentHTML := ""
 			if strings.TrimSpace(entry.Notes) != "" {
-				commentHTML = `<p><strong>Комментарий:</strong> ` + template.HTMLEscapeString(entry.Notes) + `</p>`
+				commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
 			}
-			scheduleRows.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical"><div class="schedule-entry-main"><p><strong>Объекты:</strong> %s</p><p><strong>Работники:</strong> %s</p><p><strong>Время:</strong> %s - %s · %s ч</p>%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></div>`,
-				joinMappedValues(entry.ObjectIDs, objectsMap),
-				joinMappedValues(entry.WorkerIDs, workersMap),
+			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></article>`,
 				template.HTMLEscapeString(entry.StartTime),
 				template.HTMLEscapeString(entry.EndTime),
 				template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
+				joinMappedValues(entry.ObjectIDs, objectsMap),
+				joinMappedValues(entry.WorkerIDs, workersMap),
 				commentHTML,
 				template.HTMLEscapeString(entry.ID),
 				template.HTMLEscapeString(entry.ID),
@@ -664,12 +664,12 @@ func TimesheetsPage(c *gin.Context) {
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Табель</h1><a class="btn btn-secondary" href="/schedule">К расписанию</a></div>
-<div class="card">
+<div class="card timesheet-card">
   <form method="GET" action="/timesheets" class="month-selector">
     <label for="month">Месяц:</label>
     <select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select>
   </form>
-  <div class="table-scroll"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}</tr></thead><tbody>{{ROWS}}</tbody></table></div>
+  <div class="table-scroll timesheet-table-wrap"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}</tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div>
 </div></body></html>`
 
