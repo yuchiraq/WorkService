@@ -41,13 +41,13 @@ func ObjectsPage(c *gin.Context) {
 		userNames[user.ID] = user.Name
 	}
 
-	var rows strings.Builder
+	var cards strings.Builder
 	for _, object := range objects {
 		responsible := userNames[object.ResponsibleUserID]
 		if responsible == "" {
 			responsible = "Не назначен"
 		}
-		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><a class="btn btn-secondary" href="/objects/edit/%s">Редактировать</a></td></tr>`,
+		cards.WriteString(fmt.Sprintf(`<div class="info-card"><div class="info-card-header"><h3>%s</h3><span class="status-badge active">%s</span></div><p><strong>Адрес:</strong> %s</p><p><strong>Ответственный:</strong> %s</p><div class="info-card-actions"><a class="btn btn-secondary" href="/objects/edit/%s">Редактировать</a></div></div>`,
 			template.HTMLEscapeString(object.Name),
 			template.HTMLEscapeString(objectStatusLabel(object.Status)),
 			template.HTMLEscapeString(object.Address),
@@ -55,9 +55,8 @@ func ObjectsPage(c *gin.Context) {
 			template.HTMLEscapeString(object.ID),
 		))
 	}
-
-	if rows.Len() == 0 {
-		rows.WriteString(`<tr><td colspan="5">Объекты пока не добавлены.</td></tr>`)
+	if cards.Len() == 0 {
+		cards.WriteString(`<div class="info-card"><p>Объекты пока не добавлены.</p></div>`)
 	}
 
 	page := `
@@ -75,20 +74,13 @@ func ObjectsPage(c *gin.Context) {
             <h1>Объекты</h1>
             <a href="/objects/new" class="btn btn-primary">Добавить объект</a>
         </div>
-        <div class="card">
-            <table class="table">
-                <thead>
-                    <tr><th>Название</th><th>Статус</th><th>Адрес</th><th>Ответственный</th><th>Действия</th></tr>
-                </thead>
-                <tbody>{{ROWS}}</tbody>
-            </table>
-        </div>
+        <div class="card"><div class="compact-grid">{{CARDS}}</div></div>
     </div>
 </body>
 </html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "objects"), 1)
-	final = strings.Replace(final, "{{ROWS}}", rows.String(), 1)
+	final = strings.Replace(final, "{{CARDS}}", cards.String(), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
 

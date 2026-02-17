@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -87,17 +86,20 @@ func SchedulePage(c *gin.Context) {
 		return
 	}
 
-	var rows strings.Builder
+	var cards strings.Builder
 	for _, entry := range entries {
-		rows.WriteString(fmt.Sprintf(`<tr>
-<td>%s</td>
-<td>%s–%s</td>
-<td>%d мин</td>
-<td>%s</td>
-<td>%s</td>
-<td>%s</td>
-<td><a href="/schedule/edit/%s" class="btn btn-secondary">Редактировать</a></td>
-</tr>`,
+		cards.WriteString(fmt.Sprintf(`<div class="info-card">
+            <div class="info-card-header">
+                <h3>%s</h3>
+                <span class="status-badge active">%s–%s</span>
+            </div>
+            <p><strong>Обед:</strong> %d мин</p>
+            <p><strong>Часы:</strong> %s</p>
+            <p><strong>Работники:</strong> %s</p>
+            <p><strong>Объекты:</strong> %s</p>
+            <p><strong>Комментарий:</strong> %s</p>
+            <div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary">Редактировать</a></div>
+        </div>`,
 			template.HTMLEscapeString(entry.Date),
 			template.HTMLEscapeString(entry.StartTime),
 			template.HTMLEscapeString(entry.EndTime),
@@ -105,24 +107,24 @@ func SchedulePage(c *gin.Context) {
 			template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
 			joinMappedValues(entry.WorkerIDs, workersMap),
 			joinMappedValues(entry.ObjectIDs, objectsMap),
+			template.HTMLEscapeString(entry.Notes),
 			template.HTMLEscapeString(entry.ID),
 		))
 	}
-
-	if rows.Len() == 0 {
-		rows.WriteString(`<tr><td colspan="7">Записей расписания пока нет.</td></tr>`)
+	if cards.Len() == 0 {
+		cards.WriteString(`<div class="info-card"><p>Записей расписания пока нет.</p></div>`)
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Расписание</h1><a class="btn btn-primary" href="/schedule/new">Добавить назначение</a></div>
-<div class="card"><table class="table"><thead><tr><th>Дата</th><th>Смена</th><th>Обед</th><th>Часы</th><th>Работники</th><th>Объекты</th><th>Действия</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
+<div class="card"><div class="compact-grid">{{CARDS}}</div></div>
 </div>
 </body></html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "schedule"), 1)
-	final = strings.Replace(final, "{{ROWS}}", rows.String(), 1)
+	final = strings.Replace(final, "{{CARDS}}", cards.String(), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
 
@@ -366,20 +368,33 @@ func TimesheetsPage(c *gin.Context) {
 		return
 	}
 
-	dateSet := make(map[string]struct{})
-	for _, entry := range entries {
-		dateSet[entry.Date] = struct{}{}
+	selectedMonth := c.Query("month")
+	if selectedMonth == "" {
+		selectedMonth = time.Now().Format("2006-01")
 	}
-	dates := make([]string, 0, len(dateSet))
-	for d := range dateSet {
-		dates = append(dates, d)
+	monthStart, err := time.Parse("2006-01", selectedMonth)
+	if err != nil {
+		monthStart = time.Now()
+		selectedMonth = monthStart.Format("2006-01")
 	}
-	sort.Strings(dates)
+	monthStart = time.Date(monthStart.Year(), monthStart.Month(), 1, 0, 0, 0, 0, time.UTC)
+	nextMonth := monthStart.AddDate(0, 1, 0)
+	daysInMonth := int(nextMonth.Sub(monthStart).Hours() / 24)
+
+	monthDates := make([]string, 0, daysInMonth)
+	for d := 1; d <= daysInMonth; d++ {
+		monthDates = append(monthDates, fmt.Sprintf("%s-%02d", selectedMonth, d))
+	}
+
+	var headers strings.Builder
+	for d := 1; d <= daysInMonth; d++ {
+		headers.WriteString(fmt.Sprintf(`<th>%d</th>`, d))
+	}
 
 	workerRows := make([]string, 0, len(workers))
 	for _, worker := range workers {
 		var cells strings.Builder
-		for _, date := range dates {
+		for _, date := range monthDates {
 			total := 0.0
 			details := make([]string, 0)
 			for _, entry := range entries {
@@ -396,42 +411,42 @@ func TimesheetsPage(c *gin.Context) {
 				if !contains {
 					continue
 				}
-				hours, _ := strconv.ParseFloat(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes), 64)
+				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
+				hours, _ := strconv.ParseFloat(hoursStr, 64)
 				total += hours
 				objects := joinMappedValues(entry.ObjectIDs, objectsMap)
-				details = append(details, fmt.Sprintf("%s-%s, %s ч, %s, %s", entry.StartTime, entry.EndTime, formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes), objects, template.HTMLEscapeString(entry.Notes)))
+				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes)))
 			}
 			if len(details) == 0 {
 				cells.WriteString(`<td class="hours-cell empty">—</td>`)
 				continue
 			}
-			cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.2f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
+			cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
 		}
 		workerRows = append(workerRows, fmt.Sprintf(`<tr><th>%s</th>%s</tr>`, template.HTMLEscapeString(worker.Name), cells.String()))
 	}
 
-	if len(dates) == 0 {
-		dates = []string{time.Now().Format("2006-01-02")}
-	}
-
-	var headers strings.Builder
-	for _, d := range dates {
-		headers.WriteString(fmt.Sprintf(`<th>%s</th>`, template.HTMLEscapeString(d)))
-	}
-
 	rows := strings.Join(workerRows, "")
 	if rows == "" {
-		rows = `<tr><td colspan="100%">Нет работников или данных табеля.</td></tr>`
+		rows = `<tr><td colspan="100%">Нет работников.</td></tr>`
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-<div class="page-header"><h1>Табель</h1><a class="btn btn-primary" href="/schedule">К расписанию</a></div>
-<div class="card table-scroll"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}</tr></thead><tbody>{{ROWS}}</tbody></table></div>
+<div class="page-header"><h1>Табель</h1><a class="btn btn-secondary" href="/schedule">К расписанию</a></div>
+<div class="card">
+  <form method="GET" action="/timesheets" class="month-selector">
+    <label for="month">Месяц:</label>
+    <input type="month" id="month" name="month" value="{{MONTH}}">
+    <button type="submit" class="btn btn-primary">Показать</button>
+  </form>
+  <div class="table-scroll"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}</tr></thead><tbody>{{ROWS}}</tbody></table></div>
+</div>
 </div></body></html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "timesheets"), 1)
+	final = strings.Replace(final, "{{MONTH}}", template.HTMLEscapeString(selectedMonth), 1)
 	final = strings.Replace(final, "{{HEADERS}}", headers.String(), 1)
 	final = strings.Replace(final, "{{ROWS}}", rows, 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
