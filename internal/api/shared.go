@@ -62,26 +62,64 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 	}
 
 	uiScript := `<script>(function(){
+const body=document.body;
 const modal=document.getElementById('app-action-modal');
 const iframe=document.getElementById('app-action-modal-iframe');
 const title=document.getElementById('app-action-modal-title');
 const closeBtn=document.querySelector('[data-modal-close]');
-function closeModal(){ if(!modal) return; modal.classList.remove('visible'); document.body.classList.remove('modal-open'); if(iframe){ iframe.removeAttribute('src'); iframe.removeAttribute('data-return-path'); }}
+const burger=document.querySelector('[data-mobile-nav-toggle]');
+
+function closeModal(){
+  if(!modal) return;
+  modal.classList.remove('visible');
+  body.classList.remove('modal-open');
+  if(iframe){ iframe.removeAttribute('src'); iframe.removeAttribute('data-return-path'); }
+}
+function closeNav(){ body.classList.remove('nav-open'); }
 function openModal(url,t,ret){
   if(!modal||!iframe){ window.location.href=url; return; }
   try{ const u=new URL(url,window.location.origin); if(!u.searchParams.has('modal')) u.searchParams.set('modal','1'); url=u.pathname+u.search; }catch(_){ }
-  modal.classList.add('visible'); document.body.classList.add('modal-open'); title.textContent=t||'Форма'; iframe.setAttribute('data-return-path', ret||window.location.pathname); iframe.src=url;
+  modal.classList.add('visible');
+  body.classList.add('modal-open');
+  title.textContent=t||'Форма';
+  iframe.setAttribute('data-return-path', ret||window.location.pathname);
+  iframe.src=url;
 }
-document.addEventListener('click',function(e){ const t=e.target.closest('[data-modal-url]'); if(!t) return; e.preventDefault(); openModal(t.getAttribute('data-modal-url'), t.getAttribute('data-modal-title'), t.getAttribute('data-modal-return'));});
+function sameTarget(current, target){
+  try{
+    const c=new URL(current, window.location.origin);
+    const t=new URL(target, window.location.origin);
+    const cp=c.pathname.replace(/\/$/, '');
+    const tp=t.pathname.replace(/\/$/, '');
+    return cp===tp;
+  }catch(_){ return false; }
+}
+
+document.addEventListener('click',function(e){
+  const t=e.target.closest('[data-modal-url]');
+  if(!t) return;
+  e.preventDefault();
+  openModal(t.getAttribute('data-modal-url'), t.getAttribute('data-modal-title'), t.getAttribute('data-modal-return'));
+});
 if(closeBtn) closeBtn.addEventListener('click',closeModal);
 if(modal) modal.addEventListener('click',function(e){ if(e.target===modal) closeModal();});
-document.addEventListener('keydown',function(e){ if(e.key==='Escape') closeModal();});
-if(iframe){ iframe.addEventListener('load',function(){ const ret=iframe.getAttribute('data-return-path'); let p=''; try{ p=iframe.contentWindow.location.pathname; }catch(_){ return; } if(ret&&p===ret){ closeModal(); window.location.reload(); }}); }
+if(burger) burger.addEventListener('click', function(){ body.classList.toggle('nav-open'); });
+document.querySelectorAll('.nav-links a').forEach(function(a){ a.addEventListener('click', closeNav); });
+document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeModal(); closeNav(); }});
+if(iframe){
+  iframe.addEventListener('load',function(){
+    const ret=iframe.getAttribute('data-return-path');
+    let href='';
+    try{ href=iframe.contentWindow.location.href; }catch(_){ return; }
+    if(ret && sameTarget(href, ret)){ closeModal(); window.location.href=ret; }
+  });
+}
 })();</script>`
 
 	return fmt.Sprintf(`
 <header class="top-nav">
   <div class="container nav-inner">
+    <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню">☰</button>
     <div class="brand"><img src="/static/img/logo.svg" alt="logo"><span>АВАЮССТРОЙ</span></div>
     <nav class="nav-links">%s</nav>
     <div class="nav-user"><span class="user-avatar">%s</span><div><strong>%s</strong><small>%s</small></div><a class="nav-link" href="/logout">Выйти</a></div>

@@ -62,13 +62,14 @@ func ObjectsPage(c *gin.Context) {
 		if responsible == "" {
 			responsible = "Не назначен"
 		}
-		cards.WriteString(fmt.Sprintf(`<div class="info-card"><div class="info-card-header"><h3>%s</h3><span class="status-badge active">%s</span></div><p><strong>Адрес:</strong> %s</p><p><strong>Ответственный:</strong> %s</p><div class="info-card-actions"><a class="btn btn-secondary" href="/objects/edit/%s" data-modal-url="/objects/edit/%s" data-modal-title="Редактировать объект" data-modal-return="/objects?tab={{TAB}}">Редактировать</a></div></div>`,
+		cards.WriteString(fmt.Sprintf(`<div class="info-card"><div class="info-card-header"><h3>%s</h3><span class="status-badge active">%s</span></div><p><strong>Адрес:</strong> %s</p><p><strong>Ответственный:</strong> %s</p><div class="info-card-actions"><a class="btn btn-secondary" href="/objects/edit/%s" data-modal-url="/objects/edit/%s" data-modal-title="Редактировать объект" data-modal-return="/objects?tab=%s">Редактировать</a></div></div>`,
 			template.HTMLEscapeString(object.Name),
 			template.HTMLEscapeString(objectStatusLabel(object.Status)),
 			template.HTMLEscapeString(object.Address),
 			template.HTMLEscapeString(responsible),
 			template.HTMLEscapeString(object.ID),
 			template.HTMLEscapeString(object.ID),
+			template.HTMLEscapeString(selectedTab),
 		))
 	}
 	if cards.Len() == 0 {
