@@ -221,34 +221,29 @@ func SchedulePage(c *gin.Context) {
 }
 
 func buildSelectAndSelectedList(items [][2]string, selectedIDs []string, selectID, inputName string) (string, string) {
-	selectedSet := make(map[string]struct{}, len(selectedIDs))
-	for _, id := range selectedIDs {
-		selectedSet[id] = struct{}{}
-	}
-
+	_ = selectID
 	var options strings.Builder
+	options.WriteString(`<option value="">Выберите...</option>`)
 	for _, item := range items {
 		options.WriteString(fmt.Sprintf(`<option value="%s">%s</option>`, template.HTMLEscapeString(item[0]), template.HTMLEscapeString(item[1])))
 	}
 
-	var selectedList strings.Builder
-	for _, item := range items {
-		if _, ok := selectedSet[item[0]]; !ok {
-			continue
+	var rows strings.Builder
+	for _, selectedID := range selectedIDs {
+		rows.WriteString(`<div class="dynamic-select-row"><select name="` + template.HTMLEscapeString(inputName) + `" class="dynamic-select">`)
+		rows.WriteString(`<option value="">Выберите...</option>`)
+		for _, item := range items {
+			selected := ""
+			if item[0] == selectedID {
+				selected = " selected"
+			}
+			rows.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, template.HTMLEscapeString(item[0]), selected, template.HTMLEscapeString(item[1])))
 		}
-		selectedList.WriteString(fmt.Sprintf(`<li data-id="%s"><span>%s</span><input type="hidden" name="%s" value="%s"><button type="button" class="btn btn-secondary btn-mini" onclick="removeSelection(this)">Удалить</button></li>`,
-			template.HTMLEscapeString(item[0]),
-			template.HTMLEscapeString(item[1]),
-			template.HTMLEscapeString(inputName),
-			template.HTMLEscapeString(item[0]),
-		))
+		rows.WriteString(`</select><button type="button" class="btn btn-secondary btn-mini" data-remove-select>✕</button></div>`)
 	}
+	rows.WriteString(`<div class="dynamic-select-row"><select name="` + template.HTMLEscapeString(inputName) + `" class="dynamic-select">` + options.String() + `</select><button type="button" class="btn btn-secondary btn-mini" data-remove-select>✕</button></div>`)
 
-	if selectedList.Len() == 0 {
-		selectedList.WriteString(`<li class="empty">Ничего не выбрано</li>`)
-	}
-
-	return options.String(), selectedList.String()
+	return options.String(), rows.String()
 }
 
 func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, title, submit string, isEdit bool) {
@@ -335,14 +330,16 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 <div class="form-group-edit timesheet-span-2">
   <label>Работники</label>
-  <div class="picker-row"><select id="worker_select">{{WORKER_OPTIONS}}</select><button class="btn btn-primary" type="button" onclick="addSelection('worker_select','worker_selected','worker_ids')">Добавить работника</button></div>
-  <ul id="worker_selected" class="selected-list">{{WORKER_SELECTED}}</ul>
+  <div class="dynamic-select-group" data-dynamic-select-group>
+    {{WORKER_SELECTED}}
+  </div>
 </div>
 
 <div class="form-group-edit timesheet-span-2">
   <label>Объекты</label>
-  <div class="picker-row"><select id="object_select">{{OBJECT_OPTIONS}}</select><button class="btn btn-primary" type="button" onclick="addSelection('object_select','object_selected','object_ids')">Добавить объект</button></div>
-  <ul id="object_selected" class="selected-list">{{OBJECT_SELECTED}}</ul>
+  <div class="dynamic-select-group" data-dynamic-select-group>
+    {{OBJECT_SELECTED}}
+  </div>
 </div>
 
 <div class="form-group-edit timesheet-span-2"><label for="notes">Комментарий</label><input id="notes" name="notes" type="text" value="{{NOTES}}" placeholder="Комментарий к смене"></div>
@@ -354,26 +351,44 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 <div id="deleteModal" class="modal" style="display:none;"><div class="modal-content"><span class="close-button" onclick="closeDeleteModal()">&times;</span><h2>Удалить назначение?</h2><p>Действие нельзя отменить.</p><form action="/schedule/delete/{{ID}}" method="POST">{{CSRF_FIELD}}<div class="form-actions"><button class="btn btn-danger" type="submit">Удалить</button><button class="btn btn-secondary" type="button" onclick="closeDeleteModal()">Отмена</button></div></form></div></div>
 <script>
-function removeSelection(button){
-  const li = button.closest('li');
-  const ul = li.parentElement;
-  li.remove();
-  if (!ul.querySelector('li')) { ul.innerHTML='<li class="empty">Ничего не выбрано</li>'; }
+function makeSelectRow(name, optionsHTML){
+  const row=document.createElement('div');
+  row.className='dynamic-select-row';
+  row.innerHTML='<select name="'+name+'" class="dynamic-select">'+optionsHTML+'</select><button type="button" class="btn btn-secondary btn-mini" data-remove-select>✕</button>';
+  return row;
 }
-function addSelection(selectId, listId, inputName){
-  const sel = document.getElementById(selectId);
-  const value = sel.value;
-  const text = sel.options[sel.selectedIndex].text;
-  const list = document.getElementById(listId);
-  if (!value) return;
-  if (list.querySelector('li[data-id="'+value+'"]')) return;
-  const empty = list.querySelector('li.empty');
-  if (empty) empty.remove();
-  const li = document.createElement('li');
-  li.setAttribute('data-id', value);
-  li.innerHTML = '<span>'+text+'</span><input type="hidden" name="'+inputName+'" value="'+value+'"><button type="button" class="btn btn-secondary btn-mini" onclick="removeSelection(this)">Удалить</button>';
-  list.appendChild(li);
+function normalizeDynamicGroup(group){
+  const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
+  rows.forEach(function(row){
+    const btn=row.querySelector('[data-remove-select]');
+    if(btn){
+      btn.onclick=function(){
+        if(group.querySelectorAll('.dynamic-select-row').length===1){
+          row.querySelector('select').value='';
+          return;
+        }
+        row.remove();
+        normalizeDynamicGroup(group);
+      };
+    }
+  });
 }
+function ensureDynamicSelectRows(group){
+  const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
+  if(!rows.length) return;
+  const last=rows[rows.length-1];
+  const select=last.querySelector('select');
+  if(select && select.value){
+    group.appendChild(makeSelectRow(select.name, select.innerHTML));
+  }
+  normalizeDynamicGroup(group);
+}
+document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group){
+  group.addEventListener('change', function(e){
+    if(e.target.matches('select')) ensureDynamicSelectRows(group);
+  });
+  ensureDynamicSelectRows(group);
+});
 function showDeleteModal(){document.getElementById('deleteModal').style.display='block';}
 function closeDeleteModal(){document.getElementById('deleteModal').style.display='none';}
 </script>

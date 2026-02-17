@@ -154,6 +154,7 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 	final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(user.Name), 1)
 	final = strings.Replace(final, "{{USERNAME}}", template.HTMLEscapeString(user.Username), 1)
 	final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(user.Phone), 1)
+	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), 1)
 	final = strings.Replace(final, "{{STATUS_FIELD}}", statusField, 1)
 	final = strings.Replace(final, "{{WORKER_FIELD}}", workerField, 1)
 	final = strings.Replace(final, "{{SUBMIT_LABEL}}", template.HTMLEscapeString(submitLabel), 1)
@@ -293,6 +294,7 @@ func ProfilePage(c *gin.Context) {
 	final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(user.Name), 1)
 	final = strings.Replace(final, "{{USERNAME}}", template.HTMLEscapeString(user.Username), 1)
 	final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(user.Phone), 1)
+	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
 

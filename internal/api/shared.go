@@ -139,6 +139,7 @@ if(iframe){
   <nav class="side-nav-links">%s</nav>
   <a class="btn btn-secondary side-nav-logout" href="/logout">Выйти</a>
 </aside>
+<a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule" aria-label="Создать назначение">+</a>
 <div class="action-modal" id="app-action-modal" aria-hidden="true">
   <div class="action-modal-sheet">
     <div class="action-modal-header"><h3 id="app-action-modal-title">Форма</h3><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button></div>
