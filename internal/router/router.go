@@ -28,6 +28,7 @@ func SetupRouter(r *gin.Engine) {
 		authRequired.POST("/workers/delete/:id", api.DeleteWorker)
 
 		authRequired.GET("/objects", api.ObjectsPage)
+		authRequired.GET("/object/:id", api.ObjectProfilePage)
 		authRequired.GET("/objects/new", api.AddObjectPage)
 		authRequired.POST("/objects/new", api.CreateObject)
 		authRequired.GET("/objects/edit/:id", api.EditObjectPage)
