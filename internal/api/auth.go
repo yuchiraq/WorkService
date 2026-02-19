@@ -129,6 +129,12 @@ func registerSuccess(attemptKey string) {
 
 // LoginPage renders the login page.
 func LoginPage(c *gin.Context) {
+	errorBlock := ""
+	switch c.Query("error") {
+	case "invalid_credentials":
+		errorBlock = `<div style="margin-bottom: 16px; color: #b42318; background: #fee4e2; border: 1px solid #fecdca; border-radius: 8px; padding: 10px 12px; font-size: 14px;">Неверное имя пользователя или пароль.</div>`
+	}
+
 	pageTemplate := `
 <!DOCTYPE html>
 <html lang="ru">
@@ -143,6 +149,7 @@ func LoginPage(c *gin.Context) {
             <div style="text-align: left;">
                 <h2>Вход в систему</h2>
                 <p style="margin-bottom: 25px;">Пожалуйста, введите свои учетные данные для входа.</p>
+                {{ERROR_BLOCK}}
                 <form action="/login" method="POST">
                     <div class="form-group">
                         <label for="username">Имя пользователя</label>
@@ -159,7 +166,8 @@ func LoginPage(c *gin.Context) {
     </div>
 </body>
 </html>`
-	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(pageTemplate))
+	final := strings.Replace(pageTemplate, "{{ERROR_BLOCK}}", errorBlock, 1)
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
 
 // Login handles the authentication logic.
