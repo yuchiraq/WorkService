@@ -437,7 +437,6 @@ p,li,label,td,th { line-height: 1.5; }
   font-size: var(--timesheet-cell-font);
   padding: clamp(7px, 1vw, 12px) clamp(5px, .9vw, 10px);
 }
-
 .timesheet-matrix tbody tr {
   background: var(--surface-strong);
   border: 1px solid var(--border);
