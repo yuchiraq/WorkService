@@ -657,6 +657,33 @@ p,li,label,td,th { line-height: 1.5; }
   .table td, .table th { padding: 8px 10px; }
 }
 
+
+@media (min-width: 1024px) {
+  .timesheet-card { padding: 14px; }
+  .timesheet-table-wrap { overflow-x: auto; }
+  .timesheet-matrix {
+    min-width: 0;
+    width: 100%;
+    table-layout: fixed;
+  }
+  .timesheet-matrix th,
+  .timesheet-matrix td {
+    min-width: 0;
+    padding: 6px 4px;
+    font-size: clamp(10px, .18vw + 9px, 12px);
+    white-space: nowrap;
+  }
+  .timesheet-matrix th:first-child,
+  .timesheet-matrix td:first-child {
+    width: clamp(118px, 12vw, 160px);
+    min-width: clamp(118px, 12vw, 160px);
+    padding: 6px 8px;
+  }
+  .timesheet-matrix .hours-cell > span {
+    min-width: 2ch;
+  }
+}
+
 @media (min-width: 1024px) {
   .side-nav { transform: translateX(0); width: 280px; }
   .side-nav-overlay { display: none; }
