@@ -355,7 +355,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 	deleteBtn := ""
 	isModal := IsModalRequest(c)
 	if isEdit {
-		deleteBtn = `<button type="button" class="btn btn-danger" onclick="showDeleteModal()">Удалить</button>`
+		deleteBtn = `<button type="button" class="btn btn-danger" onclick="confirmDeleteSchedule()">Удалить</button>`
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
@@ -394,7 +394,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 </div>
 {{LAYOUT_END}}
 
-<div id="deleteModal" class="modal" style="display:none;"><div class="modal-content"><span class="close-button" onclick="closeDeleteModal()">&times;</span><h2>Удалить назначение?</h2><p>Действие нельзя отменить.</p><form action="{{DELETE_ACTION}}" method="POST">{{CSRF_FIELD}}<input type="hidden" name="return_to" value="{{RETURN_TO}}"><div class="form-actions"><button class="btn btn-danger" type="submit">Удалить</button><button class="btn btn-secondary" type="button" onclick="closeDeleteModal()">Отмена</button></div></form></div></div>
+<form id="schedule-delete-form" action="{{DELETE_ACTION}}" method="POST" style="display:none;">{{CSRF_FIELD}}<input type="hidden" name="return_to" value="{{RETURN_TO}}"></form>
 <script>
 function makeSelectRow(name, optionsHTML){
   const row=document.createElement('div');
@@ -434,8 +434,11 @@ document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group)
   });
   ensureDynamicSelectRows(group);
 });
-function showDeleteModal(){document.getElementById('deleteModal').style.display='block';}
-function closeDeleteModal(){document.getElementById('deleteModal').style.display='none';}
+function confirmDeleteSchedule(){
+  if(!window.confirm('Удалить назначение? Действие нельзя отменить.')) return;
+  const form=document.getElementById('schedule-delete-form');
+  if(form) form.submit();
+}
 </script>
 </body></html>`
 

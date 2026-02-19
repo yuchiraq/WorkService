@@ -300,8 +300,8 @@ input:focus, select:focus, textarea:focus {
 .btn-danger:hover { background: color-mix(in srgb, var(--accent-red), #000 12%); transform: translateY(-1px); }
 
 .schedule-day-group, .schedule-entry-vertical, .table-scroll { margin-top: 10px; }
-.schedule-day-group { display: grid; gap: 10px; }
-.schedule-day-group h3 { margin: 0; font-size: 16px; color: var(--text-secondary); }
+.schedule-day-group { display: grid; gap: 10px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--surface), transparent 8%); }
+.schedule-day-group h3 { margin: 0; font-size: 15px; letter-spacing: .02em; color: var(--text-secondary); padding-bottom: 8px; border-bottom: 1px dashed var(--border); }
 .schedule-day-list, .schedule-vertical { display: grid; gap: 10px; }
 .schedule-day-list .assignment-card, .schedule-vertical .assignment-card, .schedule-vertical .structured-assignment { width: min(680px, 100%); margin-inline: auto; }
 .assignment-card, .structured-assignment { padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-strong); }

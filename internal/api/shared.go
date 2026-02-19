@@ -92,6 +92,25 @@ function openModal(url,t,ret){
   iframe.setAttribute('data-return-path', effectiveRet);
   iframe.src=url;
 }
+
+function ensureBrandAssets(){
+  const head=document.head||document.getElementsByTagName('head')[0];
+  if(!head) return;
+  if(!head.querySelector('link[rel="icon"]')){
+    const ico=document.createElement('link');
+    ico.rel='icon';
+    ico.type='image/x-icon';
+    ico.href='/static/img/favicon.ico';
+    head.appendChild(ico);
+  }
+  if(!head.querySelector('link[rel="apple-touch-icon"]')){
+    const png=document.createElement('link');
+    png.rel='apple-touch-icon';
+    png.href='/static/img/logo.png';
+    head.appendChild(png);
+  }
+}
+
 function sameTarget(current, target){
   try{
     const c=new URL(current, window.location.origin);
@@ -102,6 +121,7 @@ function sameTarget(current, target){
   }catch(_){ return false; }
 }
 
+ensureBrandAssets();
 document.addEventListener('click',function(e){
   const t=e.target.closest('[data-modal-url]');
   if(!t) return;
