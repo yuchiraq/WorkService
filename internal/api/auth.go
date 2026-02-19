@@ -183,6 +183,7 @@ func Login(c *gin.Context) {
 	}
 
 	registerSuccess(attemptKey)
+	_ = storage.UpdateUserLastLogin(user.ID, time.Now())
 	cleanExpiredSessions()
 	token := randomToken(32)
 	csrf := randomToken(24)
