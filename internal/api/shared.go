@@ -84,11 +84,12 @@ function closeModal(){
 function closeNav(){ body.classList.remove('nav-open'); }
 function openModal(url,t,ret){
   if(!modal||!iframe){ window.location.href=url; return; }
-  try{ const u=new URL(url,window.location.origin); if(!u.searchParams.has('modal')) u.searchParams.set('modal','1'); if(ret && !u.searchParams.has('return')) u.searchParams.set('return', ret); url=u.pathname+u.search; }catch(_){ }
+  const effectiveRet = ret || (window.location.pathname + window.location.search);
+  try{ const u=new URL(url,window.location.origin); if(!u.searchParams.has('modal')) u.searchParams.set('modal','1'); if(effectiveRet && !u.searchParams.has('return')) u.searchParams.set('return', effectiveRet); url=u.pathname+u.search; }catch(_){ }
   modal.classList.add('visible');
   body.classList.add('modal-open');
   title.textContent=t||'Форма';
-  iframe.setAttribute('data-return-path', ret||window.location.pathname);
+  iframe.setAttribute('data-return-path', effectiveRet);
   iframe.src=url;
 }
 function sameTarget(current, target){
