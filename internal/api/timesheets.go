@@ -776,7 +776,7 @@ func TimesheetsPage(c *gin.Context) {
 			if len(details) == 0 {
 				quickReturn := url.QueryEscape("/timesheets?month=" + selectedMonth)
 				quickURL := fmt.Sprintf("/schedule/new?date=%s&worker_id=%s&return=%s", template.URLQueryEscaper(date), template.URLQueryEscaper(worker.ID), quickReturn)
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><a class="timesheet-quick-add" href="%s" data-modal-url="%s" data-modal-title="Новое назначение" data-modal-return="/timesheets?month=%s">+</a></td>`, template.HTMLEscapeString(quickURL), template.HTMLEscapeString(quickURL), template.HTMLEscapeString(selectedMonth)))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">0.0</span><a class="timesheet-quick-add" href="%s" data-modal-url="%s" data-modal-title="Новое назначение" data-modal-return="/timesheets?month=%s">+</a></td>`, template.HTMLEscapeString(quickURL), template.HTMLEscapeString(quickURL), template.HTMLEscapeString(selectedMonth)))
 				continue
 			}
 			cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
