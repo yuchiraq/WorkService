@@ -745,6 +745,7 @@ func TimesheetsPage(c *gin.Context) {
 	workerRows := make([]string, 0, len(workers))
 	for _, worker := range workers {
 		var cells strings.Builder
+		workerTotal := 0.0
 		for _, date := range monthDates {
 			total := 0.0
 			details := make([]string, 0)
@@ -779,8 +780,9 @@ func TimesheetsPage(c *gin.Context) {
 				continue
 			}
 			cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
+			workerTotal += total
 		}
-		workerRows = append(workerRows, fmt.Sprintf(`<tr><th><a class="entity-link" href="/worker/%s">%s</a></th>%s</tr>`, template.HTMLEscapeString(worker.ID), template.HTMLEscapeString(worker.Name), cells.String()))
+		workerRows = append(workerRows, fmt.Sprintf(`<tr><th><a class="entity-link" href="/worker/%s">%s</a></th>%s<td class="hours-cell month-total">%.1f</td></tr>`, template.HTMLEscapeString(worker.ID), template.HTMLEscapeString(worker.Name), cells.String(), workerTotal))
 	}
 
 	rows := strings.Join(workerRows, "")
@@ -797,7 +799,7 @@ func TimesheetsPage(c *gin.Context) {
     <label for="month">Месяц:</label>
     <select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select>
   </form>
-  <div class="table-scroll timesheet-table-wrap"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}</tr></thead><tbody>{{ROWS}}</tbody></table></div>
+  <div class="table-scroll timesheet-table-wrap"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}<th>Итого</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div>
 </div></body></html>`
 

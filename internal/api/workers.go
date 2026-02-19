@@ -348,7 +348,6 @@ func WorkerProfilePage(c *gin.Context) {
             <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11a1 1 0 11-2 0v-2a1 1 0 112 0v2zm-1-4a1 1 0 01-1-1V7a1 1 0 112 0v1a1 1 0 01-1 1z"/></svg>Ставка: {{RATE}} руб/час</li>
         </ul>
 
-        {{ASSIGNMENTS_SECTION}}
 
         <div class="profile-grid">
             <div class="placeholder-card">
@@ -381,6 +380,7 @@ func WorkerProfilePage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{MONTH_OPTIONS}}", workerMonthOptions.String(), -1)
 	finalHTML = strings.Replace(finalHTML, "{{TOTAL_HOURS}}", fmt.Sprintf("%.2f", totalHours), -1)
 	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_BY_DAY}}", workerAssignments.String(), -1)
+	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_SECTION}}", "", -1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
@@ -417,15 +417,15 @@ func AddWorkerPage(c *gin.Context) {
                     </div>
                     <div class="form-group">
                         <label for="phone">Телефон</label>
-                        <input type="tel" id="phone" name="phone" required>
+                        <input type="tel" id="phone" name="phone">
                     </div>
                     <div class="form-group">
                         <label for="birth_date">Дата рождения</label>
-                        <input type="date" id="birth_date" name="birth_date" required>
+                        <input type="date" id="birth_date" name="birth_date">
                     </div>
                     <div class="form-group">
                         <label for="hourly_rate">Ставка (руб/час)</label>
-                        <input type="number" id="hourly_rate" name="hourly_rate" step="0.01" required>
+                        <input type="number" id="hourly_rate" name="hourly_rate" step="0.01">
                     </div>
                 </div>
                 <div class="form-actions">
@@ -455,10 +455,15 @@ func AddWorkerPage(c *gin.Context) {
 
 // CreateWorker handles the creation of a new worker.
 func CreateWorker(c *gin.Context) {
-	rate, err := strconv.ParseFloat(c.PostForm("hourly_rate"), 64)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
-		return
+	rate := 0.0
+	rateRaw := strings.TrimSpace(c.PostForm("hourly_rate"))
+	if rateRaw != "" {
+		parsedRate, err := strconv.ParseFloat(rateRaw, 64)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
+			return
+		}
+		rate = parsedRate
 	}
 
 	userID, _ := c.Get("userID")
@@ -474,7 +479,7 @@ func CreateWorker(c *gin.Context) {
 		CreatedByName: userName.(string),
 	}
 
-	_, err = storage.CreateWorker(newWorker)
+	_, err := storage.CreateWorker(newWorker)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to create worker: %v", err)
 		return
@@ -524,17 +529,17 @@ func EditWorkerPage(c *gin.Context) {
 
                 <div class="form-group-edit form-group-phone">
                     <label for="phone">Телефон</label>
-                    <input type="tel" id="phone" name="phone" value="{{PHONE}}" required>
+                    <input type="tel" id="phone" name="phone" value="{{PHONE}}">
                 </div>
 
                 <div class="form-group-edit form-group-birthdate">
                     <label for="birth_date">Дата рождения</label>
-                    <input type="date" id="birth_date" name="birth_date" value="{{BIRTH_DATE}}" required>
+                    <input type="date" id="birth_date" name="birth_date" value="{{BIRTH_DATE}}">
                 </div>
 
                 <div class="form-group-edit form-group-rate">
                     <label for="hourly_rate">Ставка (руб/час)</label>
-                    <input type="number" id="hourly_rate" name="hourly_rate" value="{{RATE}}" step="0.01" required>
+                    <input type="number" id="hourly_rate" name="hourly_rate" value="{{RATE}}" step="0.01">
                 </div>
 
                 <div class="form-actions-edit">
@@ -617,10 +622,15 @@ func UpdateWorker(c *gin.Context) {
 		return
 	}
 
-	rate, err := strconv.ParseFloat(c.PostForm("hourly_rate"), 64)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
-		return
+	rate := 0.0
+	rateRaw := strings.TrimSpace(c.PostForm("hourly_rate"))
+	if rateRaw != "" {
+		parsedRate, err := strconv.ParseFloat(rateRaw, 64)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
+			return
+		}
+		rate = parsedRate
 	}
 
 	// Update fields from the form
