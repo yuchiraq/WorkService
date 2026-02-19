@@ -187,7 +187,7 @@ body.nav-open .side-nav { transform: translateX(0); }
   border: 1px solid var(--border);
   backdrop-filter: blur(10px);
 }
- .floating-create-btn {
+.floating-create-btn {
   width: 52px;
   height: 52px;
   border-radius: 50%;
@@ -280,6 +280,7 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-blue), transparent 76%);
 }
 .form-actions, .form-actions-edit, .filter-actions, .table-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.form-error { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--accent-red), transparent 45%); background: color-mix(in srgb, var(--accent-red), transparent 86%); color: #ffd4d9; font-weight: 600; animation: fadeUp .22s ease both; }
 
 .btn {
   border: 1px solid var(--border);
@@ -292,14 +293,17 @@ input:focus, select:focus, textarea:focus {
 }
 .btn:active { transform: translateY(1px); }
 .btn-primary { background: var(--accent-blue); color: #fff; border-color: transparent; }
-.btn-primary:hover { background: color-mix(in srgb, var(--accent-blue), #000 18%); }
+.btn-primary:hover { background: color-mix(in srgb, var(--accent-blue), #000 18%); box-shadow: 0 6px 16px rgba(77,163,255,.28); transform: translateY(-1px); }
 .btn-secondary { background: var(--surface-strong); color: var(--text-primary); }
+.btn-secondary:hover { background: color-mix(in srgb, var(--surface-strong), #fff 8%); transform: translateY(-1px); }
 .btn-danger { background: var(--accent-red); color: #fff; border-color: transparent; }
+.btn-danger:hover { background: color-mix(in srgb, var(--accent-red), #000 12%); transform: translateY(-1px); }
 
 .schedule-day-group, .schedule-entry-vertical, .table-scroll { margin-top: 10px; }
 .schedule-day-group { display: grid; gap: 10px; }
 .schedule-day-group h3 { margin: 0; font-size: 16px; color: var(--text-secondary); }
 .schedule-day-list, .schedule-vertical { display: grid; gap: 10px; }
+.schedule-day-list .assignment-card, .schedule-vertical .assignment-card, .schedule-vertical .structured-assignment { width: min(680px, 100%); margin-inline: auto; }
 .assignment-card, .structured-assignment { padding: 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-strong); }
 .assignment-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .assignment-head span { color: var(--accent-blue); font-weight: 700; }
@@ -477,7 +481,7 @@ p,li,label,td,th { line-height: 1.5; }
   .table-actions .btn, .filter-actions .btn { width: auto; }
   .action-modal-sheet { width: 100vw; height: 100vh; border-radius: 0; }
   .floating-create-wrap { right: 10px; bottom: 10px; padding: 6px; }
-  .floating-create-btn { width: 48px; height: 48px; font-size: 30px; }
+ .floating-create-btn { width: 48px; height: 48px; font-size: 30px; }
   .dynamic-select-row { grid-template-columns: 1fr; }
   .btn-mini { width: 100%; }
 }

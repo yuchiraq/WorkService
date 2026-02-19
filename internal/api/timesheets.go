@@ -86,6 +86,31 @@ func joinMappedLinks(ids []string, valuesMap map[string]string, pathPrefix strin
 
 // SchedulePage shows assignment entries list (old "Табель" page renamed to "Расписание").
 
+func humanizeScheduleError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.TrimSpace(err.Error())
+	switch {
+	case strings.Contains(msg, "at least one worker is required"):
+		return "Нужно назначить хотя бы одного работника."
+	case strings.Contains(msg, "at least one object is required"):
+		return "Нужно назначить хотя бы один объект."
+	case strings.Contains(msg, "invalid date format"):
+		return "Некорректная дата назначения."
+	case strings.Contains(msg, "invalid start time"), strings.Contains(msg, "invalid end time"):
+		return "Проверьте корректность времени начала и окончания."
+	case strings.Contains(msg, "end time must be after start time"):
+		return "Время окончания должно быть позже времени начала."
+	case strings.Contains(msg, "lunch break must be shorter"):
+		return "Обед должен быть короче продолжительности смены."
+	case strings.Contains(msg, "нельзя назначить"):
+		return msg
+	default:
+		return "Не удалось сохранить назначение: " + msg
+	}
+}
+
 func cleanIDList(ids []string) []string {
 	clean := make([]string, 0, len(ids))
 	for _, id := range ids {
@@ -264,7 +289,7 @@ func buildSelectAndSelectedList(items [][2]string, selectedIDs []string, selectI
 	return options.String(), rows.String()
 }
 
-func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, title, submit string, isEdit bool) {
+func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, title, submit string, isEdit bool, errorMsg string) {
 	workers, err := storage.GetWorkers()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
@@ -342,6 +367,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 <form action="{{ACTION_URL}}" method="POST" class="form-grid-edit timesheet-form">
 {{CSRF_FIELD}}
 <input type="hidden" name="return_to" value="{{RETURN_TO}}">
+{{ERROR_BLOCK}}
 <div class="form-group-edit"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
 <div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
 <div class="form-group-edit"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
@@ -362,13 +388,13 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 </div>
 
 <div class="form-group-edit timesheet-span-2"><label for="notes">Комментарий</label><input id="notes" name="notes" type="text" value="{{NOTES}}" placeholder="Комментарий к смене"></div>
-<div class="form-actions-edit"><button class="btn btn-primary" type="submit">{{SUBMIT}}</button><a href="/schedule" class="btn btn-secondary">Отмена</a>{{DELETE_BUTTON}}</div>
+<div class="form-actions-edit"><button class="btn btn-primary" type="submit">{{SUBMIT}}</button><a href="{{RETURN_TO}}" class="btn btn-secondary">Отмена</a>{{DELETE_BUTTON}}</div>
 </form>
 </div>
 </div>
 {{LAYOUT_END}}
 
-<div id="deleteModal" class="modal" style="display:none;"><div class="modal-content"><span class="close-button" onclick="closeDeleteModal()">&times;</span><h2>Удалить назначение?</h2><p>Действие нельзя отменить.</p><form action="/schedule/delete/{{ID}}" method="POST">{{CSRF_FIELD}}<div class="form-actions"><button class="btn btn-danger" type="submit">Удалить</button><button class="btn btn-secondary" type="button" onclick="closeDeleteModal()">Отмена</button></div></form></div></div>
+<div id="deleteModal" class="modal" style="display:none;"><div class="modal-content"><span class="close-button" onclick="closeDeleteModal()">&times;</span><h2>Удалить назначение?</h2><p>Действие нельзя отменить.</p><form action="{{DELETE_ACTION}}" method="POST">{{CSRF_FIELD}}<input type="hidden" name="return_to" value="{{RETURN_TO}}"><div class="form-actions"><button class="btn btn-danger" type="submit">Удалить</button><button class="btn btn-secondary" type="button" onclick="closeDeleteModal()">Отмена</button></div></form></div></div>
 <script>
 function makeSelectRow(name, optionsHTML){
   const row=document.createElement('div');
@@ -418,11 +444,18 @@ function closeDeleteModal(){document.getElementById('deleteModal').style.display
 	mainClass := ""
 	backLink := `<a href="/schedule" class="back-link">← К расписанию</a>`
 	cardClass := ""
+	formActionURL := actionURL
+	deleteActionURL := "/schedule/delete/" + entry.ID
 	returnTo := c.DefaultQuery("return", "/schedule")
 	if !strings.HasPrefix(returnTo, "/") {
 		returnTo = "/schedule"
 	}
 	if isModal {
+		q := "?modal=1&return=" + url.QueryEscape(returnTo)
+		formActionURL = actionURL + q
+		if entry.ID != "" {
+			deleteActionURL = "/schedule/delete/" + entry.ID + q
+		}
 		layoutStart = `<div class="modal-form-layout">`
 		layoutEnd = `</div>`
 		mainClass = " modal-form-content"
@@ -437,9 +470,15 @@ function closeDeleteModal(){document.getElementById('deleteModal').style.display
 	final = strings.Replace(final, "{{BACK_LINK}}", backLink, 1)
 	final = strings.Replace(final, "{{CARD_CLASS}}", cardClass, 1)
 	final = strings.Replace(final, "{{TITLE}}", template.HTMLEscapeString(title), -1)
-	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(actionURL), 1)
+	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(formActionURL), 1)
 	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
-	final = strings.Replace(final, "{{RETURN_TO}}", template.HTMLEscapeString(returnTo), 1)
+	final = strings.Replace(final, "{{RETURN_TO}}", template.HTMLEscapeString(returnTo), -1)
+	final = strings.Replace(final, "{{DELETE_ACTION}}", template.HTMLEscapeString(deleteActionURL), 1)
+	errorBlock := ""
+	if strings.TrimSpace(errorMsg) != "" {
+		errorBlock = `<div class="form-error">` + template.HTMLEscapeString(errorMsg) + `</div>`
+	}
+	final = strings.Replace(final, "{{ERROR_BLOCK}}", errorBlock, 1)
 	final = strings.Replace(final, "{{DATE}}", template.HTMLEscapeString(entry.Date), 1)
 	final = strings.Replace(final, "{{START_TIME}}", template.HTMLEscapeString(entry.StartTime), 1)
 	final = strings.Replace(final, "{{END_TIME}}", template.HTMLEscapeString(entry.EndTime), 1)
@@ -472,7 +511,7 @@ func AddSchedulePage(c *gin.Context) {
 	if objectID := strings.TrimSpace(c.Query("object_id")); objectID != "" {
 		entry.ObjectIDs = []string{objectID}
 	}
-	renderScheduleForm(c, entry, "/schedule/new", "Новое назначение", "Сохранить", false)
+	renderScheduleForm(c, entry, "/schedule/new", "Новое назначение", "Сохранить", false, "")
 }
 
 func validateScheduleLinks(workerIDs, objectIDs []string) error {
@@ -529,11 +568,11 @@ func CreateScheduleEntry(c *gin.Context) {
 		entry.UserMark = "Создано пользователем " + c.GetString("userName")
 	}
 	if err := validateScheduleLinks(entry.WorkerIDs, entry.ObjectIDs); err != nil {
-		c.String(http.StatusBadRequest, err.Error())
+		renderScheduleForm(c, entry, "/schedule/new", "Новое назначение", "Сохранить", false, humanizeScheduleError(err))
 		return
 	}
 	if _, err := storage.CreateTimesheet(entry); err != nil {
-		c.String(http.StatusBadRequest, "Failed to create schedule entry: %v", err)
+		renderScheduleForm(c, entry, "/schedule/new", "Новое назначение", "Сохранить", false, humanizeScheduleError(err))
 		return
 	}
 	returnTo := c.PostForm("return_to")
@@ -567,7 +606,7 @@ func EditSchedulePage(c *gin.Context) {
 			return
 		}
 	}
-	renderScheduleForm(c, entry, "/schedule/edit/"+entry.ID, "Редактирование назначения", "Сохранить изменения", true)
+	renderScheduleForm(c, entry, "/schedule/edit/"+entry.ID, "Редактирование назначения", "Сохранить изменения", true, "")
 }
 
 func UpdateScheduleEntry(c *gin.Context) {
@@ -610,11 +649,11 @@ func UpdateScheduleEntry(c *gin.Context) {
 	}
 
 	if err := validateScheduleLinks(entry.WorkerIDs, entry.ObjectIDs); err != nil {
-		c.String(http.StatusBadRequest, err.Error())
+		renderScheduleForm(c, entry, "/schedule/edit/"+entry.ID, "Редактирование назначения", "Сохранить изменения", true, humanizeScheduleError(err))
 		return
 	}
 	if err := storage.UpdateTimesheet(entry); err != nil {
-		c.String(http.StatusBadRequest, "Failed to update schedule entry: %v", err)
+		renderScheduleForm(c, entry, "/schedule/edit/"+entry.ID, "Редактирование назначения", "Сохранить изменения", true, humanizeScheduleError(err))
 		return
 	}
 	returnTo := c.PostForm("return_to")
