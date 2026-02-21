@@ -210,6 +210,13 @@ input:focus, select:focus, textarea:focus {
   display: grid; place-items: center; text-decoration: none; font-size: 2rem; color: #fff;
   background: var(--accent);
 }
+.schedule-day-group { padding: 10px; display: grid; gap: 10px; }
+.schedule-day-list, .schedule-vertical, .dashboard-stats { display: grid; gap: 10px; }
+.assignment-card, .structured-assignment { padding: 12px; }
+.assignment-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.assignment-head span { color: var(--accent); font-weight: 700; }
+.assignment-meta, .assignment-note { padding: 8px 10px; }
+.assignment-meta span, .assignment-note span, .text-muted, .back-link { color: var(--text-secondary); }
 
 .action-modal { position: fixed; inset: 0; display: none; place-items: center; background: rgba(4,8,18,.48); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 300; }
 .action-modal.visible { display: grid; }
