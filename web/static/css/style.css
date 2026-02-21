@@ -2,8 +2,6 @@
 
 :root {
   --bg: #111214;
-  --bg-grad-a: rgba(255, 122, 24, 0.24);
-  --bg-grad-b: rgba(255, 178, 102, 0.18);
   --surface: rgba(28, 29, 32, 0.66);
   --surface-strong: rgba(36, 37, 41, 0.86);
   --surface-soft: rgba(255, 255, 255, 0.06);
@@ -22,8 +20,6 @@
 @media (prefers-color-scheme: light) {
   :root {
     --bg: #f3f3f4;
-    --bg-grad-a: rgba(255, 122, 24, 0.2);
-    --bg-grad-b: rgba(255, 182, 122, 0.24);
     --surface: rgba(255, 255, 255, 0.82);
     --surface-strong: rgba(255, 255, 255, 0.96);
     --surface-soft: rgba(255, 255, 255, 0.6);
@@ -104,6 +100,8 @@ body.nav-open .side-nav-overlay { opacity: 1; pointer-events: auto; }
   display: flex; align-items: center; gap: 10px; text-decoration: none;
   background: var(--surface-soft); border: 1px solid var(--border); border-radius: 14px; padding: 10px;
 }
+.side-nav-user strong { display:block; line-height:1.2; }
+.side-nav-user small { display:block; margin-top:2px; color: var(--text-secondary); }
 .user-avatar, .worker-avatar {
   width: 38px; height: 38px; border-radius: 50%;
   display: grid; place-items: center; font-weight: 700;
@@ -127,12 +125,12 @@ body.nav-open .side-nav-overlay { opacity: 1; pointer-events: auto; }
 
 
 .card, .worker-card, .info-card, .placeholder-card, .table-row, .center-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface), transparent 18%);
+  border: 1px solid color-mix(in srgb, var(--border), transparent 16%);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(var(--blur));
-  -webkit-backdrop-filter: blur(var(--blur));
+  box-shadow: 0 8px 24px rgba(0,0,0,.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 .card, .worker-card, .info-card, .placeholder-card, .timesheet-card { padding: clamp(14px, 2vw, 20px); }
 
@@ -191,13 +189,13 @@ input:focus, select:focus, textarea:focus {
 .status-badge.warning { background: rgba(255,122,24,.16); color: var(--accent); }
 
 .schedule-day-group, .assignment-card, .structured-assignment, .assignment-meta, .assignment-note, .detail-row {
-  border: 1px solid var(--border);
-  background: var(--surface-soft);
+  border: 1px solid color-mix(in srgb, var(--border), transparent 22%);
+  background: color-mix(in srgb, var(--surface-soft), transparent 24%);
   border-radius: 14px;
 }
 .schedule-day-group { padding: 10px; display: grid; gap: 10px; }
 .schedule-day-list, .schedule-vertical, .dashboard-stats { display: grid; gap: 10px; }
-.assignment-card, .structured-assignment { padding: 12px; }
+.assignment-card, .structured-assignment { padding: 12px; max-width: 620px; margin-inline: auto; }
 .assignment-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 .assignment-head span { color: var(--accent); font-weight: 700; }
 .assignment-meta, .assignment-note { padding: 8px 10px; }
@@ -212,6 +210,13 @@ input:focus, select:focus, textarea:focus {
   display: grid; place-items: center; text-decoration: none; font-size: 2rem; color: #fff;
   background: var(--accent);
 }
+.schedule-day-group { padding: 10px; display: grid; gap: 10px; }
+.schedule-day-list, .schedule-vertical, .dashboard-stats { display: grid; gap: 10px; }
+.assignment-card, .structured-assignment { padding: 12px; }
+.assignment-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.assignment-head span { color: var(--accent); font-weight: 700; }
+.assignment-meta, .assignment-note { padding: 8px 10px; }
+.assignment-meta span, .assignment-note span, .text-muted, .back-link { color: var(--text-secondary); }
 
 .action-modal { position: fixed; inset: 0; display: none; place-items: center; background: rgba(4,8,18,.48); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); z-index: 300; }
 .action-modal.visible { display: grid; }
@@ -228,10 +233,8 @@ input:focus, select:focus, textarea:focus {
   grid-template-rows: 1fr;
   padding: 12px;
 }
-.action-modal-header { display: none; }
-.action-modal-header h3 { margin: 0; }
-.action-modal-close { background: transparent; border: 0; color: var(--text-primary); font-size: 1.1rem; cursor: pointer; }
-.action-modal iframe { width: 100%; height: 100%; min-height: min(76vh, 720px); max-height: calc(100dvh - 56px); border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
+.action-modal-close { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text-primary); font-size: 1rem; cursor: pointer; z-index: 2; }
+.action-modal iframe { width: 100%; height: 100%; min-height: min(72vh, 680px); max-height: calc(100dvh - 68px); border: 1px solid var(--border); border-radius: 12px; background: var(--surface); }
 
 .center-page { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
 .center-card { width: min(480px, 100%); }
@@ -401,17 +404,21 @@ input:focus, select:focus, textarea:focus {
 }
 .action-modal.visible { opacity: 1; visibility: visible; }
 .action-modal-sheet {
-  width: min(640px, 96vw);
+  position: relative;
+  width: min(620px, 94vw);
   height: auto;
-  max-height: calc(100dvh - 32px);
-  padding: 12px;
-  border-radius: 16px;
+  max-height: calc(100dvh - 28px);
+  padding: 14px;
+  border-radius: 18px;
+  background: var(--surface-strong);
+  border: 1px solid var(--border);
+  box-shadow: 0 20px 50px rgba(0,0,0,.35);
   transform: translateY(16px) scale(.98);
-  transition: transform .28s cubic-bezier(.2,.8,.2,1), opacity .28s ease;
+  transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .3s ease;
   opacity: .01;
 }
 .action-modal.visible .action-modal-sheet { transform: translateY(0) scale(1); opacity: 1; }
-.action-modal iframe { min-height: min(76vh, 720px); max-height: calc(100dvh - 56px); border: 1px solid var(--border); border-radius: 12px; }
+.action-modal iframe { min-height: min(70vh, 650px); max-height: calc(100dvh - 66px); border: 1px solid var(--border); border-radius: 12px; }
 
 .modal {
   animation: modalOverlayIn .24s ease;
@@ -441,5 +448,5 @@ input:focus, select:focus, textarea:focus {
   .timesheet-form .dynamic-select-row { grid-template-columns: 1fr auto; }
   .timesheet-form .btn-mini { width: 42px; }
   .assignment-head { flex-direction: column; align-items: flex-start; }
-  .action-modal-sheet { width: min(96vw, 640px); max-height: calc(100dvh - 20px); border-radius: 14px; padding: 10px; }
+  .action-modal-sheet { width: min(96vw, 620px); max-height: calc(100dvh - 16px); border-radius: 14px; padding: 10px; }
 }
