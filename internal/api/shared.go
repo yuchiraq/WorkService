@@ -96,6 +96,12 @@ function openModal(url,t,ret){
 function ensureBrandAssets(){
   const head=document.head||document.getElementsByTagName('head')[0];
   if(!head) return;
+  if(!head.querySelector('meta[name="viewport"]')){
+    const viewport=document.createElement('meta');
+    viewport.name='viewport';
+    viewport.content='width=device-width, initial-scale=1';
+    head.appendChild(viewport);
+  }
   if(!head.querySelector('link[rel="icon"]')){
     const ico=document.createElement('link');
     ico.rel='icon';
