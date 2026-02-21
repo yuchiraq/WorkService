@@ -332,6 +332,29 @@ input:focus, select:focus, textarea:focus {
 .modal-form-layout .form-grid, .modal-form-layout .form-grid-edit, .modal-form-layout .timesheet-form { gap: 10px; }
 
 
+
+
+/* Glow interactions */
+.btn, .nav-link, .worker-card, .info-card, .card, .placeholder-card, .assignment-card, .structured-assignment {
+  transition: box-shadow .24s ease, border-color .24s ease, transform .24s ease, background-color .24s ease;
+}
+.btn:hover, .btn:focus-visible {
+  box-shadow: 0 0 0 1px rgba(255,122,24,.34), 0 0 18px rgba(255,122,24,.26);
+  border-color: rgba(255,122,24,.46);
+}
+.btn-primary:hover, .btn-primary:focus-visible {
+  box-shadow: 0 0 0 1px rgba(255,122,24,.5), 0 0 24px rgba(255,122,24,.34);
+}
+.nav-link.active, .nav-link:hover {
+  box-shadow: inset 0 0 0 1px rgba(255,122,24,.28), 0 0 14px rgba(255,122,24,.18);
+}
+.worker-card:hover, .info-card:hover, .card:hover, .placeholder-card:hover,
+.assignment-card:hover, .structured-assignment:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255,122,24,.35);
+  box-shadow: 0 0 0 1px rgba(255,122,24,.20), 0 10px 30px rgba(0,0,0,.32), 0 0 20px rgba(255,122,24,.14);
+}
+
 /* UI refinement overrides */
 .entity-link, .back-link { text-decoration: none; }
 .table.timesheet-matrix th:first-child,
