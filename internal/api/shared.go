@@ -96,6 +96,12 @@ function openModal(url,t,ret){
 function ensureBrandAssets(){
   const head=document.head||document.getElementsByTagName('head')[0];
   if(!head) return;
+  if(!head.querySelector('meta[name="viewport"]')){
+    const viewport=document.createElement('meta');
+    viewport.name='viewport';
+    viewport.content='width=device-width, initial-scale=1';
+    head.appendChild(viewport);
+  }
   if(!head.querySelector('link[rel="icon"]')){
     const ico=document.createElement('link');
     ico.rel='icon';
@@ -130,7 +136,7 @@ document.addEventListener('click',function(e){
 });
 if(closeBtn) closeBtn.addEventListener('click',closeModal);
 if(modal) modal.addEventListener('click',function(e){ if(e.target===modal) closeModal();});
-if(burger) burger.addEventListener('click', function(){ body.classList.toggle('nav-open'); });
+if(burger){ burger.addEventListener('click', function(){ body.classList.toggle('nav-open'); }); burger.addEventListener('keydown', function(e){ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); body.classList.toggle('nav-open'); }}); }
 if(navOverlay) navOverlay.addEventListener('click', closeNav);
 document.querySelectorAll('.side-nav-links a').forEach(function(a){ a.addEventListener('click', closeNav); });
 document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeModal(); closeNav(); }});
@@ -147,10 +153,7 @@ if(iframe){
 	return fmt.Sprintf(`
 <header class="top-nav">
   <div class="container nav-inner">
-    <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню">
-      <span></span><span></span><span></span>
-    </button>
-    <h1 class="top-nav-title">%s</h1>
+    <h1 class="top-nav-title" data-mobile-nav-toggle role="button" tabindex="0" aria-label="Открыть навигацию">%s</h1>
   </div>
 </header>
 <div class="side-nav-overlay" data-nav-overlay></div>
