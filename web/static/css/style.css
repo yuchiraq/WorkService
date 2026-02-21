@@ -308,6 +308,7 @@ input:focus, select:focus, textarea:focus {
   -webkit-backdrop-filter: blur(9px);
   z-index: 300;
 }
+.hours-cell:hover .hours-tooltip { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
 
 .modal {
   position: fixed;
