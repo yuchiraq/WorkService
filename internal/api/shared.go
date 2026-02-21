@@ -70,8 +70,8 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 const body=document.body;
 const modal=document.getElementById('app-action-modal');
 const iframe=document.getElementById('app-action-modal-iframe');
-const title=document.getElementById('app-action-modal-title');
 const closeBtn=document.querySelector('[data-modal-close]');
+const modalSheet=document.querySelector('.action-modal-sheet');
 const burger=document.querySelector('[data-mobile-nav-toggle]');
 const navOverlay=document.querySelector('[data-nav-overlay]');
 
@@ -88,7 +88,6 @@ function openModal(url,t,ret){
   try{ const u=new URL(url,window.location.origin); if(!u.searchParams.has('modal')) u.searchParams.set('modal','1'); if(effectiveRet && !u.searchParams.has('return')) u.searchParams.set('return', effectiveRet); url=u.pathname+u.search; }catch(_){ }
   modal.classList.add('visible');
   body.classList.add('modal-open');
-  title.textContent=t||'Форма';
   iframe.setAttribute('data-return-path', effectiveRet);
   iframe.src=url;
 }
@@ -96,6 +95,12 @@ function openModal(url,t,ret){
 function ensureBrandAssets(){
   const head=document.head||document.getElementsByTagName('head')[0];
   if(!head) return;
+  if(!head.querySelector('meta[name="viewport"]')){
+    const viewport=document.createElement('meta');
+    viewport.name='viewport';
+    viewport.content='width=device-width, initial-scale=1';
+    head.appendChild(viewport);
+  }
   if(!head.querySelector('link[rel="icon"]')){
     const ico=document.createElement('link');
     ico.rel='icon';
@@ -130,7 +135,7 @@ document.addEventListener('click',function(e){
 });
 if(closeBtn) closeBtn.addEventListener('click',closeModal);
 if(modal) modal.addEventListener('click',function(e){ if(e.target===modal) closeModal();});
-if(burger) burger.addEventListener('click', function(){ body.classList.toggle('nav-open'); });
+if(burger){ burger.addEventListener('click', function(){ body.classList.toggle('nav-open'); }); burger.addEventListener('keydown', function(e){ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); body.classList.toggle('nav-open'); }}); }
 if(navOverlay) navOverlay.addEventListener('click', closeNav);
 document.querySelectorAll('.side-nav-links a').forEach(function(a){ a.addEventListener('click', closeNav); });
 document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeModal(); closeNav(); }});
@@ -138,7 +143,16 @@ if(iframe){
   iframe.addEventListener('load',function(){
     const ret=iframe.getAttribute('data-return-path');
     let href='';
-    try{ href=iframe.contentWindow.location.href; }catch(_){ return; }
+    try{
+      href=iframe.contentWindow.location.href;
+      if(modalSheet && iframe.contentWindow && iframe.contentWindow.document){
+        const d=iframe.contentWindow.document;
+        const h=Math.max(d.body ? d.body.scrollHeight : 0, d.documentElement ? d.documentElement.scrollHeight : 0);
+        if(h>0){
+          modalSheet.style.height=Math.min(Math.max(h+18, 300), window.innerHeight-32)+'px';
+        }
+      }
+    }catch(_){ return; }
     if(ret && sameTarget(href, ret)){ closeModal(); window.location.href=ret; }
   });
 }
@@ -147,10 +161,7 @@ if(iframe){
 	return fmt.Sprintf(`
 <header class="top-nav">
   <div class="container nav-inner">
-    <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню">
-      <span></span><span></span><span></span>
-    </button>
-    <h1 class="top-nav-title">%s</h1>
+    <h1 class="top-nav-title" data-mobile-nav-toggle role="button" tabindex="0" aria-label="Открыть навигацию">%s</h1>
   </div>
 </header>
 <div class="side-nav-overlay" data-nav-overlay></div>
@@ -163,7 +174,7 @@ if(iframe){
 <div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение">+</a></div>
 <div class="action-modal" id="app-action-modal" aria-hidden="true">
   <div class="action-modal-sheet">
-    <div class="action-modal-header"><h3 id="app-action-modal-title">Форма</h3><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button></div>
+    <button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button>
     <iframe id="app-action-modal-iframe" title="Форма"></iframe>
   </div>
 </div>%s%s`, pageTitle, userInitial, userName, roleLabel, nav.String(), csrfScript, uiScript)
