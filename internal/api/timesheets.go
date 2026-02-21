@@ -396,11 +396,42 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 <form id="schedule-delete-form" action="{{DELETE_ACTION}}" method="POST" style="display:none;">{{CSRF_FIELD}}<input type="hidden" name="return_to" value="{{RETURN_TO}}"></form>
 <script>
+function parseOptions(html){
+  const probe=document.createElement('select');
+  probe.innerHTML=html;
+  return Array.from(probe.options).map(function(o){ return {value:o.value,text:o.text}; });
+}
+function buildOptionsHTML(options, currentValue, blocked){
+  return options.filter(function(opt){
+    if(opt.value==='') return true;
+    if(opt.value===currentValue) return true;
+    return !blocked.has(opt.value);
+  }).map(function(opt){
+    const selected=opt.value===currentValue ? ' selected' : '';
+    return '<option value="'+opt.value+'"'+selected+'>'+opt.text+'</option>';
+  }).join('');
+}
 function makeSelectRow(name, optionsHTML){
   const row=document.createElement('div');
   row.className='dynamic-select-row';
   row.innerHTML='<select name="'+name+'" class="dynamic-select">'+optionsHTML+'</select><button type="button" class="btn btn-secondary btn-mini" data-remove-select>✕</button>';
   return row;
+}
+function syncGroupOptions(group){
+  if(!group.dataset.optionTemplate){
+    const first=group.querySelector('select');
+    group.dataset.optionTemplate = first ? first.innerHTML : '<option value="">—</option>';
+  }
+  const options=parseOptions(group.dataset.optionTemplate);
+  const selects=Array.from(group.querySelectorAll('select'));
+  const allSelected=new Set(selects.map(function(s){ return s.value; }).filter(Boolean));
+  selects.forEach(function(select){
+    const current=select.value;
+    const blocked=new Set(allSelected);
+    if(current) blocked.delete(current);
+    select.innerHTML=buildOptionsHTML(options, current, blocked);
+    select.value=current;
+  });
 }
 function normalizeDynamicGroup(group){
   const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
@@ -413,6 +444,7 @@ function normalizeDynamicGroup(group){
           return;
         }
         row.remove();
+        syncGroupOptions(group);
         normalizeDynamicGroup(group);
       };
     }
@@ -426,9 +458,11 @@ function ensureDynamicSelectRows(group){
   if(select && select.value){
     group.appendChild(makeSelectRow(select.name, select.innerHTML));
   }
+  syncGroupOptions(group);
   normalizeDynamicGroup(group);
 }
 document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group){
+  syncGroupOptions(group);
   group.addEventListener('change', function(e){
     if(e.target.matches('select')) ensureDynamicSelectRows(group);
   });
