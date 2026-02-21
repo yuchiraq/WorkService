@@ -117,6 +117,31 @@ function ensureBrandAssets(){
   }
 }
 
+function applySavedTheme(){
+  const saved=localStorage.getItem('app-theme');
+  if(saved==='dark'||saved==='light'){
+    body.setAttribute('data-theme', saved);
+    return;
+  }
+  const prefersLight=window.matchMedia&&window.matchMedia('(prefers-color-scheme: light)').matches;
+  body.setAttribute('data-theme', prefersLight ? 'light' : 'dark');
+}
+
+function updateThemeButtons(){
+  const isLight=body.getAttribute('data-theme')==='light';
+  document.querySelectorAll('[data-theme-toggle]').forEach(function(btn){
+    btn.textContent=isLight ? '🌙' : '☀️';
+    btn.setAttribute('aria-label', isLight ? 'Включить тёмную тему' : 'Включить светлую тему');
+  });
+}
+
+function toggleTheme(){
+  const next=body.getAttribute('data-theme')==='light' ? 'dark' : 'light';
+  body.setAttribute('data-theme', next);
+  localStorage.setItem('app-theme', next);
+  updateThemeButtons();
+}
+
 function sameTarget(current, target){
   try{
     const c=new URL(current, window.location.origin);
@@ -128,7 +153,15 @@ function sameTarget(current, target){
 }
 
 ensureBrandAssets();
+applySavedTheme();
+updateThemeButtons();
 document.addEventListener('click',function(e){
+  const themeBtn=e.target.closest('[data-theme-toggle]');
+  if(themeBtn){
+    e.preventDefault();
+    toggleTheme();
+    return;
+  }
   const t=e.target.closest('[data-modal-url]');
   if(!t) return;
   e.preventDefault();
