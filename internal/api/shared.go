@@ -72,6 +72,7 @@ const modal=document.getElementById('app-action-modal');
 const iframe=document.getElementById('app-action-modal-iframe');
 const title=document.getElementById('app-action-modal-title');
 const closeBtn=document.querySelector('[data-modal-close]');
+const modalSheet=document.querySelector('.action-modal-sheet');
 const burger=document.querySelector('[data-mobile-nav-toggle]');
 const navOverlay=document.querySelector('[data-nav-overlay]');
 
@@ -177,7 +178,16 @@ if(iframe){
   iframe.addEventListener('load',function(){
     const ret=iframe.getAttribute('data-return-path');
     let href='';
-    try{ href=iframe.contentWindow.location.href; }catch(_){ return; }
+    try{
+      href=iframe.contentWindow.location.href;
+      if(modalSheet && iframe.contentWindow && iframe.contentWindow.document){
+        const d=iframe.contentWindow.document;
+        const h=Math.max(d.body ? d.body.scrollHeight : 0, d.documentElement ? d.documentElement.scrollHeight : 0);
+        if(h>0){
+          modalSheet.style.height=Math.min(Math.max(h+18, 300), window.innerHeight-32)+'px';
+        }
+      }
+    }catch(_){ return; }
     if(ret && sameTarget(href, ret)){ closeModal(); window.location.href=ret; }
   });
 }
