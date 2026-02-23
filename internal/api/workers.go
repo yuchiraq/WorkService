@@ -326,7 +326,7 @@ func WorkerProfilePage(c *gin.Context) {
 <body>
     {{SIDEBAR_HTML}}
     <div class="main-content"> 
-        <a href="/workers" class="back-link"><svg viewBox="0 0 16 16"><path d="M11.9,8.5H4.1l3.3,3.3c0.2,0.2,0.2,0.5,0,0.7s-0.5,0.2-0.7,0l-4-4C2.6,8.4,2.5,8.2,2.5,8s0.1-0.4,0.2-0.5l4-4c0.2-0.2,0.5-0.2,0.7,0s0.2,0.5,0,0.7L4.1,7.5H11.9c0.3,0,0.5,0.2,0.5,0.5S12.2,8.5,11.9,8.5z"/></svg>К списку работников</a>
+        <a href="/workers" class="back-link">К списку работников</a>
 
         <div class="profile-header-container">
             <div class="profile-header">
@@ -569,7 +569,7 @@ func EditWorkerPage(c *gin.Context) {
 
     <script>
         function showDeleteModal() {
-            document.getElementById('deleteModal').style.display = 'block';
+            document.getElementById('deleteModal').style.display = 'flex';
         }
         function closeDeleteModal() {
             document.getElementById('deleteModal').style.display = 'none';
