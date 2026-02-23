@@ -136,9 +136,6 @@ func validateTimesheet(entry models.TimesheetEntry) error {
 		if entry.LunchBreakMinutes >= totalMinutes {
 			return errors.New("lunch break must be shorter than work interval")
 		}
-		if len(entry.ObjectIDs) == 0 {
-			return errors.New("at least one object is required")
-		}
 	}
 
 	for _, workerID := range entry.WorkerIDs {
