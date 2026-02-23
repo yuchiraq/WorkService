@@ -147,11 +147,13 @@ if(iframe){
     let href='';
     try{
       href=iframe.contentWindow.location.href;
-      if(modalSheet && iframe.contentWindow && iframe.contentWindow.document){
+      if(iframe.contentWindow && iframe.contentWindow.document){
         const d=iframe.contentWindow.document;
         const h=Math.max(d.body ? d.body.scrollHeight : 0, d.documentElement ? d.documentElement.scrollHeight : 0);
         if(h>0){
-          modalSheet.style.height=Math.min(Math.max(h+18, 300), window.innerHeight-32)+'px';
+          const maxH = window.innerHeight - 140;
+          iframe.style.height = Math.min(Math.max(h + 14, 320), maxH) + 'px';
+          if(modalSheet) modalSheet.style.height = 'auto';
         }
       }
     }catch(_){ return; }
