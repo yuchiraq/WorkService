@@ -344,11 +344,12 @@ func WorkerProfilePage(c *gin.Context) {
                     <p>{{POSITION}}</p>
                 </div>
             </div>
-            <div class="profile-actions">
-                {{STATUS_BADGE}}
-                <a href="/workers/edit/{{WORKER_ID}}" class="btn btn-secondary" data-modal-url="/workers/edit/{{WORKER_ID}}" data-modal-title="Редактировать работника" data-modal-return="/worker/{{WORKER_ID}}">Редактировать</a>
-            </div>
-        </div>
+			<div class="profile-actions">
+				{{STATUS_BADGE}}
+				<a href="/schedule/new?worker_id={{WORKER_ID}}&return=/worker/{{WORKER_ID}}&special_mark=vacation" class="btn btn-primary" data-modal-url="/schedule/new?worker_id={{WORKER_ID}}&return=/worker/{{WORKER_ID}}&special_mark=vacation" data-modal-title="Добавить отметку" data-modal-return="/worker/{{WORKER_ID}}">Добавить отпуск/больничный/выходной</a>
+				<a href="/workers/edit/{{WORKER_ID}}" class="btn btn-secondary" data-modal-url="/workers/edit/{{WORKER_ID}}" data-modal-title="Редактировать работника" data-modal-return="/worker/{{WORKER_ID}}">Редактировать</a>
+			</div>
+		</div>
 
         <ul class="profile-details">
             <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M6 8V7a4 4 0 118 0v1h2V7a6 6 0 10-12 0v1h2zm6 2H8v6h4v-6z"/></svg>Дата рождения: {{BIRTH_DATE}}</li>

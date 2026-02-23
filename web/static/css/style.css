@@ -267,6 +267,7 @@ input:focus, select:focus, textarea:focus {
 .modal-form-layout .side-nav,
 .modal-form-layout .side-nav-overlay,
 .modal-form-layout .floating-create-wrap { display: none !important; }
+.modal-form-layout .back-link { display: none !important; }
 .modal-form-layout .main-content { margin: 0; max-width: none; padding: 12px; }
 .modal-form-card { max-width: 900px; margin: 0 auto; }
 .modal-form-content { width: 100%; }
@@ -369,10 +370,14 @@ input:focus, select:focus, textarea:focus {
 
 /* UI refinement overrides */
 .entity-link, .back-link { text-decoration: none; }
+.back-link { display: inline-flex; align-items: center; gap: 8px; }
+.back-link svg { width: 16px; height: 16px; flex-shrink: 0; }
 .table.timesheet-matrix th:first-child,
 .table.timesheet-matrix td:first-child,
 .timesheet-matrix th:first-child,
 .timesheet-matrix td:first-child { text-align: left; }
+
+.timesheet-work-fields { display: contents; }
 
 .hours-cell.empty { position: relative; }
 .hours-cell.empty .empty-value { opacity: 1; transition: opacity .18s ease; }
@@ -394,31 +399,163 @@ input:focus, select:focus, textarea:focus {
 .hours-cell.empty:hover .empty-value { opacity: 0; }
 .hours-cell.empty:hover .timesheet-quick-add { opacity: 1; transform: translate(-50%, -50%) scale(1); }
 
+.timesheet-quick-menu {
+  position: absolute;
+  inset: calc(100% + 8px) auto auto 50%;
+  transform: translateX(-50%) translateY(-4px);
+  z-index: 12;
+  min-width: 170px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface-strong);
+  box-shadow: 0 14px 32px rgba(0,0,0,.32);
+  display: grid;
+  gap: 5px;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .18s ease, transform .18s ease, visibility .18s ease;
+}
+.timesheet-quick-menu a {
+  display: block;
+  padding: 7px 10px;
+  border-radius: 9px;
+  text-decoration: none;
+  color: var(--text-primary);
+  font-size: .9rem;
+}
+.timesheet-quick-menu a:hover {
+  background: rgba(255,122,24,.14);
+  color: #fff;
+}
+.timesheet-quick-menu.open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.hours-cell.empty.marked .timesheet-quick-add {
+  top: 50%;
+}
+
+.hours-cell.empty.marked:hover .empty-value,
+.hours-cell.empty.marked:focus-within .empty-value {
+  opacity: 1;
+}
+
+.hours-cell.empty.marked:hover .timesheet-quick-add,
+.hours-cell.empty.marked:focus-within .timesheet-quick-add {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.hours-cell.empty .timesheet-quick-add:focus + .timesheet-quick-menu,
+.hours-cell.empty .timesheet-quick-menu:hover {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+.profile-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.profile-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.history-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.history-header h2 {
+  margin: 0;
+}
+
+.modal-form-layout .placeholder-card,
+.modal-form-layout .card,
+.modal-form-layout .timesheet-card {
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  box-shadow: 0 14px 28px rgba(0,0,0,.24);
+}
+
+.modal-form-layout .form-group,
+.modal-form-layout .form-group-edit {
+  background: rgba(255,255,255,.02);
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 12px;
+  padding: 9px;
+}
+
+.modal-form-layout .form-actions,
+.modal-form-layout .form-actions-edit {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
 .details-list, .schedule-day-list, .schedule-vertical, .assignment-body, .info-card-actions { display: grid; gap: 10px; }
 .object-card .info-card-header, .assignment-head { margin-bottom: 8px; }
 
 .action-modal {
   opacity: 0;
   visibility: hidden;
-  transition: opacity .24s ease, visibility .24s ease;
+  transition: opacity .2s ease, visibility .2s ease;
+  background: rgba(4,8,18,.46);
 }
 .action-modal.visible { opacity: 1; visibility: visible; }
 .action-modal-sheet {
   position: relative;
-  width: min(620px, 94vw);
-  height: auto;
-  max-height: calc(100dvh - 28px);
-  padding: 14px;
-  border-radius: 18px;
+  width: min(700px, 96vw);
+  max-height: calc(100dvh - 32px);
+  padding: 16px;
+  border-radius: 16px;
   background: var(--surface-strong);
   border: 1px solid var(--border);
-  box-shadow: 0 20px 50px rgba(0,0,0,.35);
-  transform: translateY(16px) scale(.98);
-  transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .3s ease;
+  box-shadow: var(--shadow);
+  transform: translateY(8px) scale(.98);
+  transition: transform .22s ease, opacity .22s ease;
   opacity: .01;
 }
 .action-modal.visible .action-modal-sheet { transform: translateY(0) scale(1); opacity: 1; }
-.action-modal iframe { min-height: min(70vh, 650px); max-height: calc(100dvh - 66px); border: 1px solid var(--border); border-radius: 12px; }
+.action-modal iframe {
+  width: 100%;
+  min-height: min(64vh, 560px);
+  max-height: calc(100dvh - 120px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.action-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -2px 0 10px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+.action-modal-header strong { font-size: 1rem; font-weight: 700; }
+.action-modal-header .action-modal-close {
+  position: static;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
 
 .modal {
   animation: modalOverlayIn .24s ease;
@@ -448,5 +585,8 @@ input:focus, select:focus, textarea:focus {
   .timesheet-form .dynamic-select-row { grid-template-columns: 1fr auto; }
   .timesheet-form .btn-mini { width: 42px; }
   .assignment-head { flex-direction: column; align-items: flex-start; }
-  .action-modal-sheet { width: min(96vw, 620px); max-height: calc(100dvh - 16px); border-radius: 14px; padding: 10px; }
+  .action-modal-sheet { width: min(96vw, 700px); max-height: calc(100dvh - 16px); border-radius: 14px; padding: 10px; }
+  .timesheet-quick-menu { left: 50%; right: auto; max-width: min(220px, 86vw); }
+  .profile-actions { justify-content: flex-start; }
+  .profile-grid { grid-template-columns: 1fr !important; }
 }
