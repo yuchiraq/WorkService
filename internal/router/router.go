@@ -28,6 +28,7 @@ func SetupRouter(r *gin.Engine) {
 		authRequired.POST("/workers/delete/:id", api.DeleteWorker)
 
 		authRequired.GET("/objects", api.ObjectsPage)
+		authRequired.GET("/object/:id", api.ObjectProfilePage)
 		authRequired.GET("/objects/new", api.AddObjectPage)
 		authRequired.POST("/objects/new", api.CreateObject)
 		authRequired.GET("/objects/edit/:id", api.EditObjectPage)
@@ -51,6 +52,7 @@ func SetupRouter(r *gin.Engine) {
 		// Timesheet matrix (табель)
 		authRequired.GET("/timesheets", api.TimesheetsPage)
 		authRequired.GET("/timesheets/", api.TimesheetsPage)
+		authRequired.GET("/timesheets/export", api.ExportTimesheetsExcel)
 		authRequired.GET("/timesheet", api.TimesheetsPage)
 		authRequired.GET("/timesheet/", api.TimesheetsPage)
 		authRequired.GET("/tabel", api.TimesheetsPage)

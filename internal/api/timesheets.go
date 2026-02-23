@@ -1,9 +1,11 @@
 package api
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -13,6 +15,7 @@ import (
 	"project/internal/storage"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xuri/excelize/v2"
 )
 
 func formatWorkHours(startTime, endTime string, lunch int) string {
@@ -68,7 +71,59 @@ func joinMappedValues(ids []string, valuesMap map[string]string) string {
 	return strings.Join(names, ", ")
 }
 
+func joinMappedLinks(ids []string, valuesMap map[string]string, pathPrefix string) string {
+	items := make([]string, 0, len(ids))
+	for _, id := range ids {
+		name, exists := valuesMap[id]
+		if !exists {
+			continue
+		}
+		items = append(items, fmt.Sprintf(`<a class="entity-link" href="%s/%s">%s</a>`, template.HTMLEscapeString(pathPrefix), template.HTMLEscapeString(id), template.HTMLEscapeString(name)))
+	}
+	if len(items) == 0 {
+		return "—"
+	}
+	return strings.Join(items, ", ")
+}
+
 // SchedulePage shows assignment entries list (old "Табель" page renamed to "Расписание").
+
+func humanizeScheduleError(err error) string {
+	if err == nil {
+		return ""
+	}
+	msg := strings.TrimSpace(err.Error())
+	switch {
+	case strings.Contains(msg, "at least one worker is required"):
+		return "Нужно назначить хотя бы одного работника."
+	case strings.Contains(msg, "at least one object is required"):
+		return "Нужно назначить хотя бы один объект."
+	case strings.Contains(msg, "invalid date format"):
+		return "Некорректная дата назначения."
+	case strings.Contains(msg, "invalid start time"), strings.Contains(msg, "invalid end time"):
+		return "Проверьте корректность времени начала и окончания."
+	case strings.Contains(msg, "end time must be after start time"):
+		return "Время окончания должно быть позже времени начала."
+	case strings.Contains(msg, "lunch break must be shorter"):
+		return "Обед должен быть короче продолжительности смены."
+	case strings.Contains(msg, "нельзя назначить"):
+		return msg
+	default:
+		return "Не удалось сохранить назначение: " + msg
+	}
+}
+
+func cleanIDList(ids []string) []string {
+	clean := make([]string, 0, len(ids))
+	for _, id := range ids {
+		id = strings.TrimSpace(id)
+		if id == "" {
+			continue
+		}
+		clean = append(clean, id)
+	}
+	return clean
+}
 
 func getScopedEntries(c *gin.Context, entries []models.TimesheetEntry) ([]models.TimesheetEntry, error) {
 	if c.GetString("userStatus") == "admin" {
@@ -105,6 +160,30 @@ func monthOptionsHTML(selectedMonth string) string {
 		b.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, template.HTMLEscapeString(value), selected, template.HTMLEscapeString(label)))
 	}
 	return b.String()
+}
+
+func resolveSelectedMonth(value string) (string, time.Time, int) {
+	selectedMonth := strings.TrimSpace(value)
+	if selectedMonth == "" {
+		selectedMonth = time.Now().Format("2006-01")
+	}
+	monthStart, err := time.Parse("2006-01", selectedMonth)
+	if err != nil {
+		monthStart = time.Now()
+		selectedMonth = monthStart.Format("2006-01")
+	}
+	monthStart = time.Date(monthStart.Year(), monthStart.Month(), 1, 0, 0, 0, 0, time.UTC)
+	nextMonth := monthStart.AddDate(0, 1, 0)
+	daysInMonth := int(nextMonth.Sub(monthStart).Hours() / 24)
+	return selectedMonth, monthStart, daysInMonth
+}
+
+func buildMonthDates(selectedMonth string, daysInMonth int) []string {
+	monthDates := make([]string, 0, daysInMonth)
+	for d := 1; d <= daysInMonth; d++ {
+		monthDates = append(monthDates, fmt.Sprintf("%s-%02d", selectedMonth, d))
+	}
+	return monthDates
 }
 func formatScheduleDateLabel(date string) string {
 	t, err := time.Parse("2006-01-02", date)
@@ -175,14 +254,19 @@ func SchedulePage(c *gin.Context) {
 			}
 			commentHTML := ""
 			if strings.TrimSpace(entry.Notes) != "" {
-				commentHTML = `<p><strong>Комментарий:</strong> ` + template.HTMLEscapeString(entry.Notes) + `</p>`
+				commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
 			}
-			scheduleRows.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical"><div class="schedule-entry-main"><p><strong>Объекты:</strong> %s</p><p><strong>Работники:</strong> %s</p><p><strong>Время:</strong> %s - %s · %s ч</p>%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></div>`,
-				joinMappedValues(entry.ObjectIDs, objectsMap),
-				joinMappedValues(entry.WorkerIDs, workersMap),
+			creatorHTML := ""
+			if strings.TrimSpace(entry.CreatedByName) != "" {
+				creatorHTML = `<div class="assignment-meta"><span>Создал</span><p>` + template.HTMLEscapeString(entry.CreatedByName) + `</p></div>`
+			}
+			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></article>`,
 				template.HTMLEscapeString(entry.StartTime),
 				template.HTMLEscapeString(entry.EndTime),
 				template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
+				joinMappedLinks(entry.ObjectIDs, objectsMap, "/object"),
+				joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"),
+				creatorHTML,
 				commentHTML,
 				template.HTMLEscapeString(entry.ID),
 				template.HTMLEscapeString(entry.ID),
@@ -206,37 +290,32 @@ func SchedulePage(c *gin.Context) {
 }
 
 func buildSelectAndSelectedList(items [][2]string, selectedIDs []string, selectID, inputName string) (string, string) {
-	selectedSet := make(map[string]struct{}, len(selectedIDs))
-	for _, id := range selectedIDs {
-		selectedSet[id] = struct{}{}
-	}
-
+	_ = selectID
 	var options strings.Builder
+	options.WriteString(`<option value="">Выберите...</option>`)
 	for _, item := range items {
 		options.WriteString(fmt.Sprintf(`<option value="%s">%s</option>`, template.HTMLEscapeString(item[0]), template.HTMLEscapeString(item[1])))
 	}
 
-	var selectedList strings.Builder
-	for _, item := range items {
-		if _, ok := selectedSet[item[0]]; !ok {
-			continue
+	var rows strings.Builder
+	for _, selectedID := range selectedIDs {
+		rows.WriteString(`<div class="dynamic-select-row"><select name="` + template.HTMLEscapeString(inputName) + `" class="dynamic-select">`)
+		rows.WriteString(`<option value="">Выберите...</option>`)
+		for _, item := range items {
+			selected := ""
+			if item[0] == selectedID {
+				selected = " selected"
+			}
+			rows.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, template.HTMLEscapeString(item[0]), selected, template.HTMLEscapeString(item[1])))
 		}
-		selectedList.WriteString(fmt.Sprintf(`<li data-id="%s"><span>%s</span><input type="hidden" name="%s" value="%s"><button type="button" class="btn btn-secondary btn-mini" onclick="removeSelection(this)">Удалить</button></li>`,
-			template.HTMLEscapeString(item[0]),
-			template.HTMLEscapeString(item[1]),
-			template.HTMLEscapeString(inputName),
-			template.HTMLEscapeString(item[0]),
-		))
+		rows.WriteString(`</select><button type="button" class="btn btn-secondary btn-mini" data-remove-select>✕</button></div>`)
 	}
+	rows.WriteString(`<div class="dynamic-select-row"><select name="` + template.HTMLEscapeString(inputName) + `" class="dynamic-select">` + options.String() + `</select><button type="button" class="btn btn-secondary btn-mini" data-remove-select>✕</button></div>`)
 
-	if selectedList.Len() == 0 {
-		selectedList.WriteString(`<li class="empty">Ничего не выбрано</li>`)
-	}
-
-	return options.String(), selectedList.String()
+	return options.String(), rows.String()
 }
 
-func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, title, submit string, isEdit bool) {
+func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, title, submit string, isEdit bool, errorMsg string) {
 	workers, err := storage.GetWorkers()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
@@ -302,7 +381,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 	deleteBtn := ""
 	isModal := IsModalRequest(c)
 	if isEdit {
-		deleteBtn = `<button type="button" class="btn btn-danger" onclick="showDeleteModal()">Удалить</button>`
+		deleteBtn = `<button type="button" class="btn btn-danger" onclick="confirmDeleteSchedule()">Удалить</button>`
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
@@ -313,6 +392,8 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 <div class="card{{CARD_CLASS}}">
 <form action="{{ACTION_URL}}" method="POST" class="form-grid-edit timesheet-form">
 {{CSRF_FIELD}}
+<input type="hidden" name="return_to" value="{{RETURN_TO}}">
+{{ERROR_BLOCK}}
 <div class="form-group-edit"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
 <div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
 <div class="form-group-edit"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
@@ -320,47 +401,70 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 <div class="form-group-edit timesheet-span-2">
   <label>Работники</label>
-  <div class="picker-row"><select id="worker_select">{{WORKER_OPTIONS}}</select><button class="btn btn-primary" type="button" onclick="addSelection('worker_select','worker_selected','worker_ids')">Добавить работника</button></div>
-  <ul id="worker_selected" class="selected-list">{{WORKER_SELECTED}}</ul>
+  <div class="dynamic-select-group" data-dynamic-select-group>
+    {{WORKER_SELECTED}}
+  </div>
 </div>
 
 <div class="form-group-edit timesheet-span-2">
   <label>Объекты</label>
-  <div class="picker-row"><select id="object_select">{{OBJECT_OPTIONS}}</select><button class="btn btn-primary" type="button" onclick="addSelection('object_select','object_selected','object_ids')">Добавить объект</button></div>
-  <ul id="object_selected" class="selected-list">{{OBJECT_SELECTED}}</ul>
+  <div class="dynamic-select-group" data-dynamic-select-group>
+    {{OBJECT_SELECTED}}
+  </div>
 </div>
 
 <div class="form-group-edit timesheet-span-2"><label for="notes">Комментарий</label><input id="notes" name="notes" type="text" value="{{NOTES}}" placeholder="Комментарий к смене"></div>
-<div class="form-actions-edit"><button class="btn btn-primary" type="submit">{{SUBMIT}}</button><a href="/schedule" class="btn btn-secondary">Отмена</a>{{DELETE_BUTTON}}</div>
+<div class="form-actions-edit"><button class="btn btn-primary" type="submit">{{SUBMIT}}</button><a href="{{RETURN_TO}}" class="btn btn-secondary">Отмена</a>{{DELETE_BUTTON}}</div>
 </form>
 </div>
 </div>
 {{LAYOUT_END}}
 
-<div id="deleteModal" class="modal" style="display:none;"><div class="modal-content"><span class="close-button" onclick="closeDeleteModal()">&times;</span><h2>Удалить назначение?</h2><p>Действие нельзя отменить.</p><form action="/schedule/delete/{{ID}}" method="POST">{{CSRF_FIELD}}<div class="form-actions"><button class="btn btn-danger" type="submit">Удалить</button><button class="btn btn-secondary" type="button" onclick="closeDeleteModal()">Отмена</button></div></form></div></div>
+<form id="schedule-delete-form" action="{{DELETE_ACTION}}" method="POST" style="display:none;">{{CSRF_FIELD}}<input type="hidden" name="return_to" value="{{RETURN_TO}}"></form>
 <script>
-function removeSelection(button){
-  const li = button.closest('li');
-  const ul = li.parentElement;
-  li.remove();
-  if (!ul.querySelector('li')) { ul.innerHTML='<li class="empty">Ничего не выбрано</li>'; }
+function makeSelectRow(name, optionsHTML){
+  const row=document.createElement('div');
+  row.className='dynamic-select-row';
+  row.innerHTML='<select name="'+name+'" class="dynamic-select">'+optionsHTML+'</select><button type="button" class="btn btn-secondary btn-mini" data-remove-select>✕</button>';
+  return row;
 }
-function addSelection(selectId, listId, inputName){
-  const sel = document.getElementById(selectId);
-  const value = sel.value;
-  const text = sel.options[sel.selectedIndex].text;
-  const list = document.getElementById(listId);
-  if (!value) return;
-  if (list.querySelector('li[data-id="'+value+'"]')) return;
-  const empty = list.querySelector('li.empty');
-  if (empty) empty.remove();
-  const li = document.createElement('li');
-  li.setAttribute('data-id', value);
-  li.innerHTML = '<span>'+text+'</span><input type="hidden" name="'+inputName+'" value="'+value+'"><button type="button" class="btn btn-secondary btn-mini" onclick="removeSelection(this)">Удалить</button>';
-  list.appendChild(li);
+function normalizeDynamicGroup(group){
+  const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
+  rows.forEach(function(row){
+    const btn=row.querySelector('[data-remove-select]');
+    if(btn){
+      btn.onclick=function(){
+        if(group.querySelectorAll('.dynamic-select-row').length===1){
+          row.querySelector('select').value='';
+          return;
+        }
+        row.remove();
+        normalizeDynamicGroup(group);
+      };
+    }
+  });
 }
-function showDeleteModal(){document.getElementById('deleteModal').style.display='block';}
-function closeDeleteModal(){document.getElementById('deleteModal').style.display='none';}
+function ensureDynamicSelectRows(group){
+  const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
+  if(!rows.length) return;
+  const last=rows[rows.length-1];
+  const select=last.querySelector('select');
+  if(select && select.value){
+    group.appendChild(makeSelectRow(select.name, select.innerHTML));
+  }
+  normalizeDynamicGroup(group);
+}
+document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group){
+  group.addEventListener('change', function(e){
+    if(e.target.matches('select')) ensureDynamicSelectRows(group);
+  });
+  ensureDynamicSelectRows(group);
+});
+function confirmDeleteSchedule(){
+  if(!window.confirm('Удалить назначение? Действие нельзя отменить.')) return;
+  const form=document.getElementById('schedule-delete-form');
+  if(form) form.submit();
+}
 </script>
 </body></html>`
 
@@ -369,7 +473,18 @@ function closeDeleteModal(){document.getElementById('deleteModal').style.display
 	mainClass := ""
 	backLink := `<a href="/schedule" class="back-link">← К расписанию</a>`
 	cardClass := ""
+	formActionURL := actionURL
+	deleteActionURL := "/schedule/delete/" + entry.ID
+	returnTo := c.DefaultQuery("return", "/schedule")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/schedule"
+	}
 	if isModal {
+		q := "?modal=1&return=" + url.QueryEscape(returnTo)
+		formActionURL = actionURL + q
+		if entry.ID != "" {
+			deleteActionURL = "/schedule/delete/" + entry.ID + q
+		}
 		layoutStart = `<div class="modal-form-layout">`
 		layoutEnd = `</div>`
 		mainClass = " modal-form-content"
@@ -384,8 +499,15 @@ function closeDeleteModal(){document.getElementById('deleteModal').style.display
 	final = strings.Replace(final, "{{BACK_LINK}}", backLink, 1)
 	final = strings.Replace(final, "{{CARD_CLASS}}", cardClass, 1)
 	final = strings.Replace(final, "{{TITLE}}", template.HTMLEscapeString(title), -1)
-	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(actionURL), 1)
+	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(formActionURL), 1)
 	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
+	final = strings.Replace(final, "{{RETURN_TO}}", template.HTMLEscapeString(returnTo), -1)
+	final = strings.Replace(final, "{{DELETE_ACTION}}", template.HTMLEscapeString(deleteActionURL), 1)
+	errorBlock := ""
+	if strings.TrimSpace(errorMsg) != "" {
+		errorBlock = `<div class="form-error">` + template.HTMLEscapeString(errorMsg) + `</div>`
+	}
+	final = strings.Replace(final, "{{ERROR_BLOCK}}", errorBlock, 1)
 	final = strings.Replace(final, "{{DATE}}", template.HTMLEscapeString(entry.Date), 1)
 	final = strings.Replace(final, "{{START_TIME}}", template.HTMLEscapeString(entry.StartTime), 1)
 	final = strings.Replace(final, "{{END_TIME}}", template.HTMLEscapeString(entry.EndTime), 1)
@@ -406,7 +528,19 @@ function closeDeleteModal(){document.getElementById('deleteModal').style.display
 }
 
 func AddSchedulePage(c *gin.Context) {
-	renderScheduleForm(c, models.TimesheetEntry{Date: time.Now().Format("2006-01-02"), StartTime: "08:00", EndTime: "17:00", LunchBreakMinutes: 60}, "/schedule/new", "Новое назначение", "Сохранить", false)
+	entry := models.TimesheetEntry{Date: time.Now().Format("2006-01-02"), StartTime: "08:00", EndTime: "17:00", LunchBreakMinutes: 60}
+	if qDate := strings.TrimSpace(c.Query("date")); qDate != "" {
+		if _, err := time.Parse("2006-01-02", qDate); err == nil {
+			entry.Date = qDate
+		}
+	}
+	if workerID := strings.TrimSpace(c.Query("worker_id")); workerID != "" {
+		entry.WorkerIDs = []string{workerID}
+	}
+	if objectID := strings.TrimSpace(c.Query("object_id")); objectID != "" {
+		entry.ObjectIDs = []string{objectID}
+	}
+	renderScheduleForm(c, entry, "/schedule/new", "Новое назначение", "Сохранить", false, "")
 }
 
 func validateScheduleLinks(workerIDs, objectIDs []string) error {
@@ -449,9 +583,11 @@ func CreateScheduleEntry(c *gin.Context) {
 		StartTime:         c.PostForm("start_time"),
 		EndTime:           c.PostForm("end_time"),
 		LunchBreakMinutes: lunch,
-		WorkerIDs:         c.PostFormArray("worker_ids"),
-		ObjectIDs:         c.PostFormArray("object_ids"),
+		WorkerIDs:         cleanIDList(c.PostFormArray("worker_ids")),
+		ObjectIDs:         cleanIDList(c.PostFormArray("object_ids")),
 		Notes:             c.PostForm("notes"),
+		CreatedByID:       c.GetString("userID"),
+		CreatedByName:     c.GetString("userName"),
 	}
 
 	if c.GetString("userStatus") != "admin" {
@@ -461,14 +597,18 @@ func CreateScheduleEntry(c *gin.Context) {
 		entry.UserMark = "Создано пользователем " + c.GetString("userName")
 	}
 	if err := validateScheduleLinks(entry.WorkerIDs, entry.ObjectIDs); err != nil {
-		c.String(http.StatusBadRequest, err.Error())
+		renderScheduleForm(c, entry, "/schedule/new", "Новое назначение", "Сохранить", false, humanizeScheduleError(err))
 		return
 	}
 	if _, err := storage.CreateTimesheet(entry); err != nil {
-		c.String(http.StatusBadRequest, "Failed to create schedule entry: %v", err)
+		renderScheduleForm(c, entry, "/schedule/new", "Новое назначение", "Сохранить", false, humanizeScheduleError(err))
 		return
 	}
-	c.Redirect(http.StatusFound, "/schedule")
+	returnTo := c.PostForm("return_to")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/schedule"
+	}
+	c.Redirect(http.StatusFound, returnTo)
 }
 
 func EditSchedulePage(c *gin.Context) {
@@ -495,7 +635,7 @@ func EditSchedulePage(c *gin.Context) {
 			return
 		}
 	}
-	renderScheduleForm(c, entry, "/schedule/edit/"+entry.ID, "Редактирование назначения", "Сохранить изменения", true)
+	renderScheduleForm(c, entry, "/schedule/edit/"+entry.ID, "Редактирование назначения", "Сохранить изменения", true, "")
 }
 
 func UpdateScheduleEntry(c *gin.Context) {
@@ -527,8 +667,8 @@ func UpdateScheduleEntry(c *gin.Context) {
 	entry.StartTime = c.PostForm("start_time")
 	entry.EndTime = c.PostForm("end_time")
 	entry.LunchBreakMinutes = lunch
-	entry.WorkerIDs = c.PostFormArray("worker_ids")
-	entry.ObjectIDs = c.PostFormArray("object_ids")
+	entry.WorkerIDs = cleanIDList(c.PostFormArray("worker_ids"))
+	entry.ObjectIDs = cleanIDList(c.PostFormArray("object_ids"))
 	entry.Notes = c.PostForm("notes")
 	if c.GetString("userStatus") != "admin" {
 		if worker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil {
@@ -538,14 +678,18 @@ func UpdateScheduleEntry(c *gin.Context) {
 	}
 
 	if err := validateScheduleLinks(entry.WorkerIDs, entry.ObjectIDs); err != nil {
-		c.String(http.StatusBadRequest, err.Error())
+		renderScheduleForm(c, entry, "/schedule/edit/"+entry.ID, "Редактирование назначения", "Сохранить изменения", true, humanizeScheduleError(err))
 		return
 	}
 	if err := storage.UpdateTimesheet(entry); err != nil {
-		c.String(http.StatusBadRequest, "Failed to update schedule entry: %v", err)
+		renderScheduleForm(c, entry, "/schedule/edit/"+entry.ID, "Редактирование назначения", "Сохранить изменения", true, humanizeScheduleError(err))
 		return
 	}
-	c.Redirect(http.StatusFound, "/schedule")
+	returnTo := c.PostForm("return_to")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/schedule"
+	}
+	c.Redirect(http.StatusFound, returnTo)
 }
 
 func DeleteScheduleEntry(c *gin.Context) {
@@ -576,7 +720,128 @@ func DeleteScheduleEntry(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Failed to delete schedule entry: %v", err)
 		return
 	}
-	c.Redirect(http.StatusFound, "/schedule")
+	returnTo := c.PostForm("return_to")
+	if !strings.HasPrefix(returnTo, "/") {
+		returnTo = "/schedule"
+	}
+	c.Redirect(http.StatusFound, returnTo)
+}
+
+func ExportTimesheetsExcel(c *gin.Context) {
+	entries, err := storage.GetTimesheets()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to load timesheets: %v", err)
+		return
+	}
+	entries, err = getScopedEntries(c, entries)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to scope timesheets: %v", err)
+		return
+	}
+
+	workers, err := storage.GetWorkers()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
+		return
+	}
+	sort.Slice(workers, func(i, j int) bool { return workers[i].Name < workers[j].Name })
+
+	selectedMonth, monthStart, daysInMonth := resolveSelectedMonth(c.Query("month"))
+	monthDates := buildMonthDates(selectedMonth, daysInMonth)
+
+	f := excelize.NewFile()
+	sheet := "Табель"
+	f.SetSheetName("Sheet1", sheet)
+
+	headerStyle, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Size: 12}, Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true}})
+	titleStyle, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Size: 14}, Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"}})
+	cellStyle, _ := f.NewStyle(&excelize.Style{Border: []excelize.Border{{Type: "left", Color: "000000", Style: 1}, {Type: "right", Color: "000000", Style: 1}, {Type: "top", Color: "000000", Style: 1}, {Type: "bottom", Color: "000000", Style: 1}}, Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"}})
+	nameStyle, _ := f.NewStyle(&excelize.Style{Border: []excelize.Border{{Type: "left", Color: "000000", Style: 1}, {Type: "right", Color: "000000", Style: 1}, {Type: "top", Color: "000000", Style: 1}, {Type: "bottom", Color: "000000", Style: 1}}, Alignment: &excelize.Alignment{Horizontal: "left", Vertical: "center"}})
+
+	lastCol, _ := excelize.ColumnNumberToName(daysInMonth + 2)
+	totalCol, _ := excelize.ColumnNumberToName(daysInMonth + 3)
+	f.SetCellValue(sheet, "A1", "РЭСПУБЛIКА БЕЛАРУСЬ")
+	f.MergeCell(sheet, "A1", totalCol+"1")
+	f.SetCellStyle(sheet, "A1", totalCol+"1", titleStyle)
+	f.SetCellValue(sheet, "A2", "ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ")
+	f.MergeCell(sheet, "A2", totalCol+"2")
+	f.SetCellStyle(sheet, "A2", totalCol+"2", titleStyle)
+	f.SetCellValue(sheet, "A3", fmt.Sprintf("за %s %d", monthStart.Month().String(), monthStart.Year()))
+	f.MergeCell(sheet, "A3", totalCol+"3")
+	f.SetCellStyle(sheet, "A3", totalCol+"3", headerStyle)
+
+	f.SetCellValue(sheet, "A5", "Работник")
+	for day := 1; day <= daysInMonth; day++ {
+		col, _ := excelize.ColumnNumberToName(day + 1)
+		f.SetCellValue(sheet, col+"5", day)
+	}
+	f.SetCellValue(sheet, totalCol+"5", "Итого")
+	f.SetCellStyle(sheet, "A5", totalCol+"5", headerStyle)
+
+	row := 6
+	for _, worker := range workers {
+		if worker.IsFired {
+			continue
+		}
+		f.SetCellValue(sheet, fmt.Sprintf("A%d", row), worker.Name)
+		f.SetCellStyle(sheet, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), nameStyle)
+
+		for i, date := range monthDates {
+			total := 0.0
+			for _, entry := range entries {
+				if entry.Date != date {
+					continue
+				}
+				contains := false
+				for _, wid := range entry.WorkerIDs {
+					if wid == worker.ID {
+						contains = true
+						break
+					}
+				}
+				if !contains {
+					continue
+				}
+				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
+				hours, _ := strconv.ParseFloat(hoursStr, 64)
+				total += hours
+			}
+			col, _ := excelize.ColumnNumberToName(i + 2)
+			cell := fmt.Sprintf("%s%d", col, row)
+			if total == 0 {
+				f.SetCellValue(sheet, cell, "—")
+			} else {
+				f.SetCellValue(sheet, cell, total)
+			}
+			f.SetCellStyle(sheet, cell, cell, cellStyle)
+		}
+
+		formula := fmt.Sprintf("=SUM(B%d:%s%d)", row, lastCol, row)
+		totalCell := fmt.Sprintf("%s%d", totalCol, row)
+		f.SetCellFormula(sheet, totalCell, formula)
+		f.SetCellStyle(sheet, totalCell, totalCell, cellStyle)
+		row++
+	}
+
+	if row == 6 {
+		f.SetCellValue(sheet, "A6", "Нет данных за выбранный месяц")
+		f.MergeCell(sheet, "A6", totalCol+"6")
+	}
+
+	f.SetColWidth(sheet, "A", "A", 28)
+	f.SetColWidth(sheet, "B", lastCol, 4.5)
+	f.SetColWidth(sheet, totalCol, totalCol, 10)
+
+	filename := fmt.Sprintf("tabel-%s.xlsx", selectedMonth)
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+
+	var buf bytes.Buffer
+	if err := f.Write(&buf); err != nil {
+		c.String(http.StatusInternalServerError, "Failed to build xlsx: %v", err)
+		return
+	}
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
 }
 
 // TimesheetsPage is new табель matrix by workers/dates with per-cell hover details.
@@ -597,23 +862,8 @@ func TimesheetsPage(c *gin.Context) {
 		return
 	}
 
-	selectedMonth := c.Query("month")
-	if selectedMonth == "" {
-		selectedMonth = time.Now().Format("2006-01")
-	}
-	monthStart, err := time.Parse("2006-01", selectedMonth)
-	if err != nil {
-		monthStart = time.Now()
-		selectedMonth = monthStart.Format("2006-01")
-	}
-	monthStart = time.Date(monthStart.Year(), monthStart.Month(), 1, 0, 0, 0, 0, time.UTC)
-	nextMonth := monthStart.AddDate(0, 1, 0)
-	daysInMonth := int(nextMonth.Sub(monthStart).Hours() / 24)
-
-	monthDates := make([]string, 0, daysInMonth)
-	for d := 1; d <= daysInMonth; d++ {
-		monthDates = append(monthDates, fmt.Sprintf("%s-%02d", selectedMonth, d))
-	}
+	selectedMonth, _, daysInMonth := resolveSelectedMonth(c.Query("month"))
+	monthDates := buildMonthDates(selectedMonth, daysInMonth)
 
 	var headers strings.Builder
 	for d := 1; d <= daysInMonth; d++ {
@@ -623,6 +873,7 @@ func TimesheetsPage(c *gin.Context) {
 	workerRows := make([]string, 0, len(workers))
 	for _, worker := range workers {
 		var cells strings.Builder
+		workerTotal := 0.0
 		for _, date := range monthDates {
 			total := 0.0
 			details := make([]string, 0)
@@ -643,16 +894,23 @@ func TimesheetsPage(c *gin.Context) {
 				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
 				hours, _ := strconv.ParseFloat(hoursStr, 64)
 				total += hours
-				objects := joinMappedValues(entry.ObjectIDs, objectsMap)
-				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes)))
+				objects := joinMappedLinks(entry.ObjectIDs, objectsMap, "/object")
+				creator := strings.TrimSpace(entry.CreatedByName)
+				if creator == "" {
+					creator = "—"
+				}
+				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s · создал: %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(creator)))
 			}
 			if len(details) == 0 {
-				cells.WriteString(`<td class="hours-cell empty">—</td>`)
+				quickReturn := url.QueryEscape("/timesheets?month=" + selectedMonth)
+				quickURL := fmt.Sprintf("/schedule/new?date=%s&worker_id=%s&return=%s", template.URLQueryEscaper(date), template.URLQueryEscaper(worker.ID), quickReturn)
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><a class="timesheet-quick-add" href="%s" data-modal-url="%s" data-modal-title="Новое назначение" data-modal-return="/timesheets?month=%s">+</a></td>`, template.HTMLEscapeString(quickURL), template.HTMLEscapeString(quickURL), template.HTMLEscapeString(selectedMonth)))
 				continue
 			}
 			cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
+			workerTotal += total
 		}
-		workerRows = append(workerRows, fmt.Sprintf(`<tr><th>%s</th>%s</tr>`, template.HTMLEscapeString(worker.Name), cells.String()))
+		workerRows = append(workerRows, fmt.Sprintf(`<tr><th><a class="entity-link" href="/worker/%s">%s</a></th>%s<td class="hours-cell month-total">%.1f</td></tr>`, template.HTMLEscapeString(worker.ID), template.HTMLEscapeString(worker.Name), cells.String(), workerTotal))
 	}
 
 	rows := strings.Join(workerRows, "")
@@ -663,13 +921,13 @@ func TimesheetsPage(c *gin.Context) {
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-<div class="page-header"><h1>Табель</h1><a class="btn btn-secondary" href="/schedule">К расписанию</a></div>
-<div class="card">
+<div class="page-header"><h1>Табель</h1><a class="btn btn-secondary" href="/timesheets/export?month={{SELECTED_MONTH}}">Экспорт в Excel</a></div>
+<div class="card timesheet-card">
   <form method="GET" action="/timesheets" class="month-selector">
     <label for="month">Месяц:</label>
     <select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select>
   </form>
-  <div class="table-scroll"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}</tr></thead><tbody>{{ROWS}}</tbody></table></div>
+  <div class="table-scroll timesheet-table-wrap"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}<th>Итого</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div>
 </div></body></html>`
 
@@ -678,5 +936,6 @@ func TimesheetsPage(c *gin.Context) {
 	final = strings.Replace(final, "{{MONTH_OPTIONS}}", monthOptions, 1)
 	final = strings.Replace(final, "{{HEADERS}}", headers.String(), 1)
 	final = strings.Replace(final, "{{ROWS}}", rows, 1)
+	final = strings.Replace(final, "{{SELECTED_MONTH}}", template.URLQueryEscaper(selectedMonth), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }

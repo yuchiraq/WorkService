@@ -147,7 +147,8 @@ func WorkersPage(c *gin.Context) {
                 <a class="btn btn-secondary{{TAB_ACTIVE_CLASS}}" href="/workers?tab=active">Текущие</a>
                 <a class="btn btn-secondary{{TAB_FIRED_CLASS}}" href="/workers?tab=fired">Уволенные</a>
             </div>
-            <form action="/workers" method="GET" class="workers-filters">
+            <button type="button" class="btn btn-secondary workers-search-toggle{{FILTER_TOGGLE_ACTIVE}}" data-search-toggle aria-expanded="{{FILTER_EXPANDED}}">Поиск и фильтры</button>
+            <form action="/workers" method="GET" class="workers-filters{{FILTERS_CLASS}}" data-search-panel>
                 <input type="hidden" name="tab" value="{{TAB}}">
                 <div class="form-group">
                     <label for="q">Поиск по Ф.И.О.</label>
@@ -162,13 +163,27 @@ func WorkersPage(c *gin.Context) {
                 </div>
                 <div class="filter-actions">
                     <button type="submit" class="btn btn-primary">Применить</button>
-                    <a href="/workers" class="btn btn-secondary">Сбросить</a>
+                    <a href="/workers?tab={{TAB}}" class="btn btn-secondary">Сбросить</a>
                 </div>
             </form>
             <p class="workers-summary">Найдено: <strong>{{FILTERED_COUNT}}</strong> из <strong>{{TOTAL_COUNT}}</strong>.</p>
             <div class="workers-grid">%s</div>
         </div>
     </div>
+
+    <script>
+      (function(){
+        const toggle=document.querySelector('[data-search-toggle]');
+        const panel=document.querySelector('[data-search-panel]');
+        if(!toggle||!panel) return;
+        toggle.addEventListener('click', function(){
+          panel.classList.toggle('is-open');
+          const expanded=panel.classList.contains('is-open');
+          toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+          toggle.classList.toggle('active', expanded);
+        });
+      })();
+    </script>
 </body>
 </html>`
 
@@ -178,9 +193,21 @@ func WorkersPage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, 1)
 	finalHTML = strings.Replace(finalHTML, "{{SEARCH_QUERY}}", template.HTMLEscapeString(searchQuery), 1)
 	finalHTML = strings.Replace(finalHTML, "{{POSITION_OPTIONS}}", positionOptionsHTML.String(), 1)
+	filtersOpen := strings.TrimSpace(searchQuery) != "" || strings.TrimSpace(selectedPosition) != ""
+	filtersClass := ""
+	filterExpanded := "false"
+	filterToggleActive := ""
+	if filtersOpen {
+		filtersClass = " is-open"
+		filterExpanded = "true"
+		filterToggleActive = " active"
+	}
+	finalHTML = strings.Replace(finalHTML, "{{FILTERS_CLASS}}", filtersClass, 1)
+	finalHTML = strings.Replace(finalHTML, "{{FILTER_EXPANDED}}", filterExpanded, 1)
+	finalHTML = strings.Replace(finalHTML, "{{FILTER_TOGGLE_ACTIVE}}", filterToggleActive, 1)
 	finalHTML = strings.Replace(finalHTML, "{{FILTERED_COUNT}}", strconv.Itoa(len(filteredWorkers)), 1)
 	finalHTML = strings.Replace(finalHTML, "{{TOTAL_COUNT}}", strconv.Itoa(len(scopedWorkers)), 1)
-	finalHTML = strings.Replace(finalHTML, "{{TAB}}", template.HTMLEscapeString(selectedTab), 1)
+	finalHTML = strings.Replace(finalHTML, "{{TAB}}", template.HTMLEscapeString(selectedTab), -1)
 	tabActiveClass := ""
 	tabFiredClass := ""
 	if selectedTab == "fired" {
@@ -255,7 +282,11 @@ func WorkerProfilePage(c *gin.Context) {
 		if strings.TrimSpace(entry.Notes) != "" {
 			commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
 		}
-		workerAssignments.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical structured-assignment"><div class="assignment-head"><strong>%s — %s</strong><span>%.2f ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div>%s</div></div>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, joinMappedValues(entry.ObjectIDs, objectsMap), commentHTML))
+		creatorHTML := ""
+		if strings.TrimSpace(entry.CreatedByName) != "" {
+			creatorHTML = `<div class="assignment-meta"><span>Создал</span><p>` + template.HTMLEscapeString(entry.CreatedByName) + `</p></div>`
+		}
+		workerAssignments.WriteString(fmt.Sprintf(`<div class="schedule-entry-vertical structured-assignment"><div class="assignment-head"><strong>%s — %s</strong><span>%.2f ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div>%s%s</div></div>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), hoursVal, joinMappedLinks(entry.ObjectIDs, objectsMap, "/object"), creatorHTML, commentHTML))
 	}
 	if workerAssignments.Len() == 0 {
 		workerAssignments.WriteString(`<p>Назначений за выбранный месяц нет.</p>`)
@@ -317,7 +348,6 @@ func WorkerProfilePage(c *gin.Context) {
             <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11a1 1 0 11-2 0v-2a1 1 0 112 0v2zm-1-4a1 1 0 01-1-1V7a1 1 0 112 0v1a1 1 0 01-1 1z"/></svg>Ставка: {{RATE}} руб/час</li>
         </ul>
 
-        {{ASSIGNMENTS_SECTION}}
 
         <div class="profile-grid">
             <div class="placeholder-card">
@@ -350,6 +380,7 @@ func WorkerProfilePage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{MONTH_OPTIONS}}", workerMonthOptions.String(), -1)
 	finalHTML = strings.Replace(finalHTML, "{{TOTAL_HOURS}}", fmt.Sprintf("%.2f", totalHours), -1)
 	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_BY_DAY}}", workerAssignments.String(), -1)
+	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_SECTION}}", "", -1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(finalHTML))
 }
@@ -386,15 +417,15 @@ func AddWorkerPage(c *gin.Context) {
                     </div>
                     <div class="form-group">
                         <label for="phone">Телефон</label>
-                        <input type="tel" id="phone" name="phone" required>
+                        <input type="tel" id="phone" name="phone">
                     </div>
                     <div class="form-group">
                         <label for="birth_date">Дата рождения</label>
-                        <input type="date" id="birth_date" name="birth_date" required>
+                        <input type="date" id="birth_date" name="birth_date">
                     </div>
                     <div class="form-group">
                         <label for="hourly_rate">Ставка (руб/час)</label>
-                        <input type="number" id="hourly_rate" name="hourly_rate" step="0.01" required>
+                        <input type="number" id="hourly_rate" name="hourly_rate" step="0.01">
                     </div>
                 </div>
                 <div class="form-actions">
@@ -424,10 +455,15 @@ func AddWorkerPage(c *gin.Context) {
 
 // CreateWorker handles the creation of a new worker.
 func CreateWorker(c *gin.Context) {
-	rate, err := strconv.ParseFloat(c.PostForm("hourly_rate"), 64)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
-		return
+	rate := 0.0
+	rateRaw := strings.TrimSpace(c.PostForm("hourly_rate"))
+	if rateRaw != "" {
+		parsedRate, err := strconv.ParseFloat(rateRaw, 64)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
+			return
+		}
+		rate = parsedRate
 	}
 
 	userID, _ := c.Get("userID")
@@ -443,7 +479,7 @@ func CreateWorker(c *gin.Context) {
 		CreatedByName: userName.(string),
 	}
 
-	_, err = storage.CreateWorker(newWorker)
+	_, err := storage.CreateWorker(newWorker)
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to create worker: %v", err)
 		return
@@ -493,17 +529,17 @@ func EditWorkerPage(c *gin.Context) {
 
                 <div class="form-group-edit form-group-phone">
                     <label for="phone">Телефон</label>
-                    <input type="tel" id="phone" name="phone" value="{{PHONE}}" required>
+                    <input type="tel" id="phone" name="phone" value="{{PHONE}}">
                 </div>
 
                 <div class="form-group-edit form-group-birthdate">
                     <label for="birth_date">Дата рождения</label>
-                    <input type="date" id="birth_date" name="birth_date" value="{{BIRTH_DATE}}" required>
+                    <input type="date" id="birth_date" name="birth_date" value="{{BIRTH_DATE}}">
                 </div>
 
                 <div class="form-group-edit form-group-rate">
                     <label for="hourly_rate">Ставка (руб/час)</label>
-                    <input type="number" id="hourly_rate" name="hourly_rate" value="{{RATE}}" step="0.01" required>
+                    <input type="number" id="hourly_rate" name="hourly_rate" value="{{RATE}}" step="0.01">
                 </div>
 
                 <div class="form-actions-edit">
@@ -586,10 +622,15 @@ func UpdateWorker(c *gin.Context) {
 		return
 	}
 
-	rate, err := strconv.ParseFloat(c.PostForm("hourly_rate"), 64)
-	if err != nil {
-		c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
-		return
+	rate := 0.0
+	rateRaw := strings.TrimSpace(c.PostForm("hourly_rate"))
+	if rateRaw != "" {
+		parsedRate, err := strconv.ParseFloat(rateRaw, 64)
+		if err != nil {
+			c.String(http.StatusBadRequest, "Invalid hourly rate: %v", err)
+			return
+		}
+		rate = parsedRate
 	}
 
 	// Update fields from the form
