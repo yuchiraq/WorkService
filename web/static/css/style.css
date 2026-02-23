@@ -22,8 +22,6 @@
   --blur-sheet: blur(24px) saturate(1.2);
   --ease-default: 0.28s ease-in-out;
   --shadow-min: 0 1px 2px rgb(0 0 0 / 0.08);
-  --overlay-backdrop: light-dark(rgb(15 23 42 / 0.26), rgb(0 0 0 / 0.66));
-  --overlay-backdrop-soft: light-dark(rgb(15 23 42 / 0.18), rgb(0 0 0 / 0.58));
 }
 
 * { box-sizing: border-box; }
@@ -97,7 +95,7 @@ a:hover { text-decoration: underline; }
   margin: 0;
   width: 100%;
   text-align: center;
-  font-size: clamp(1.1rem, 1.8vw, 1.5rem);
+  font-size: clamp(1.35rem, 2.3vw, 2rem);
   font-weight: 700;
   color: var(--label);
   border-radius: var(--radius-control);
@@ -126,7 +124,7 @@ textarea:focus-visible,
   opacity: 0;
   pointer-events: none;
   transition: opacity var(--ease-default);
-  background: var(--overlay-backdrop-soft);
+  background: color-mix(in srgb, var(--label), transparent 82%);
 }
 
 .side-nav {
@@ -154,11 +152,11 @@ body.nav-open .side-nav-overlay { opacity: 1; pointer-events: auto; }
   align-items: center;
   gap: 10px;
   color: var(--label);
-  font-size: 17px;
+  font-size: 13px;
   font-weight: 700;
 }
 
-.side-nav-brand img { width: 42px; height: 42px; }
+.side-nav-brand img { width: 34px; height: 34px; }
 
 .side-nav-user {
   display: flex;
@@ -171,10 +169,6 @@ body.nav-open .side-nav-overlay { opacity: 1; pointer-events: auto; }
   color: var(--label);
 }
 .side-nav-user small { color: var(--secondary-label); }
-.side-nav-user strong,
-.side-nav-user small {
-  display: block;
-}
 
 .user-avatar,
 .worker-avatar {
@@ -471,7 +465,7 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   display: none;
   place-items: center;
   padding: var(--space-md);
-  background: var(--overlay-backdrop);
+  background: color-mix(in srgb, var(--label), transparent 72%);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
 }
@@ -492,36 +486,6 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   background: var(--tertiary-system-background);
   color: var(--label);
   cursor: pointer;
-}
-
-#deleteModal .modal-content {
-  width: min(480px, 100%);
-  border-radius: 14px;
-  padding: 18px;
-  background: var(--secondary-system-background);
-}
-
-#deleteModal .modal-content h2 {
-  font-size: 22px;
-  margin: 0 0 8px;
-}
-
-#deleteModal .modal-content p {
-  margin: 0 0 16px;
-  color: var(--secondary-label);
-}
-
-#deleteModal .modal-content form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-#deleteModal .close-button {
-  float: right;
-  display: inline-grid;
-  place-items: center;
-  margin-bottom: 8px;
 }
 
 .floating-create-wrap {
@@ -595,7 +559,6 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 @media (max-width: 1023px) { .main-content { margin-top: 84px; } }
 
 @media (min-width: 1024px) {
-  .mobile-nav-toggle { display: none; }
   .side-nav { transform: translateX(0); width: 290px; }
   .side-nav-overlay { display: none; }
   .top-nav { left: 290px; }
