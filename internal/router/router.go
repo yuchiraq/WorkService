@@ -52,6 +52,7 @@ func SetupRouter(r *gin.Engine) {
 		// Timesheet matrix (табель)
 		authRequired.GET("/timesheets", api.TimesheetsPage)
 		authRequired.GET("/timesheets/", api.TimesheetsPage)
+		authRequired.GET("/timesheets/export", api.ExportTimesheetsExcel)
 		authRequired.GET("/timesheet", api.TimesheetsPage)
 		authRequired.GET("/timesheet/", api.TimesheetsPage)
 		authRequired.GET("/tabel", api.TimesheetsPage)

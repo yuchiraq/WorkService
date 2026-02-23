@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -14,6 +15,7 @@ import (
 	"project/internal/storage"
 
 	"github.com/gin-gonic/gin"
+	"github.com/xuri/excelize/v2"
 )
 
 func formatWorkHours(startTime, endTime string, lunch int) string {
@@ -158,6 +160,30 @@ func monthOptionsHTML(selectedMonth string) string {
 		b.WriteString(fmt.Sprintf(`<option value="%s"%s>%s</option>`, template.HTMLEscapeString(value), selected, template.HTMLEscapeString(label)))
 	}
 	return b.String()
+}
+
+func resolveSelectedMonth(value string) (string, time.Time, int) {
+	selectedMonth := strings.TrimSpace(value)
+	if selectedMonth == "" {
+		selectedMonth = time.Now().Format("2006-01")
+	}
+	monthStart, err := time.Parse("2006-01", selectedMonth)
+	if err != nil {
+		monthStart = time.Now()
+		selectedMonth = monthStart.Format("2006-01")
+	}
+	monthStart = time.Date(monthStart.Year(), monthStart.Month(), 1, 0, 0, 0, 0, time.UTC)
+	nextMonth := monthStart.AddDate(0, 1, 0)
+	daysInMonth := int(nextMonth.Sub(monthStart).Hours() / 24)
+	return selectedMonth, monthStart, daysInMonth
+}
+
+func buildMonthDates(selectedMonth string, daysInMonth int) []string {
+	monthDates := make([]string, 0, daysInMonth)
+	for d := 1; d <= daysInMonth; d++ {
+		monthDates = append(monthDates, fmt.Sprintf("%s-%02d", selectedMonth, d))
+	}
+	return monthDates
 }
 func formatScheduleDateLabel(date string) string {
 	t, err := time.Parse("2006-01-02", date)
@@ -396,42 +422,11 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 <form id="schedule-delete-form" action="{{DELETE_ACTION}}" method="POST" style="display:none;">{{CSRF_FIELD}}<input type="hidden" name="return_to" value="{{RETURN_TO}}"></form>
 <script>
-function parseOptions(html){
-  const probe=document.createElement('select');
-  probe.innerHTML=html;
-  return Array.from(probe.options).map(function(o){ return {value:o.value,text:o.text}; });
-}
-function buildOptionsHTML(options, currentValue, blocked){
-  return options.filter(function(opt){
-    if(opt.value==='') return true;
-    if(opt.value===currentValue) return true;
-    return !blocked.has(opt.value);
-  }).map(function(opt){
-    const selected=opt.value===currentValue ? ' selected' : '';
-    return '<option value="'+opt.value+'"'+selected+'>'+opt.text+'</option>';
-  }).join('');
-}
 function makeSelectRow(name, optionsHTML){
   const row=document.createElement('div');
   row.className='dynamic-select-row';
   row.innerHTML='<select name="'+name+'" class="dynamic-select">'+optionsHTML+'</select><button type="button" class="btn btn-secondary btn-mini" data-remove-select>✕</button>';
   return row;
-}
-function syncGroupOptions(group){
-  if(!group.dataset.optionTemplate){
-    const first=group.querySelector('select');
-    group.dataset.optionTemplate = first ? first.innerHTML : '<option value="">—</option>';
-  }
-  const options=parseOptions(group.dataset.optionTemplate);
-  const selects=Array.from(group.querySelectorAll('select'));
-  const allSelected=new Set(selects.map(function(s){ return s.value; }).filter(Boolean));
-  selects.forEach(function(select){
-    const current=select.value;
-    const blocked=new Set(allSelected);
-    if(current) blocked.delete(current);
-    select.innerHTML=buildOptionsHTML(options, current, blocked);
-    select.value=current;
-  });
 }
 function normalizeDynamicGroup(group){
   const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
@@ -444,7 +439,6 @@ function normalizeDynamicGroup(group){
           return;
         }
         row.remove();
-        syncGroupOptions(group);
         normalizeDynamicGroup(group);
       };
     }
@@ -458,11 +452,9 @@ function ensureDynamicSelectRows(group){
   if(select && select.value){
     group.appendChild(makeSelectRow(select.name, select.innerHTML));
   }
-  syncGroupOptions(group);
   normalizeDynamicGroup(group);
 }
 document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group){
-  syncGroupOptions(group);
   group.addEventListener('change', function(e){
     if(e.target.matches('select')) ensureDynamicSelectRows(group);
   });
@@ -735,6 +727,123 @@ func DeleteScheduleEntry(c *gin.Context) {
 	c.Redirect(http.StatusFound, returnTo)
 }
 
+func ExportTimesheetsExcel(c *gin.Context) {
+	entries, err := storage.GetTimesheets()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to load timesheets: %v", err)
+		return
+	}
+	entries, err = getScopedEntries(c, entries)
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to scope timesheets: %v", err)
+		return
+	}
+
+	workers, err := storage.GetWorkers()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
+		return
+	}
+	sort.Slice(workers, func(i, j int) bool { return workers[i].Name < workers[j].Name })
+
+	selectedMonth, monthStart, daysInMonth := resolveSelectedMonth(c.Query("month"))
+	monthDates := buildMonthDates(selectedMonth, daysInMonth)
+
+	f := excelize.NewFile()
+	sheet := "Табель"
+	f.SetSheetName("Sheet1", sheet)
+
+	headerStyle, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Size: 12}, Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center", WrapText: true}})
+	titleStyle, _ := f.NewStyle(&excelize.Style{Font: &excelize.Font{Bold: true, Size: 14}, Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"}})
+	cellStyle, _ := f.NewStyle(&excelize.Style{Border: []excelize.Border{{Type: "left", Color: "000000", Style: 1}, {Type: "right", Color: "000000", Style: 1}, {Type: "top", Color: "000000", Style: 1}, {Type: "bottom", Color: "000000", Style: 1}}, Alignment: &excelize.Alignment{Horizontal: "center", Vertical: "center"}})
+	nameStyle, _ := f.NewStyle(&excelize.Style{Border: []excelize.Border{{Type: "left", Color: "000000", Style: 1}, {Type: "right", Color: "000000", Style: 1}, {Type: "top", Color: "000000", Style: 1}, {Type: "bottom", Color: "000000", Style: 1}}, Alignment: &excelize.Alignment{Horizontal: "left", Vertical: "center"}})
+
+	lastCol, _ := excelize.ColumnNumberToName(daysInMonth + 2)
+	totalCol, _ := excelize.ColumnNumberToName(daysInMonth + 3)
+	f.SetCellValue(sheet, "A1", "РЭСПУБЛIКА БЕЛАРУСЬ")
+	f.MergeCell(sheet, "A1", totalCol+"1")
+	f.SetCellStyle(sheet, "A1", totalCol+"1", titleStyle)
+	f.SetCellValue(sheet, "A2", "ТАБЕЛЬ УЧЕТА РАБОЧЕГО ВРЕМЕНИ")
+	f.MergeCell(sheet, "A2", totalCol+"2")
+	f.SetCellStyle(sheet, "A2", totalCol+"2", titleStyle)
+	f.SetCellValue(sheet, "A3", fmt.Sprintf("за %s %d", monthStart.Month().String(), monthStart.Year()))
+	f.MergeCell(sheet, "A3", totalCol+"3")
+	f.SetCellStyle(sheet, "A3", totalCol+"3", headerStyle)
+
+	f.SetCellValue(sheet, "A5", "Работник")
+	for day := 1; day <= daysInMonth; day++ {
+		col, _ := excelize.ColumnNumberToName(day + 1)
+		f.SetCellValue(sheet, col+"5", day)
+	}
+	f.SetCellValue(sheet, totalCol+"5", "Итого")
+	f.SetCellStyle(sheet, "A5", totalCol+"5", headerStyle)
+
+	row := 6
+	for _, worker := range workers {
+		if worker.IsFired {
+			continue
+		}
+		f.SetCellValue(sheet, fmt.Sprintf("A%d", row), worker.Name)
+		f.SetCellStyle(sheet, fmt.Sprintf("A%d", row), fmt.Sprintf("A%d", row), nameStyle)
+
+		for i, date := range monthDates {
+			total := 0.0
+			for _, entry := range entries {
+				if entry.Date != date {
+					continue
+				}
+				contains := false
+				for _, wid := range entry.WorkerIDs {
+					if wid == worker.ID {
+						contains = true
+						break
+					}
+				}
+				if !contains {
+					continue
+				}
+				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
+				hours, _ := strconv.ParseFloat(hoursStr, 64)
+				total += hours
+			}
+			col, _ := excelize.ColumnNumberToName(i + 2)
+			cell := fmt.Sprintf("%s%d", col, row)
+			if total == 0 {
+				f.SetCellValue(sheet, cell, "—")
+			} else {
+				f.SetCellValue(sheet, cell, total)
+			}
+			f.SetCellStyle(sheet, cell, cell, cellStyle)
+		}
+
+		formula := fmt.Sprintf("=SUM(B%d:%s%d)", row, lastCol, row)
+		totalCell := fmt.Sprintf("%s%d", totalCol, row)
+		f.SetCellFormula(sheet, totalCell, formula)
+		f.SetCellStyle(sheet, totalCell, totalCell, cellStyle)
+		row++
+	}
+
+	if row == 6 {
+		f.SetCellValue(sheet, "A6", "Нет данных за выбранный месяц")
+		f.MergeCell(sheet, "A6", totalCol+"6")
+	}
+
+	f.SetColWidth(sheet, "A", "A", 28)
+	f.SetColWidth(sheet, "B", lastCol, 4.5)
+	f.SetColWidth(sheet, totalCol, totalCol, 10)
+
+	filename := fmt.Sprintf("tabel-%s.xlsx", selectedMonth)
+	c.Header("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+
+	var buf bytes.Buffer
+	if err := f.Write(&buf); err != nil {
+		c.String(http.StatusInternalServerError, "Failed to build xlsx: %v", err)
+		return
+	}
+	c.Data(http.StatusOK, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", buf.Bytes())
+}
+
 // TimesheetsPage is new табель matrix by workers/dates with per-cell hover details.
 func TimesheetsPage(c *gin.Context) {
 	entries, err := storage.GetTimesheets()
@@ -753,23 +862,8 @@ func TimesheetsPage(c *gin.Context) {
 		return
 	}
 
-	selectedMonth := c.Query("month")
-	if selectedMonth == "" {
-		selectedMonth = time.Now().Format("2006-01")
-	}
-	monthStart, err := time.Parse("2006-01", selectedMonth)
-	if err != nil {
-		monthStart = time.Now()
-		selectedMonth = monthStart.Format("2006-01")
-	}
-	monthStart = time.Date(monthStart.Year(), monthStart.Month(), 1, 0, 0, 0, 0, time.UTC)
-	nextMonth := monthStart.AddDate(0, 1, 0)
-	daysInMonth := int(nextMonth.Sub(monthStart).Hours() / 24)
-
-	monthDates := make([]string, 0, daysInMonth)
-	for d := 1; d <= daysInMonth; d++ {
-		monthDates = append(monthDates, fmt.Sprintf("%s-%02d", selectedMonth, d))
-	}
+	selectedMonth, _, daysInMonth := resolveSelectedMonth(c.Query("month"))
+	monthDates := buildMonthDates(selectedMonth, daysInMonth)
 
 	var headers strings.Builder
 	for d := 1; d <= daysInMonth; d++ {
@@ -827,7 +921,7 @@ func TimesheetsPage(c *gin.Context) {
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-<div class="page-header"><h1>Табель</h1><a class="btn btn-secondary" href="/schedule">К расписанию</a></div>
+<div class="page-header"><h1>Табель</h1><a class="btn btn-secondary" href="/timesheets/export?month={{SELECTED_MONTH}}">Экспорт в Excel</a></div>
 <div class="card timesheet-card">
   <form method="GET" action="/timesheets" class="month-selector">
     <label for="month">Месяц:</label>
@@ -842,5 +936,6 @@ func TimesheetsPage(c *gin.Context) {
 	final = strings.Replace(final, "{{MONTH_OPTIONS}}", monthOptions, 1)
 	final = strings.Replace(final, "{{HEADERS}}", headers.String(), 1)
 	final = strings.Replace(final, "{{ROWS}}", rows, 1)
+	final = strings.Replace(final, "{{SELECTED_MONTH}}", template.URLQueryEscaper(selectedMonth), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
