@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"project/internal/models"
 
@@ -224,4 +225,17 @@ func DeleteUser(id string) error {
 	}
 
 	return errors.New("user not found for deletion")
+}
+
+func UpdateUserLastLogin(userID string, when time.Time) error {
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	for i := range users {
+		if users[i].ID == userID {
+			users[i].LastLoginAt = when.Format(time.RFC3339)
+			return saveUsers()
+		}
+	}
+	return errors.New("user not found")
 }
