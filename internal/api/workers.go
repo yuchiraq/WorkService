@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -253,9 +254,15 @@ func WorkerProfilePage(c *gin.Context) {
 	})
 
 	totalHours := 0.0
+	monthSalary := 0.0
 	var workerAssignments strings.Builder
 	var workerMarks strings.Builder
 	currentDate := ""
+	returnToWorker := "/worker/" + worker.ID + "?month=" + selectedMonth
+	returnToWorkerEsc := template.HTMLEscapeString(returnToWorker)
+	returnToWorkerQuery := url.QueryEscape(returnToWorker)
+	csrfField := CSRFHiddenInput(c)
+
 	for _, entry := range entries {
 		if !strings.HasPrefix(entry.Date, selectedMonth+"-") {
 			continue
@@ -271,7 +278,11 @@ func WorkerProfilePage(c *gin.Context) {
 			continue
 		}
 		if isSpecialMark(entry.UserMark) {
-			workerMarks.WriteString(fmt.Sprintf(`<div class="assignment-note"><span>%s</span><p>%s — %s</p></div>`, template.HTMLEscapeString(entry.Date), template.HTMLEscapeString(specialMarkLabel(entry.UserMark)), template.HTMLEscapeString(entry.Notes)))
+			commentHTML := "—"
+			if strings.TrimSpace(entry.Notes) != "" {
+				commentHTML = template.HTMLEscapeString(entry.Notes)
+			}
+			workerMarks.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical structured-assignment"><div class="assignment-head"><strong>%s</strong><span>%s</span></div><div class="assignment-body"><div class="assignment-note"><span>Комментарий</span><p>%s</p></div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование отметки" data-modal-return="%s">Редактировать</a><form action="/schedule/delete/%s" method="POST"><input type="hidden" name="return_to" value="%s">%s<button type="submit" class="btn btn-danger">Удалить</button></form></div></div></article>`, template.HTMLEscapeString(formatScheduleDateLabel(entry.Date)), template.HTMLEscapeString(specialMarkLabel(entry.UserMark)), commentHTML, template.HTMLEscapeString(entry.ID), template.HTMLEscapeString(entry.ID), returnToWorkerEsc, template.HTMLEscapeString(entry.ID), returnToWorkerEsc, csrfField))
 			continue
 		}
 		hoursVal, _ := strconv.ParseFloat(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes), 64)
@@ -300,6 +311,9 @@ func WorkerProfilePage(c *gin.Context) {
 	}
 	if workerMarks.Len() == 0 {
 		workerMarks.WriteString(`<p>Отметок за выбранный месяц нет.</p>`)
+	}
+	if worker.HourlyRate > 0 {
+		monthSalary = totalHours * worker.HourlyRate
 	}
 
 	monthNames := []string{"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"}
@@ -344,11 +358,12 @@ func WorkerProfilePage(c *gin.Context) {
                     <p>{{POSITION}}</p>
                 </div>
             </div>
-            <div class="profile-actions">
-                {{STATUS_BADGE}}
-                <a href="/workers/edit/{{WORKER_ID}}" class="btn btn-secondary" data-modal-url="/workers/edit/{{WORKER_ID}}" data-modal-title="Редактировать работника" data-modal-return="/worker/{{WORKER_ID}}">Редактировать</a>
-            </div>
-        </div>
+			<div class="profile-actions">
+				{{STATUS_BADGE}}
+				<a href="/schedule/new?worker_id={{WORKER_ID}}&return={{WORKER_RETURN_QUERY}}&special_mark=vacation" class="btn btn-primary" data-modal-url="/schedule/new?worker_id={{WORKER_ID}}&return={{WORKER_RETURN_QUERY}}&special_mark=vacation" data-modal-title="Добавить отметку" data-modal-return="/worker/{{WORKER_ID}}">Добавить отпуск/больничный/выходной</a>
+				<a href="/workers/edit/{{WORKER_ID}}" class="btn btn-secondary" data-modal-url="/workers/edit/{{WORKER_ID}}" data-modal-title="Редактировать работника" data-modal-return="/worker/{{WORKER_ID}}">Редактировать</a>
+			</div>
+		</div>
 
         <ul class="profile-details">
             <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M6 8V7a4 4 0 118 0v1h2V7a6 6 0 10-12 0v1h2zm6 2H8v6h4v-6z"/></svg>Дата рождения: {{BIRTH_DATE}}</li>
@@ -360,7 +375,7 @@ func WorkerProfilePage(c *gin.Context) {
         <div class="profile-grid" style="grid-template-columns: 1.2fr .8fr; align-items:start;">
             <div class="placeholder-card">
                  <div class="history-header"><h2>История назначений</h2></div>
-                 <form method="GET" action="/worker/{{WORKER_ID}}" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select><span><strong>Итого часов:</strong> {{TOTAL_HOURS}}</span></form>
+			 <form method="GET" action="/worker/{{WORKER_ID}}" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select><span><strong>Итого часов:</strong> {{TOTAL_HOURS}}</span>{{MONTH_SALARY}}</form>
                  <div class="schedule-vertical">{{ASSIGNMENTS_BY_DAY}}</div>
             </div>
             <div class="placeholder-card">
@@ -380,6 +395,7 @@ func WorkerProfilePage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{INITIALS}}", template.HTMLEscapeString(strings.ToUpper(initials)), -1)
 	finalHTML = strings.Replace(finalHTML, "{{POSITION}}", template.HTMLEscapeString(worker.Position), -1)
 	finalHTML = strings.Replace(finalHTML, "{{WORKER_ID}}", template.HTMLEscapeString(worker.ID), -1)
+	finalHTML = strings.Replace(finalHTML, "{{WORKER_RETURN_QUERY}}", template.HTMLEscapeString(returnToWorkerQuery), -1)
 	finalHTML = strings.Replace(finalHTML, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
 	finalHTML = strings.Replace(finalHTML, "{{BIRTH_DATE}}", template.HTMLEscapeString(formattedBirthDate), -1)
 	finalHTML = strings.Replace(finalHTML, "{{PHONE}}", template.HTMLEscapeString(worker.Phone), -1)
@@ -391,6 +407,11 @@ func WorkerProfilePage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{STATUS_BADGE}}", statusBadge, -1)
 	finalHTML = strings.Replace(finalHTML, "{{MONTH_OPTIONS}}", workerMonthOptions.String(), -1)
 	finalHTML = strings.Replace(finalHTML, "{{TOTAL_HOURS}}", fmt.Sprintf("%.2f", totalHours), -1)
+	monthSalaryHTML := ""
+	if monthSalary > 0 {
+		monthSalaryHTML = `<span><strong>ЗП за месяц:</strong> ` + fmt.Sprintf("%.2f", monthSalary) + ` руб</span>`
+	}
+	finalHTML = strings.Replace(finalHTML, "{{MONTH_SALARY}}", monthSalaryHTML, -1)
 	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_BY_DAY}}", workerAssignments.String(), -1)
 	finalHTML = strings.Replace(finalHTML, "{{MARKS_BY_DAY}}", workerMarks.String(), -1)
 	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_SECTION}}", "", -1)
