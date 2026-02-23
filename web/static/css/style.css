@@ -54,7 +54,7 @@ body {
   margin: 0;
   min-height: 100vh;
   font-family: Inter, system-ui, -apple-system, sans-serif;
-  background: radial-gradient(circle at top right, rgba(77,163,255,.18), transparent 42%), var(--bg);
+  background: var(--bg);
   background-repeat: no-repeat;
   background-size: 100% 100%;
   color: var(--text-primary);
@@ -64,7 +64,7 @@ body {
 .container { max-width: 1120px; margin: 0 auto; padding: 0 var(--content-pad); }
 .main-content {
   max-width: 1120px;
-  margin: calc(var(--top-nav-height) + 24px) auto 0;
+  margin: calc(var(--top-nav-height) + 8px) auto 0;
   padding: var(--content-pad);
   display: grid;
   gap: 18px;
@@ -374,13 +374,13 @@ input:focus, select:focus, textarea:focus {
   padding: 10px;
 }
 .action-modal.visible { display: flex; animation: fadeUp .24s ease both; }
-.action-modal-sheet { width: min(980px, 96vw); height: min(90vh, 860px); background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; animation: shimmerIn .18s ease both; }
+.action-modal-sheet { width: min(980px, 96vw); height: min(90vh, 860px); margin: auto; background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; animation: shimmerIn .18s ease both; }
 .action-modal-header { height: 52px; display: flex; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid var(--border); }
 .action-modal-close { background: var(--surface-strong); border: 1px solid var(--border); border-radius: 10px; width: 32px; height: 32px; cursor: pointer; color: var(--text-primary); }
 #app-action-modal-iframe { width: 100%; height: calc(100% - 52px); border: 0; background: var(--bg); }
 
-.modal-form-layout { min-height: 100vh; padding: 16px; }
-.modal-form-content { margin: 0; padding: 0; }
+.modal-form-layout { min-height: 100vh; padding: 0; }
+.modal-form-content { margin: 0 !important; padding: 0 !important; max-width: none; }
 .modal-form-card { box-shadow: none; }
 .modal-form-layout .top-nav,
 .modal-form-layout .side-nav,
@@ -411,19 +411,6 @@ p,li,label,td,th { line-height: 1.5; }
   background: color-mix(in srgb, var(--surface), transparent 15%);
   padding: 6px;
 }
-.worker-card:hover, .info-card:hover, .card:hover, .placeholder-card:hover,
-.assignment-card:hover, .structured-assignment:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255,122,24,.35);
-  box-shadow: 0 0 0 1px rgba(255,122,24,.20), 0 10px 30px rgba(0,0,0,.32), 0 0 20px rgba(255,122,24,.14);
-}
-
-/* UI refinement overrides */
-.entity-link, .back-link { text-decoration: none; }
-.table.timesheet-matrix th:first-child,
-.table.timesheet-matrix td:first-child,
-.timesheet-matrix th:first-child,
-.timesheet-matrix td:first-child { text-align: left; }
 
 .timesheet-matrix {
   table-layout: fixed;
@@ -562,7 +549,7 @@ p,li,label,td,th { line-height: 1.5; }
 
 @media (max-width: 900px) {
   .container, .main-content { padding-left: 16px; padding-right: 16px; }
-  .main-content { margin-top: 92px; padding-top: 12px; }
+  .main-content { margin-top: 76px; padding-top: 8px; }
   .nav-inner { min-height: 68px; }
 }
 
