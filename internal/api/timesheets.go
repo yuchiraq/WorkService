@@ -988,6 +988,9 @@ func TimesheetsPage(c *gin.Context) {
 		var cells strings.Builder
 		workerTotal := 0.0
 		for _, date := range monthDates {
+			quickReturn := url.QueryEscape("/timesheets?month=" + selectedMonth)
+			base := fmt.Sprintf("/schedule/new?date=%s&worker_id=%s&return=%s", template.URLQueryEscaper(date), template.URLQueryEscaper(worker.ID), quickReturn)
+			menu := fmt.Sprintf(`<div class="timesheet-quick-menu"><a href="%s" data-modal-url="%s" data-modal-title="Работа" data-modal-return="/timesheets?month=%s">Работа</a><a href="%s&special_mark=vacation" data-modal-url="%s&special_mark=vacation" data-modal-title="Отпуск" data-modal-return="/timesheets?month=%s">Отпуск</a><a href="%s&special_mark=sick" data-modal-url="%s&special_mark=sick" data-modal-title="Больничный" data-modal-return="/timesheets?month=%s">Больничный</a><a href="%s&special_mark=absence" data-modal-url="%s&special_mark=absence" data-modal-title="Прогул" data-modal-return="/timesheets?month=%s">Прогул</a><a href="%s&special_mark=weekend" data-modal-url="%s&special_mark=weekend" data-modal-title="Выходной" data-modal-return="/timesheets?month=%s">Выходной</a></div>`, template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth))
 			total := 0.0
 			details := make([]string, 0)
 			cellMark := ""
@@ -1027,14 +1030,11 @@ func TimesheetsPage(c *gin.Context) {
 				}
 			}
 			if len(details) == 0 {
-				quickReturn := url.QueryEscape("/timesheets?month=" + selectedMonth)
-				base := fmt.Sprintf("/schedule/new?date=%s&worker_id=%s&return=%s", template.URLQueryEscaper(date), template.URLQueryEscaper(worker.ID), quickReturn)
-				menu := fmt.Sprintf(`<div class="timesheet-quick-menu"><a href="%s" data-modal-url="%s" data-modal-title="Работа" data-modal-return="/timesheets?month=%s">Работа</a><a href="%s&special_mark=vacation" data-modal-url="%s&special_mark=vacation" data-modal-title="Отпуск" data-modal-return="/timesheets?month=%s">Отпуск</a><a href="%s&special_mark=sick" data-modal-url="%s&special_mark=sick" data-modal-title="Больничный" data-modal-return="/timesheets?month=%s">Больничный</a><a href="%s&special_mark=absence" data-modal-url="%s&special_mark=absence" data-modal-title="Прогул" data-modal-return="/timesheets?month=%s">Прогул</a><a href="%s&special_mark=weekend" data-modal-url="%s&special_mark=weekend" data-modal-title="Выходной" data-modal-return="/timesheets?month=%s">Выходной</a></div>`, template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth))
 				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><button type="button" class="timesheet-quick-add" onclick="this.nextElementSibling.classList.toggle('open')">+</button>%s</td>`, menu))
 				continue
 			}
 			if cellMark != "" {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">%s</span><div class="hours-tooltip">%s</div></td>`, template.HTMLEscapeString(cellMark), strings.Join(details, "<br>")))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty marked"><span class="empty-value">%s</span><button type="button" class="timesheet-quick-add" onclick="this.nextElementSibling.classList.toggle('open')">+</button>%s<div class="hours-tooltip">%s</div></td>`, template.HTMLEscapeString(cellMark), menu, strings.Join(details, "<br>")))
 			} else {
 				cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
 				workerTotal += total
