@@ -254,6 +254,7 @@ func WorkerProfilePage(c *gin.Context) {
 	})
 
 	totalHours := 0.0
+	monthSalary := 0.0
 	var workerAssignments strings.Builder
 	var workerMarks strings.Builder
 	currentDate := ""
@@ -310,6 +311,9 @@ func WorkerProfilePage(c *gin.Context) {
 	}
 	if workerMarks.Len() == 0 {
 		workerMarks.WriteString(`<p>Отметок за выбранный месяц нет.</p>`)
+	}
+	if worker.HourlyRate > 0 {
+		monthSalary = totalHours * worker.HourlyRate
 	}
 
 	monthNames := []string{"Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"}
@@ -371,7 +375,7 @@ func WorkerProfilePage(c *gin.Context) {
         <div class="profile-grid" style="grid-template-columns: 1.2fr .8fr; align-items:start;">
             <div class="placeholder-card">
                  <div class="history-header"><h2>История назначений</h2></div>
-                 <form method="GET" action="/worker/{{WORKER_ID}}" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select><span><strong>Итого часов:</strong> {{TOTAL_HOURS}}</span></form>
+			 <form method="GET" action="/worker/{{WORKER_ID}}" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select><span><strong>Итого часов:</strong> {{TOTAL_HOURS}}</span>{{MONTH_SALARY}}</form>
                  <div class="schedule-vertical">{{ASSIGNMENTS_BY_DAY}}</div>
             </div>
             <div class="placeholder-card">
@@ -403,6 +407,11 @@ func WorkerProfilePage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{STATUS_BADGE}}", statusBadge, -1)
 	finalHTML = strings.Replace(finalHTML, "{{MONTH_OPTIONS}}", workerMonthOptions.String(), -1)
 	finalHTML = strings.Replace(finalHTML, "{{TOTAL_HOURS}}", fmt.Sprintf("%.2f", totalHours), -1)
+	monthSalaryHTML := ""
+	if monthSalary > 0 {
+		monthSalaryHTML = `<span><strong>ЗП за месяц:</strong> ` + fmt.Sprintf("%.2f", monthSalary) + ` руб</span>`
+	}
+	finalHTML = strings.Replace(finalHTML, "{{MONTH_SALARY}}", monthSalaryHTML, -1)
 	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_BY_DAY}}", workerAssignments.String(), -1)
 	finalHTML = strings.Replace(finalHTML, "{{MARKS_BY_DAY}}", workerMarks.String(), -1)
 	finalHTML = strings.Replace(finalHTML, "{{ASSIGNMENTS_SECTION}}", "", -1)
