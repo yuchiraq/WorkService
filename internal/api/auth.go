@@ -140,6 +140,11 @@ func LoginPage(c *gin.Context) {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#007AFF">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/static/img/logo.png">
     <title>Вход в систему</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -164,6 +169,13 @@ func LoginPage(c *gin.Context) {
             </div>
         </div>
     </div>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){
+    navigator.serviceWorker.register('/sw.js').catch(function(){});
+  });
+}
+</script>
 </body>
 </html>`
 	final := strings.Replace(pageTemplate, "{{ERROR_BLOCK}}", errorBlock, 1)
