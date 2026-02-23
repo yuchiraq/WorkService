@@ -64,9 +64,31 @@ a:hover { text-decoration: underline; }
 .nav-inner {
   min-height: 72px;
   display: grid;
+  grid-template-columns: auto 1fr;
   align-items: center;
-  justify-items: center;
   padding: 0 var(--space-md);
+}
+
+.mobile-nav-toggle {
+  width: 40px;
+  height: 40px;
+  display: inline-grid;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid var(--separator);
+  border-radius: 10px;
+  background: var(--tertiary-system-background);
+  color: var(--label);
+  cursor: pointer;
+}
+
+.mobile-nav-toggle span {
+  display: block;
+  width: 16px;
+  height: 2px;
+  margin-inline: auto;
+  border-radius: 999px;
+  background: currentColor;
 }
 
 .top-nav-title {
@@ -77,6 +99,11 @@ a:hover { text-decoration: underline; }
   font-weight: 700;
   color: var(--label);
   border-radius: var(--radius-control);
+}
+
+body.modal-open,
+body.nav-open {
+  overflow: hidden;
 }
 
 .top-nav-title:focus-visible,
@@ -157,6 +184,8 @@ body.nav-open .side-nav-overlay { opacity: 1; pointer-events: auto; }
 
 .side-nav-links { display: grid; align-content: start; gap: 4px; overflow: auto; }
 
+.side-nav-logout { margin-top: var(--space-xs); }
+
 .nav-link {
   border-radius: 12px;
   padding: 10px 12px;
@@ -211,7 +240,8 @@ body.nav-open .side-nav-overlay { opacity: 1; pointer-events: auto; }
 .worker-card-header,
 .assignment-head,
 .history-header,
-.action-modal-header {
+.action-modal-header,
+.info-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -298,6 +328,16 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   border-radius: 12px;
   border: 1px solid var(--separator);
   background: var(--tertiary-system-background);
+}
+
+.entity-link {
+  color: var(--label);
+  text-decoration: none;
+}
+
+.entity-link:hover {
+  color: var(--system-blue);
+  text-decoration: underline;
 }
 
 .table th, .table td, .timesheet-matrix th, .timesheet-matrix td {

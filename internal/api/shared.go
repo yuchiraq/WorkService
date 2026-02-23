@@ -16,10 +16,19 @@ type navItem struct {
 
 // RenderSidebar keeps historical name, but renders topbar with off-canvas navigation.
 func RenderSidebar(c *gin.Context, activePage string) string {
-	userNameValue, _ := c.Get("userName")
-	userStatusValue, _ := c.Get("userStatus")
-	userName := userNameValue.(string)
-	userStatus := userStatusValue.(string)
+	userName := "Пользователь"
+	if userNameValue, ok := c.Get("userName"); ok {
+		if value, castOK := userNameValue.(string); castOK && strings.TrimSpace(value) != "" {
+			userName = value
+		}
+	}
+
+	userStatus := "user"
+	if userStatusValue, ok := c.Get("userStatus"); ok {
+		if value, castOK := userStatusValue.(string); castOK && strings.TrimSpace(value) != "" {
+			userStatus = value
+		}
+	}
 
 	navItems := []navItem{
 		{PageID: "dashboard", Path: "/dashboard", Label: "Панель"},
@@ -79,8 +88,9 @@ const navOverlay=document.querySelector('[data-nav-overlay]');
 function closeModal(){
   if(!modal) return;
   modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden','true');
   body.classList.remove('modal-open');
-  if(iframe){ iframe.removeAttribute('src'); iframe.removeAttribute('data-return-path'); }
+  if(iframe){ iframe.removeAttribute('src'); iframe.removeAttribute('data-return-path'); iframe.style.removeProperty('height'); }
 }
 function closeNav(){ body.classList.remove('nav-open'); }
 function openModal(url,t,ret){
@@ -88,6 +98,7 @@ function openModal(url,t,ret){
   const effectiveRet = ret || (window.location.pathname + window.location.search);
   try{ const u=new URL(url,window.location.origin); if(!u.searchParams.has('modal')) u.searchParams.set('modal','1'); if(effectiveRet && !u.searchParams.has('return')) u.searchParams.set('return', effectiveRet); url=u.pathname+u.search; }catch(_){ }
   modal.classList.add('visible');
+  modal.setAttribute('aria-hidden','false');
   body.classList.add('modal-open');
   if(modalTitle) modalTitle.textContent=t||'Форма';
   iframe.setAttribute('data-return-path', effectiveRet);
@@ -124,12 +135,6 @@ function sameTarget(current, target){
 
 ensureBrandAssets();
 document.addEventListener('click',function(e){
-  const themeBtn=e.target.closest('[data-theme-toggle]');
-  if(themeBtn){
-    e.preventDefault();
-    toggleTheme();
-    return;
-  }
   const t=e.target.closest('[data-modal-url]');
   if(!t) return;
   e.preventDefault();
@@ -140,6 +145,7 @@ if(modal) modal.addEventListener('click',function(e){ if(e.target===modal) close
 if(burger) burger.addEventListener('click', function(){ body.classList.toggle('nav-open'); });
 if(navOverlay) navOverlay.addEventListener('click', closeNav);
 document.querySelectorAll('.side-nav-links a').forEach(function(a){ a.addEventListener('click', closeNav); });
+window.addEventListener('resize', function(){ if(window.innerWidth >= 1024) closeNav(); });
 document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeModal(); closeNav(); }});
 if(iframe){
   iframe.addEventListener('load',function(){
@@ -157,7 +163,7 @@ if(iframe){
         }
       }
     }catch(_){ return; }
-    if(ret && sameTarget(href, ret)){ closeModal(); window.location.href=ret; }
+    if(ret && sameTarget(href, ret)){ closeModal(); window.location.assign(ret); }
   });
 }
 })();</script>`
