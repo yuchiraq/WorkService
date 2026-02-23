@@ -557,6 +557,21 @@ input:focus, select:focus, textarea:focus {
 }
 
 
+.action-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.action-modal-header strong { font-size: 1rem; }
+.action-modal-header .action-modal-close {
+  position: static;
+  width: 30px;
+  height: 30px;
+}
+
+
 .modal {
   animation: modalOverlayIn .24s ease;
 }
