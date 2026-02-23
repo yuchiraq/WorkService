@@ -903,6 +903,7 @@ func ExportTimesheetsExcel(c *gin.Context) {
 
 		for i, date := range monthDates {
 			total := 0.0
+			cellMark := ""
 			for _, entry := range entries {
 				if entry.Date != date {
 					continue
@@ -917,13 +918,19 @@ func ExportTimesheetsExcel(c *gin.Context) {
 				if !contains {
 					continue
 				}
+				if isSpecialMark(entry.UserMark) {
+					cellMark = specialMarkLabel(entry.UserMark)
+					continue
+				}
 				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
 				hours, _ := strconv.ParseFloat(hoursStr, 64)
 				total += hours
 			}
 			col, _ := excelize.ColumnNumberToName(i + 2)
 			cell := fmt.Sprintf("%s%d", col, row)
-			if total == 0 {
+			if cellMark != "" {
+				f.SetCellValue(sheet, cell, cellMark)
+			} else if total == 0 {
 				f.SetCellValue(sheet, cell, "—")
 			} else {
 				f.SetCellValue(sheet, cell, total)
