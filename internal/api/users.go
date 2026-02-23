@@ -5,6 +5,7 @@ import (
 	"html/template"
 	"net/http"
 	"strings"
+	"time"
 
 	"project/internal/models"
 	"project/internal/storage"
@@ -19,6 +20,17 @@ func userStatusLabel(status string) string {
 	return "Пользователь"
 }
 
+func formatLastLogin(value string) string {
+	if strings.TrimSpace(value) == "" {
+		return "—"
+	}
+	t, err := time.Parse(time.RFC3339, value)
+	if err != nil {
+		return "—"
+	}
+	return t.Format("02.01.2006 15:04")
+}
+
 func UsersPage(c *gin.Context) {
 	users, err := storage.GetUsers()
 	if err != nil {
@@ -28,11 +40,12 @@ func UsersPage(c *gin.Context) {
 
 	var rows strings.Builder
 	for _, user := range users {
-		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><div class="table-actions"><a href="/users/edit/%s" class="btn btn-secondary" data-modal-url="/users/edit/%s" data-modal-title="Редактировать пользователя" data-modal-return="/users">Редактировать</a><form action="/users/delete/%s" method="POST" style="display:inline;"><button class="btn btn-danger" type="submit">Удалить</button></form></div></td></tr>`,
+		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><div class="table-actions"><a href="/users/edit/%s" class="btn btn-secondary" data-modal-url="/users/edit/%s" data-modal-title="Редактировать пользователя" data-modal-return="/users">Редактировать</a><form action="/users/delete/%s" method="POST" style="display:inline;"><button class="btn btn-danger" type="submit">Удалить</button></form></div></td></tr>`,
 			template.HTMLEscapeString(user.Name),
 			template.HTMLEscapeString(user.Username),
 			template.HTMLEscapeString(user.Phone),
 			template.HTMLEscapeString(userStatusLabel(user.Status)),
+			template.HTMLEscapeString(formatLastLogin(user.LastLoginAt)),
 			template.HTMLEscapeString(user.ID),
 			template.HTMLEscapeString(user.ID),
 			template.HTMLEscapeString(user.ID),
@@ -43,7 +56,7 @@ func UsersPage(c *gin.Context) {
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Пользователи</h1><a href="/users/new" class="btn btn-primary" data-modal-url="/users/new" data-modal-title="Новый пользователь" data-modal-return="/users">Добавить пользователя</a></div>
-<div class="card"><table class="table"><thead><tr><th>ФИО</th><th>Логин</th><th>Телефон</th><th>Статус</th><th>Действия</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
+<div class="card"><table class="table"><thead><tr><th>ФИО</th><th>Логин</th><th>Телефон</th><th>Статус</th><th>Последний вход</th><th>Действия</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div></body></html>`
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "users"), 1)
 	final = strings.Replace(final, "{{ROWS}}", rows.String(), 1)
@@ -154,6 +167,7 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 	final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(user.Name), 1)
 	final = strings.Replace(final, "{{USERNAME}}", template.HTMLEscapeString(user.Username), 1)
 	final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(user.Phone), 1)
+	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), 1)
 	final = strings.Replace(final, "{{STATUS_FIELD}}", statusField, 1)
 	final = strings.Replace(final, "{{WORKER_FIELD}}", workerField, 1)
 	final = strings.Replace(final, "{{SUBMIT_LABEL}}", template.HTMLEscapeString(submitLabel), 1)
@@ -293,6 +307,7 @@ func ProfilePage(c *gin.Context) {
 	final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(user.Name), 1)
 	final = strings.Replace(final, "{{USERNAME}}", template.HTMLEscapeString(user.Username), 1)
 	final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(user.Phone), 1)
+	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
 
