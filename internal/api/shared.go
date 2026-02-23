@@ -121,6 +121,24 @@ function ensureBrandAssets(){
     png.href='/static/img/logo.png';
     head.appendChild(png);
   }
+  if(!head.querySelector('link[rel="manifest"]')){
+    const manifest=document.createElement('link');
+    manifest.rel='manifest';
+    manifest.href='/manifest.webmanifest';
+    head.appendChild(manifest);
+  }
+  if(!head.querySelector('meta[name="theme-color"]')){
+    const theme=document.createElement('meta');
+    theme.name='theme-color';
+    theme.content='#007AFF';
+    head.appendChild(theme);
+  }
+  if(!head.querySelector('meta[name="apple-mobile-web-app-capable"]')){
+    const capable=document.createElement('meta');
+    capable.name='apple-mobile-web-app-capable';
+    capable.content='yes';
+    head.appendChild(capable);
+  }
 }
 
 function sameTarget(current, target){
@@ -134,6 +152,9 @@ function sameTarget(current, target){
 }
 
 ensureBrandAssets();
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); });
+}
 document.addEventListener('click',function(e){
   const t=e.target.closest('[data-modal-url]');
   if(!t) return;
