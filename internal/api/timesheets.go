@@ -447,21 +447,23 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 <div class="form-group-edit timesheet-span-2"><label for="entry_kind">Тип отметки</label><select id="entry_kind" name="entry_kind"><option value="work"{{MARK_WORK}}>Работа</option><option value="vacation"{{MARK_VACATION}}>Отпуск (ОТ)</option><option value="sick"{{MARK_SICK}}>Больничный (Б)</option><option value="absence"{{MARK_ABSENT}}>Прогул (ПР)</option><option value="weekend"{{MARK_WEEKEND}}>Выходной (В)</option></select></div>
 <div class="form-group-edit timesheet-span-2" id="period_wrap" style="display:none;"><label for="period_end">Период по дату (для отпуска/больничного)</label><input id="period_end" name="period_end" type="date" value="{{PERIOD_END}}"></div>
 <div class="form-group-edit"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
+<div id="work_fields_wrap" class="timesheet-work-fields">
 <div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
 <div class="form-group-edit"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
 <div class="form-group-edit"><label for="lunch_break_minutes">Обед</label><select id="lunch_break_minutes" name="lunch_break_minutes" required><option value="0"{{L0}}>Без обеда</option><option value="30"{{L30}}>30 минут</option><option value="60"{{L60}}>60 минут</option><option value="90"{{L90}}>90 минут</option></select></div>
 
 <div class="form-group-edit timesheet-span-2">
-  <label>Работники</label>
-  <div class="dynamic-select-group" data-dynamic-select-group>
-    {{WORKER_SELECTED}}
-  </div>
-</div>
-
-<div class="form-group-edit timesheet-span-2">
   <label>Объекты</label>
   <div class="dynamic-select-group" data-dynamic-select-group>
     {{OBJECT_SELECTED}}
+  </div>
+</div>
+</div>
+
+<div class="form-group-edit timesheet-span-2">
+  <label>Работники</label>
+  <div class="dynamic-select-group" data-dynamic-select-group>
+    {{WORKER_SELECTED}}
   </div>
 </div>
 
@@ -523,7 +525,7 @@ const special=document.getElementById('special_mark');
 const st=document.getElementById('start_time');
 const et=document.getElementById('end_time');
 const lunch=document.getElementById('lunch_break_minutes');
-const objectBlock=document.getElementById('object_select') ? document.getElementById('object_select').closest('.form-group-edit') : null;
+const workFieldsWrap=document.getElementById('work_fields_wrap');
 function syncEntryKind(){
   if(!kind) return;
   const v=kind.value;
@@ -533,7 +535,7 @@ function syncEntryKind(){
     if(v==='vacation') special.value='ОТ'; else if(v==='sick') special.value='Б'; else if(v==='absence') special.value='ПР'; else if(v==='weekend') special.value='В'; else special.value='';
   }
   if(st&&et&&lunch){ st.disabled=isSpec; et.disabled=isSpec; lunch.disabled=isSpec; if(isSpec){ st.value=''; et.value=''; lunch.value='0'; }}
-  if(objectBlock) objectBlock.style.display=isSpec?'none':'';
+  if(workFieldsWrap) workFieldsWrap.style.display=isSpec?'none':'contents';
 }
 if(kind){ kind.addEventListener('change', syncEntryKind); syncEntryKind(); }
 </script>
@@ -901,6 +903,7 @@ func ExportTimesheetsExcel(c *gin.Context) {
 
 		for i, date := range monthDates {
 			total := 0.0
+			cellMark := ""
 			for _, entry := range entries {
 				if entry.Date != date {
 					continue
@@ -915,13 +918,19 @@ func ExportTimesheetsExcel(c *gin.Context) {
 				if !contains {
 					continue
 				}
+				if isSpecialMark(entry.UserMark) {
+					cellMark = specialMarkLabel(entry.UserMark)
+					continue
+				}
 				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
 				hours, _ := strconv.ParseFloat(hoursStr, 64)
 				total += hours
 			}
 			col, _ := excelize.ColumnNumberToName(i + 2)
 			cell := fmt.Sprintf("%s%d", col, row)
-			if total == 0 {
+			if cellMark != "" {
+				f.SetCellValue(sheet, cell, cellMark)
+			} else if total == 0 {
 				f.SetCellValue(sheet, cell, "—")
 			} else {
 				f.SetCellValue(sheet, cell, total)
@@ -988,6 +997,9 @@ func TimesheetsPage(c *gin.Context) {
 		var cells strings.Builder
 		workerTotal := 0.0
 		for _, date := range monthDates {
+			quickReturn := url.QueryEscape("/timesheets?month=" + selectedMonth)
+			base := fmt.Sprintf("/schedule/new?date=%s&worker_id=%s&return=%s", template.URLQueryEscaper(date), template.URLQueryEscaper(worker.ID), quickReturn)
+			menu := fmt.Sprintf(`<div class="timesheet-quick-menu"><a href="%s" data-modal-url="%s" data-modal-title="Работа" data-modal-return="/timesheets?month=%s">Работа</a><a href="%s&special_mark=vacation" data-modal-url="%s&special_mark=vacation" data-modal-title="Отпуск" data-modal-return="/timesheets?month=%s">Отпуск</a><a href="%s&special_mark=sick" data-modal-url="%s&special_mark=sick" data-modal-title="Больничный" data-modal-return="/timesheets?month=%s">Больничный</a><a href="%s&special_mark=absence" data-modal-url="%s&special_mark=absence" data-modal-title="Прогул" data-modal-return="/timesheets?month=%s">Прогул</a><a href="%s&special_mark=weekend" data-modal-url="%s&special_mark=weekend" data-modal-title="Выходной" data-modal-return="/timesheets?month=%s">Выходной</a></div>`, template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth))
 			total := 0.0
 			details := make([]string, 0)
 			cellMark := ""
@@ -1027,14 +1039,11 @@ func TimesheetsPage(c *gin.Context) {
 				}
 			}
 			if len(details) == 0 {
-				quickReturn := url.QueryEscape("/timesheets?month=" + selectedMonth)
-				base := fmt.Sprintf("/schedule/new?date=%s&worker_id=%s&return=%s", template.URLQueryEscaper(date), template.URLQueryEscaper(worker.ID), quickReturn)
-				menu := fmt.Sprintf(`<div class="timesheet-quick-menu"><a href="%s" data-modal-url="%s" data-modal-title="Работа" data-modal-return="/timesheets?month=%s">Работа</a><a href="%s&special_mark=vacation" data-modal-url="%s&special_mark=vacation" data-modal-title="Отпуск" data-modal-return="/timesheets?month=%s">Отпуск</a><a href="%s&special_mark=sick" data-modal-url="%s&special_mark=sick" data-modal-title="Больничный" data-modal-return="/timesheets?month=%s">Больничный</a><a href="%s&special_mark=absence" data-modal-url="%s&special_mark=absence" data-modal-title="Прогул" data-modal-return="/timesheets?month=%s">Прогул</a><a href="%s&special_mark=weekend" data-modal-url="%s&special_mark=weekend" data-modal-title="Выходной" data-modal-return="/timesheets?month=%s">Выходной</a></div>`, template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth), template.HTMLEscapeString(base), template.HTMLEscapeString(base), template.HTMLEscapeString(selectedMonth))
 				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><button type="button" class="timesheet-quick-add" onclick="this.nextElementSibling.classList.toggle('open')">+</button>%s</td>`, menu))
 				continue
 			}
 			if cellMark != "" {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">%s</span><div class="hours-tooltip">%s</div></td>`, template.HTMLEscapeString(cellMark), strings.Join(details, "<br>")))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty marked"><span class="empty-value">%s</span><button type="button" class="timesheet-quick-add" onclick="this.nextElementSibling.classList.toggle('open')">+</button>%s<div class="hours-tooltip">%s</div></td>`, template.HTMLEscapeString(cellMark), menu, strings.Join(details, "<br>")))
 			} else {
 				cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
 				workerTotal += total
