@@ -81,6 +81,9 @@ func joinMappedLinks(ids []string, valuesMap map[string]string, pathPrefix strin
 		items = append(items, fmt.Sprintf(`<a class="entity-link" href="%s/%s">%s</a>`, template.HTMLEscapeString(pathPrefix), template.HTMLEscapeString(id), template.HTMLEscapeString(name)))
 	}
 	if len(items) == 0 {
+		if pathPrefix == "/object" {
+			return "Объект не указан"
+		}
 		return "—"
 	}
 	return strings.Join(items, ", ")

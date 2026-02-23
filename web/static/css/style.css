@@ -654,6 +654,7 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   border-radius: 10px;
   background: var(--tertiary-system-background);
 }
+.worker-card-footer { display: flex; justify-content: flex-end; margin-top: auto; }
 
 .assignment-actions {
   margin-top: 8px;
