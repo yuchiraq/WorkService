@@ -55,13 +55,29 @@ a:hover { text-decoration: underline; }
 
 @media (max-width: 760px) {
   body {
-    font-size: 18px;
-    line-height: 1.45;
+    font-size: 19px;
+    line-height: 1.5;
   }
   .main-content {
-    padding-inline: 12px;
-    gap: 12px;
+    padding-inline: 14px;
+    gap: 14px;
   }
+  .top-nav-title { font-size: 1.2rem; }
+  .card,
+  .worker-card,
+  .info-card,
+  .assignment-card,
+  .structured-assignment,
+  .timesheet-card,
+  .center-card,
+  .modal-content,
+  .action-modal-sheet { padding: 18px; }
+  input,
+  select,
+  textarea,
+  .form-control { min-height: 44px; font-size: 17px; }
+  .btn { min-height: 46px; font-size: 17px; }
+  .nav-link { min-height: 46px; font-size: 17px; }
 }
 
 .top-nav {
