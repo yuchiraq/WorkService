@@ -70,8 +70,8 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 const body=document.body;
 const modal=document.getElementById('app-action-modal');
 const iframe=document.getElementById('app-action-modal-iframe');
-const title=document.getElementById('app-action-modal-title');
 const closeBtn=document.querySelector('[data-modal-close]');
+const modalSheet=document.querySelector('.action-modal-sheet');
 const burger=document.querySelector('[data-mobile-nav-toggle]');
 const navOverlay=document.querySelector('[data-nav-overlay]');
 
@@ -123,6 +123,12 @@ function sameTarget(current, target){
 
 ensureBrandAssets();
 document.addEventListener('click',function(e){
+  const themeBtn=e.target.closest('[data-theme-toggle]');
+  if(themeBtn){
+    e.preventDefault();
+    toggleTheme();
+    return;
+  }
   const t=e.target.closest('[data-modal-url]');
   if(!t) return;
   e.preventDefault();
@@ -138,7 +144,16 @@ if(iframe){
   iframe.addEventListener('load',function(){
     const ret=iframe.getAttribute('data-return-path');
     let href='';
-    try{ href=iframe.contentWindow.location.href; }catch(_){ return; }
+    try{
+      href=iframe.contentWindow.location.href;
+      if(modalSheet && iframe.contentWindow && iframe.contentWindow.document){
+        const d=iframe.contentWindow.document;
+        const h=Math.max(d.body ? d.body.scrollHeight : 0, d.documentElement ? d.documentElement.scrollHeight : 0);
+        if(h>0){
+          modalSheet.style.height=Math.min(Math.max(h+18, 300), window.innerHeight-32)+'px';
+        }
+      }
+    }catch(_){ return; }
     if(ret && sameTarget(href, ret)){ closeModal(); window.location.href=ret; }
   });
 }
@@ -163,7 +178,7 @@ if(iframe){
 <div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение">+</a></div>
 <div class="action-modal" id="app-action-modal" aria-hidden="true">
   <div class="action-modal-sheet">
-    <div class="action-modal-header"><h3 id="app-action-modal-title">Форма</h3><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button></div>
+    <button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button>
     <iframe id="app-action-modal-iframe" title="Форма"></iframe>
   </div>
 </div>%s%s`, pageTitle, userInitial, userName, roleLabel, nav.String(), csrfScript, uiScript)
