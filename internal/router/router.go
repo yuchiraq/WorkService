@@ -1,6 +1,7 @@
 package router
 
 import (
+	"net/http"
 	"project/internal/api"
 
 	"github.com/gin-gonic/gin"
@@ -8,6 +9,24 @@ import (
 
 func SetupRouter(r *gin.Engine) {
 	r.Static("/static", "./web/static")
+	r.GET("/manifest.webmanifest", func(c *gin.Context) {
+		c.Header("Content-Type", "application/manifest+json")
+		c.File("./web/static/manifest.webmanifest")
+	})
+	r.HEAD("/manifest.webmanifest", func(c *gin.Context) {
+		c.Header("Content-Type", "application/manifest+json")
+		c.Status(http.StatusOK)
+	})
+	r.GET("/sw.js", func(c *gin.Context) {
+		c.Header("Service-Worker-Allowed", "/")
+		c.Header("Cache-Control", "no-cache")
+		c.File("./web/static/sw.js")
+	})
+	r.HEAD("/sw.js", func(c *gin.Context) {
+		c.Header("Service-Worker-Allowed", "/")
+		c.Header("Cache-Control", "no-cache")
+		c.Status(http.StatusOK)
+	})
 	r.NoRoute(api.NotFoundPage)
 
 	r.GET("/login", api.LoginPage)
@@ -76,6 +95,6 @@ func SetupRouter(r *gin.Engine) {
 	}
 
 	r.GET("/", func(c *gin.Context) {
-		c.Redirect(302, "/login")
+		c.Redirect(http.StatusFound, "/login")
 	})
 }

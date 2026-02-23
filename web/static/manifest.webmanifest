@@ -1,0 +1,25 @@
+{
+  "name": "АВАЮССТРОЙ — WorkService",
+  "short_name": "WorkService",
+  "description": "Внутренний сервис управления сотрудниками, объектами и расписанием.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#007AFF",
+  "lang": "ru",
+  "icons": [
+    {
+      "src": "/static/img/logo.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/static/img/logo.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
