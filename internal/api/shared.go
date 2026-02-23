@@ -72,6 +72,7 @@ const modal=document.getElementById('app-action-modal');
 const iframe=document.getElementById('app-action-modal-iframe');
 const closeBtn=document.querySelector('[data-modal-close]');
 const modalSheet=document.querySelector('.action-modal-sheet');
+const modalTitle=document.getElementById('app-action-modal-title');
 const burger=document.querySelector('[data-mobile-nav-toggle]');
 const navOverlay=document.querySelector('[data-nav-overlay]');
 
@@ -88,7 +89,7 @@ function openModal(url,t,ret){
   try{ const u=new URL(url,window.location.origin); if(!u.searchParams.has('modal')) u.searchParams.set('modal','1'); if(effectiveRet && !u.searchParams.has('return')) u.searchParams.set('return', effectiveRet); url=u.pathname+u.search; }catch(_){ }
   modal.classList.add('visible');
   body.classList.add('modal-open');
-  title.textContent=t||'Форма';
+  if(modalTitle) modalTitle.textContent=t||'Форма';
   iframe.setAttribute('data-return-path', effectiveRet);
   iframe.src=url;
 }
@@ -178,7 +179,7 @@ if(iframe){
 <div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение">+</a></div>
 <div class="action-modal" id="app-action-modal" aria-hidden="true">
   <div class="action-modal-sheet">
-    <button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button>
+    <div class="action-modal-header"><strong id="app-action-modal-title">Форма</strong><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button></div>
     <iframe id="app-action-modal-iframe" title="Форма"></iframe>
   </div>
 </div>%s%s`, pageTitle, userInitial, userName, roleLabel, nav.String(), csrfScript, uiScript)

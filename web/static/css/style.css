@@ -267,6 +267,7 @@ input:focus, select:focus, textarea:focus {
 .modal-form-layout .side-nav,
 .modal-form-layout .side-nav-overlay,
 .modal-form-layout .floating-create-wrap { display: none !important; }
+.modal-form-layout .back-link { display: none !important; }
 .modal-form-layout .main-content { margin: 0; max-width: none; padding: 12px; }
 .modal-form-card { max-width: 900px; margin: 0 auto; }
 .modal-form-content { width: 100%; }
@@ -369,6 +370,8 @@ input:focus, select:focus, textarea:focus {
 
 /* UI refinement overrides */
 .entity-link, .back-link { text-decoration: none; }
+.back-link { display: inline-flex; align-items: center; gap: 8px; }
+.back-link svg { width: 16px; height: 16px; flex-shrink: 0; }
 .table.timesheet-matrix th:first-child,
 .table.timesheet-matrix td:first-child,
 .timesheet-matrix th:first-child,
@@ -526,6 +529,21 @@ input:focus, select:focus, textarea:focus {
 }
 .action-modal.visible .action-modal-sheet { transform: translateY(0) scale(1); opacity: 1; }
 .action-modal iframe { min-height: min(70vh, 650px); max-height: calc(100dvh - 66px); border: 1px solid var(--border); border-radius: 12px; }
+
+.action-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.action-modal-header strong { font-size: 1rem; }
+.action-modal-header .action-modal-close {
+  position: static;
+  width: 30px;
+  height: 30px;
+}
+
 
 .modal {
   animation: modalOverlayIn .24s ease;
