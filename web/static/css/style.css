@@ -53,6 +53,17 @@ a:hover { text-decoration: underline; }
   padding-inline: var(--space-md);
 }
 
+@media (max-width: 760px) {
+  body {
+    font-size: 18px;
+    line-height: 1.45;
+  }
+  .main-content {
+    padding-inline: 12px;
+    gap: 12px;
+  }
+}
+
 .top-nav {
   position: fixed;
   z-index: 120;
@@ -101,6 +112,34 @@ a:hover { text-decoration: underline; }
   font-weight: 700;
   color: var(--label);
   border-radius: var(--radius-control);
+}
+
+.card,
+.worker-card,
+.info-card,
+.assignment-card,
+.structured-assignment,
+.schedule-day-group,
+.metric,
+.btn,
+.nav-link {
+  transition: transform 0.22s ease-in-out, background-color 0.22s ease-in-out, border-color 0.22s ease-in-out, box-shadow 0.22s ease-in-out;
+}
+
+.card:hover,
+.worker-card:hover,
+.info-card:hover,
+.assignment-card:hover,
+.structured-assignment:hover,
+.schedule-day-group:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgb(0 0 0 / 0.12);
+}
+
+.btn:active,
+.nav-link:active,
+.floating-create-btn:active {
+  transform: scale(0.98);
 }
 
 body.modal-open,
@@ -279,6 +318,17 @@ small, .text-muted, .back-link, .metric .label, .worker-info p { font-size: 13px
 .form-grid, .form-grid-edit, .timesheet-form, .workers-grid, .compact-grid {
   display: grid;
   gap: 12px;
+}
+.timesheet-time-row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.timesheet-work-fields {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 .form-grid, .form-grid-edit, .timesheet-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .workers-grid, .compact-grid { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
@@ -588,6 +638,34 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 }
 .worker-card-footer { display: flex; justify-content: flex-end; margin-top: auto; }
 
+.assignment-card {
+  width: min(100%, 880px);
+}
+
+.assignment-time {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.assignment-section {
+  padding: 10px;
+  border: 1px solid var(--separator);
+  border-radius: 10px;
+  background: var(--tertiary-system-background);
+}
+.worker-card-footer { display: flex; justify-content: flex-end; margin-top: auto; }
+
+.assignment-actions {
+  margin-top: 8px;
+}
+
+.btn-compact {
+  min-height: 36px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
 .card > * + *, .info-card > * + *, .placeholder-card > * + * { margin-top: 14px; }
 .assignment-body > * + * { margin-top: 8px; }
 .card p, .placeholder-card p, .info-card p, .workers-summary { margin: 0; }
@@ -603,10 +681,19 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 }
 
 @media (max-width: 760px) {
-  .form-grid, .form-grid-edit, .timesheet-form, .dynamic-select-row { grid-template-columns: 1fr; }
+  .form-grid, .form-grid-edit, .timesheet-form, .dynamic-select-row, .timesheet-work-fields { grid-template-columns: 1fr; }
   .timesheet-form .dynamic-select-row { grid-template-columns: 1fr auto; }
   .btn { width: 100%; }
   .table-actions .btn, .filter-actions .btn, .profile-actions .btn { width: auto; }
   .assignment-head { flex-direction: column; align-items: flex-start; }
   .timesheet-quick-menu { max-width: min(220px, 86vw); }
+}
+
+@media (min-width: 1024px) {
+  .top-nav {
+    min-height: 58px;
+  }
+  .nav-inner {
+    min-height: 58px;
+  }
 }
