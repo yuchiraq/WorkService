@@ -60,9 +60,19 @@ func normalizeTimesheet(entry *models.TimesheetEntry) {
 	entry.StartTime = strings.TrimSpace(entry.StartTime)
 	entry.EndTime = strings.TrimSpace(entry.EndTime)
 	entry.Notes = strings.TrimSpace(entry.Notes)
+	entry.UserMark = strings.TrimSpace(entry.UserMark)
 	entry.LunchBreakMinutes = normalizeLunchBreak(entry.LunchBreakMinutes)
 	entry.WorkerIDs = cleanStringSlice(entry.WorkerIDs)
 	entry.ObjectIDs = cleanStringSlice(entry.ObjectIDs)
+}
+
+func isSpecialMark(mark string) bool {
+	switch strings.ToUpper(strings.TrimSpace(mark)) {
+	case "ОТ", "Б", "ПР", "В":
+		return true
+	default:
+		return false
+	}
 }
 
 func normalizeLunchBreak(minutes int) int {
@@ -98,27 +108,37 @@ func validateTimesheet(entry models.TimesheetEntry) error {
 	if _, err := time.Parse("2006-01-02", entry.Date); err != nil {
 		return errors.New("invalid date format")
 	}
-	start, err := time.Parse("15:04", entry.StartTime)
-	if err != nil {
-		return errors.New("invalid start time")
-	}
-	end, err := time.Parse("15:04", entry.EndTime)
-	if err != nil {
-		return errors.New("invalid end time")
-	}
-	if !end.After(start) {
-		return errors.New("end time must be after start time")
-	}
-
-	totalMinutes := int(end.Sub(start).Minutes())
-	if entry.LunchBreakMinutes >= totalMinutes {
-		return errors.New("lunch break must be shorter than work interval")
-	}
 	if len(entry.WorkerIDs) == 0 {
 		return errors.New("at least one worker is required")
 	}
-	if len(entry.ObjectIDs) == 0 {
-		return errors.New("at least one object is required")
+
+	if isSpecialMark(entry.UserMark) {
+		if entry.StartTime != "" || entry.EndTime != "" {
+			return errors.New("special mark must not have working time")
+		}
+		if len(entry.ObjectIDs) > 0 {
+			return errors.New("special mark must not have objects")
+		}
+	} else {
+		start, err := time.Parse("15:04", entry.StartTime)
+		if err != nil {
+			return errors.New("invalid start time")
+		}
+		end, err := time.Parse("15:04", entry.EndTime)
+		if err != nil {
+			return errors.New("invalid end time")
+		}
+		if !end.After(start) {
+			return errors.New("end time must be after start time")
+		}
+
+		totalMinutes := int(end.Sub(start).Minutes())
+		if entry.LunchBreakMinutes >= totalMinutes {
+			return errors.New("lunch break must be shorter than work interval")
+		}
+		if len(entry.ObjectIDs) == 0 {
+			return errors.New("at least one object is required")
+		}
 	}
 
 	for _, workerID := range entry.WorkerIDs {
