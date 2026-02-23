@@ -377,6 +377,8 @@ input:focus, select:focus, textarea:focus {
 .timesheet-matrix th:first-child,
 .timesheet-matrix td:first-child { text-align: left; }
 
+.timesheet-work-fields { display: contents; }
+
 .hours-cell.empty { position: relative; }
 .hours-cell.empty .empty-value { opacity: 1; transition: opacity .18s ease; }
 .timesheet-quick-add {
@@ -510,25 +512,50 @@ input:focus, select:focus, textarea:focus {
 .action-modal {
   opacity: 0;
   visibility: hidden;
-  transition: opacity .24s ease, visibility .24s ease;
+  transition: opacity .2s ease, visibility .2s ease;
+  background: rgba(4,8,18,.46);
 }
 .action-modal.visible { opacity: 1; visibility: visible; }
 .action-modal-sheet {
   position: relative;
-  width: min(620px, 94vw);
-  height: auto;
-  max-height: calc(100dvh - 28px);
-  padding: 14px;
-  border-radius: 18px;
+  width: min(700px, 96vw);
+  max-height: calc(100dvh - 32px);
+  padding: 16px;
+  border-radius: 16px;
   background: var(--surface-strong);
   border: 1px solid var(--border);
-  box-shadow: 0 20px 50px rgba(0,0,0,.35);
-  transform: translateY(16px) scale(.98);
-  transition: transform .3s cubic-bezier(.2,.8,.2,1), opacity .3s ease;
+  box-shadow: var(--shadow);
+  transform: translateY(8px) scale(.98);
+  transition: transform .22s ease, opacity .22s ease;
   opacity: .01;
 }
 .action-modal.visible .action-modal-sheet { transform: translateY(0) scale(1); opacity: 1; }
-.action-modal iframe { min-height: min(70vh, 650px); max-height: calc(100dvh - 66px); border: 1px solid var(--border); border-radius: 12px; }
+.action-modal iframe {
+  width: 100%;
+  min-height: min(64vh, 560px);
+  max-height: calc(100dvh - 120px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.action-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: -2px 0 10px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--border);
+}
+.action-modal-header strong { font-size: 1rem; font-weight: 700; }
+.action-modal-header .action-modal-close {
+  position: static;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+}
+
 
 .action-modal-header {
   display: flex;
@@ -573,7 +600,7 @@ input:focus, select:focus, textarea:focus {
   .timesheet-form .dynamic-select-row { grid-template-columns: 1fr auto; }
   .timesheet-form .btn-mini { width: 42px; }
   .assignment-head { flex-direction: column; align-items: flex-start; }
-  .action-modal-sheet { width: min(96vw, 620px); max-height: calc(100dvh - 16px); border-radius: 14px; padding: 10px; }
+  .action-modal-sheet { width: min(96vw, 700px); max-height: calc(100dvh - 16px); border-radius: 14px; padding: 10px; }
   .timesheet-quick-menu { left: 50%; right: auto; max-width: min(220px, 86vw); }
   .profile-actions { justify-content: flex-start; }
   .profile-grid { grid-template-columns: 1fr !important; }
