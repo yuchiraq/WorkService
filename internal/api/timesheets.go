@@ -295,7 +295,7 @@ func SchedulePage(c *gin.Context) {
 			if strings.TrimSpace(entry.CreatedByName) != "" {
 				creatorHTML = `<div class="assignment-meta"><span>Создал</span><p>` + template.HTMLEscapeString(entry.CreatedByName) + `</p></div>`
 			}
-			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s%s</div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></article>`,
+			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><div class="assignment-time"><strong>%s — %s</strong><span>%s ч</span></div></div><div class="assignment-body"><div class="assignment-section"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div></div><div class="assignment-section"><div class="assignment-meta"><span>Работники</span><p>%s</p></div></div>%s%s</div><div class="info-card-actions assignment-actions"><a href="/schedule/edit/%s" class="btn btn-secondary btn-compact" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></article>`,
 				template.HTMLEscapeString(entry.StartTime),
 				template.HTMLEscapeString(entry.EndTime),
 				template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
@@ -429,15 +429,19 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 	deleteBtn := ""
 	isModal := IsModalRequest(c)
+	headerBlock := `<div class="page-header"><h1>{{TITLE}}</h1></div>`
 	if isEdit {
 		deleteBtn = `<button type="button" class="btn btn-danger" onclick="confirmDeleteSchedule()">Удалить</button>`
+	}
+	if isModal {
+		headerBlock = ""
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{LAYOUT_START}}
 <div class="main-content{{MAIN_CONTENT_CLASS}}">
 {{BACK_LINK}}
-<div class="page-header"><h1>{{TITLE}}</h1></div>
+{{HEADER_BLOCK}}
 <div class="card{{CARD_CLASS}}">
 <form action="{{ACTION_URL}}" method="POST" class="form-grid-edit timesheet-form">
 {{CSRF_FIELD}}
@@ -446,11 +450,14 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 {{ERROR_BLOCK}}
 <div class="form-group-edit timesheet-span-2"><label for="entry_kind">Тип отметки</label><select id="entry_kind" name="entry_kind"><option value="work"{{MARK_WORK}}>Работа</option><option value="vacation"{{MARK_VACATION}}>Отпуск (ОТ)</option><option value="sick"{{MARK_SICK}}>Больничный (Б)</option><option value="absence"{{MARK_ABSENT}}>Прогул (ПР)</option><option value="weekend"{{MARK_WEEKEND}}>Выходной (В)</option></select></div>
 <div class="form-group-edit timesheet-span-2" id="period_wrap" style="display:none;"><label for="period_end">Период по дату (для отпуска/больничного)</label><input id="period_end" name="period_end" type="date" value="{{PERIOD_END}}"></div>
-<div class="form-group-edit"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
-<div id="work_fields_wrap" class="timesheet-work-fields">
-<div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
-<div class="form-group-edit"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
-<div class="form-group-edit"><label for="lunch_break_minutes">Обед</label><select id="lunch_break_minutes" name="lunch_break_minutes" required><option value="0"{{L0}}>Без обеда</option><option value="30"{{L30}}>30 минут</option><option value="60"{{L60}}>60 минут</option><option value="90"{{L90}}>90 минут</option></select></div>
+<div class="timesheet-time-row timesheet-span-2">
+  <div class="form-group-edit"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
+  <div id="work_fields_wrap" class="timesheet-work-fields">
+    <div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
+    <div class="form-group-edit"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
+    <div class="form-group-edit"><label for="lunch_break_minutes">Обед</label><select id="lunch_break_minutes" name="lunch_break_minutes" required><option value="0"{{L0}}>Без обеда</option><option value="30"{{L30}}>30 минут</option><option value="60"{{L60}}>60 минут</option><option value="90"{{L90}}>90 минут</option></select></div>
+  </div>
+</div>
 
 <div class="form-group-edit timesheet-span-2">
   <label>Объекты</label>
@@ -570,6 +577,7 @@ if(kind){ kind.addEventListener('change', syncEntryKind); syncEntryKind(); }
 	final = strings.Replace(final, "{{LAYOUT_END}}", layoutEnd, 1)
 	final = strings.Replace(final, "{{MAIN_CONTENT_CLASS}}", mainClass, 1)
 	final = strings.Replace(final, "{{BACK_LINK}}", backLink, 1)
+	final = strings.Replace(final, "{{HEADER_BLOCK}}", headerBlock, 1)
 	final = strings.Replace(final, "{{CARD_CLASS}}", cardClass, 1)
 	final = strings.Replace(final, "{{TITLE}}", template.HTMLEscapeString(title), -1)
 	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(formActionURL), 1)
@@ -859,6 +867,11 @@ func ExportTimesheetsExcel(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
 		return
 	}
+	objectsMap, err := buildObjectsMap()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to load objects: %v", err)
+		return
+	}
 	sort.Slice(workers, func(i, j int) bool { return workers[i].Name < workers[j].Name })
 
 	selectedMonth, monthStart, daysInMonth := resolveSelectedMonth(c.Query("month"))
@@ -904,6 +917,7 @@ func ExportTimesheetsExcel(c *gin.Context) {
 		for i, date := range monthDates {
 			total := 0.0
 			cellMark := ""
+			details := make([]string, 0)
 			for _, entry := range entries {
 				if entry.Date != date {
 					continue
@@ -925,6 +939,22 @@ func ExportTimesheetsExcel(c *gin.Context) {
 				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
 				hours, _ := strconv.ParseFloat(hoursStr, 64)
 				total += hours
+
+				objectNames := make([]string, 0, len(entry.ObjectIDs))
+				for _, oid := range entry.ObjectIDs {
+					if objectName, ok := objectsMap[oid]; ok {
+						objectNames = append(objectNames, objectName)
+					}
+				}
+				where := "—"
+				if len(objectNames) > 0 {
+					where = strings.Join(objectNames, ", ")
+				}
+				comment := strings.TrimSpace(entry.Notes)
+				if comment == "" {
+					comment = "—"
+				}
+				details = append(details, fmt.Sprintf("%s-%s · %s ч\nгде: %s\nкоммент: %s", entry.StartTime, entry.EndTime, hoursStr, where, comment))
 			}
 			col, _ := excelize.ColumnNumberToName(i + 2)
 			cell := fmt.Sprintf("%s%d", col, row)
@@ -934,6 +964,17 @@ func ExportTimesheetsExcel(c *gin.Context) {
 				f.SetCellValue(sheet, cell, "—")
 			} else {
 				f.SetCellValue(sheet, cell, total)
+				if len(details) > 0 {
+					_ = f.AddComment(sheet, excelize.Comment{
+						Cell:   cell,
+						Author: "WorkService",
+						Paragraph: []excelize.RichTextRun{
+							{Text: strings.Join(details, "\n\n")},
+						},
+						Width:  260,
+						Height: 120,
+					})
+				}
 			}
 			f.SetCellStyle(sheet, cell, cell, cellStyle)
 		}
