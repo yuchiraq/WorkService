@@ -870,6 +870,11 @@ func ExportTimesheetsExcel(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
 		return
 	}
+	objectsMap, err := buildObjectsMap()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to load objects: %v", err)
+		return
+	}
 	sort.Slice(workers, func(i, j int) bool { return workers[i].Name < workers[j].Name })
 
 	selectedMonth, monthStart, daysInMonth := resolveSelectedMonth(c.Query("month"))
@@ -915,6 +920,7 @@ func ExportTimesheetsExcel(c *gin.Context) {
 		for i, date := range monthDates {
 			total := 0.0
 			cellMark := ""
+			details := make([]string, 0)
 			for _, entry := range entries {
 				if entry.Date != date {
 					continue
@@ -936,6 +942,22 @@ func ExportTimesheetsExcel(c *gin.Context) {
 				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
 				hours, _ := strconv.ParseFloat(hoursStr, 64)
 				total += hours
+
+				objectNames := make([]string, 0, len(entry.ObjectIDs))
+				for _, oid := range entry.ObjectIDs {
+					if objectName, ok := objectsMap[oid]; ok {
+						objectNames = append(objectNames, objectName)
+					}
+				}
+				where := "—"
+				if len(objectNames) > 0 {
+					where = strings.Join(objectNames, ", ")
+				}
+				comment := strings.TrimSpace(entry.Notes)
+				if comment == "" {
+					comment = "—"
+				}
+				details = append(details, fmt.Sprintf("%s-%s · %s ч\nгде: %s\nкоммент: %s", entry.StartTime, entry.EndTime, hoursStr, where, comment))
 			}
 			col, _ := excelize.ColumnNumberToName(i + 2)
 			cell := fmt.Sprintf("%s%d", col, row)
@@ -945,6 +967,17 @@ func ExportTimesheetsExcel(c *gin.Context) {
 				f.SetCellValue(sheet, cell, "—")
 			} else {
 				f.SetCellValue(sheet, cell, total)
+				if len(details) > 0 {
+					_ = f.AddComment(sheet, excelize.Comment{
+						Cell:   cell,
+						Author: "WorkService",
+						Paragraph: []excelize.RichTextRun{
+							{Text: strings.Join(details, "\n\n")},
+						},
+						Width:  260,
+						Height: 120,
+					})
+				}
 			}
 			f.SetCellStyle(sheet, cell, cell, cellStyle)
 		}
