@@ -532,63 +532,80 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
 
 .action-modal,
 .modal {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  display: none;
-  place-items: center;
-  padding: var(--space-md);
-  background: var(--overlay-backdrop);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+    position: fixed;
+    inset: 0;
+    z-index: 300;
+    display: none;
+    place-items: center;
+    padding: var(--space-md);
+    background: var(--overlay-backdrop);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
 }
 .action-modal.visible { display: grid; }
 .modal-content,
 .action-modal-sheet {
-  width: min(860px, 96vw);
-  max-height: calc(100dvh - 32px);
-  overflow: auto;
+    width: 100%;
+    max-width: 860px;
+    max-height: calc(100dvh - 32px);
+    overflow: auto;
+    border-radius: var(--radius-card);
+    background: var(--secondary-system-background);
+    padding: var(--space-lg);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
 }
-.action-modal iframe { width: 100%; min-height: min(72vh, 700px); border: 0; border-radius: 12px; background: var(--system-background); }
+.action-modal iframe {
+    width: 100%;
+    min-height: min(72vh, 700px);
+    border: 0;
+    border-radius: 12px;
+    background: var(--system-background);
+}
 .action-modal-close,
 .close-button {
-  min-width: 32px;
-  min-height: 32px;
-  border-radius: 10px;
-  border: 1px solid var(--separator);
-  background: var(--tertiary-system-background);
-  color: var(--label);
-  cursor: pointer;
+    min-width: 32px;
+    min-height: 32px;
+    border-radius: 10px;
+    border: 1px solid var(--separator);
+    background: var(--tertiary-system-background);
+    color: var(--label);
+    cursor: pointer;
+    position: absolute;
+    top: var(--space-md);
+    right: var(--space-md);
 }
 
 #deleteModal .modal-content {
-  width: min(480px, 100%);
-  border-radius: 14px;
-  padding: 18px;
-  background: var(--secondary-system-background);
+    width: 100%;
+    max-width: 480px;
+    border-radius: 14px;
+    padding: 18px;
+    background: var(--secondary-system-background);
 }
 
 #deleteModal .modal-content h2 {
-  font-size: 22px;
-  margin: 0 0 8px;
+    font-size: 22px;
+    margin: 0 0 8px;
 }
 
 #deleteModal .modal-content p {
-  margin: 0 0 16px;
-  color: var(--secondary-label);
+    margin: 0 0 16px;
+    color: var(--secondary-label);
 }
 
 #deleteModal .modal-content form {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
 }
 
 #deleteModal .close-button {
-  float: right;
-  display: inline-grid;
-  place-items: center;
-  margin-bottom: 8px;
+    float: right;
+    display: inline-grid;
+    place-items: center;
+    margin-bottom: 8px;
 }
 
 .floating-create-wrap {
