@@ -18,3 +18,6 @@ vendor/
 
 # Docker-compose local files
 *.local
+storage/users.json
+storage/objects.json
+storage/users.json
