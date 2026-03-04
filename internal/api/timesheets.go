@@ -313,7 +313,8 @@ func SchedulePage(c *gin.Context) {
 		scheduleRows.WriteString(`</div></div>`)
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Расписание</h1><form method="GET" action="/schedule" class="month-selector"><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select></form><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule">Добавить назначение</a></div>
@@ -440,7 +441,8 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 		headerBlock = ""
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{LAYOUT_START}}
 <div class="main-content{{MAIN_CONTENT_CLASS}}">
 {{BACK_LINK}}
@@ -1101,7 +1103,8 @@ func TimesheetsPage(c *gin.Context) {
 		rows = `<tr><td colspan="100%">Нет работников.</td></tr>`
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Табель</h1><a class="btn btn-secondary" href="/timesheets/export?month={{SELECTED_MONTH}}">Экспорт в Excel</a></div>
