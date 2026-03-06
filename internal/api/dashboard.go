@@ -44,6 +44,7 @@ func DashboardPage(c *gin.Context) {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Панель управления</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
