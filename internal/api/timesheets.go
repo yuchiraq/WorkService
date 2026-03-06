@@ -486,9 +486,9 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 <input type="hidden" name="special_mark" id="special_mark" value="{{SPECIAL_MARK}}">
 {{ERROR_BLOCK}}
 <div class="form-group-edit timesheet-span-2"><label for="entry_kind">Тип отметки</label><select id="entry_kind" name="entry_kind"><option value="work"{{MARK_WORK}}>Работа</option><option value="vacation"{{MARK_VACATION}}>Отпуск (ОТ)</option><option value="sick"{{MARK_SICK}}>Больничный (Б)</option><option value="absence"{{MARK_ABSENT}}>Прогул (ПР)</option><option value="weekend"{{MARK_WEEKEND}}>Выходной (В)</option></select></div>
-<div class="form-group-edit timesheet-span-2" id="period_wrap" style="display:none;"><label for="period_end">Период по дату (для отпуска/больничного)</label><input id="period_end" name="period_end" type="date" value="{{PERIOD_END}}"></div>
 <div class="timesheet-time-row timesheet-span-2">
-  <div class="form-group-edit"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
+  <div class="form-group-edit"><label for="date" id="date_label">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
+  <div class="form-group-edit" id="period_wrap" style="display:none;"><label for="period_end" id="period_end_label">По</label><input id="period_end" name="period_end" type="date" value="{{PERIOD_END}}"></div>
   <div id="work_fields_wrap" class="timesheet-work-fields">
     <div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
     <div class="form-group-edit"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
@@ -496,7 +496,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
   </div>
 </div>
 
-<div class="form-group-edit timesheet-span-2">
+<div class="form-group-edit timesheet-span-2" id="object_wrap">
   <label>Объекты</label>
   <div class="dynamic-select-group" data-dynamic-select-group>
     {{OBJECT_SELECTED}}
@@ -570,6 +570,9 @@ const st=document.getElementById('start_time');
 const et=document.getElementById('end_time');
 const lunch=document.getElementById('lunch_break_minutes');
 const workFieldsWrap=document.getElementById('work_fields_wrap');
+const dateLabel=document.getElementById('date_label');
+const periodLabel=document.getElementById('period_end_label');
+const objectWrap=document.getElementById('object_wrap');
 function syncEntryKind(){
   if(!kind) return;
   const v=kind.value;
@@ -580,6 +583,9 @@ function syncEntryKind(){
   }
   if(st&&et&&lunch){ st.disabled=isSpec; et.disabled=isSpec; lunch.disabled=isSpec; if(isSpec){ st.value=''; et.value=''; lunch.value='0'; }}
   if(workFieldsWrap) workFieldsWrap.style.display=isSpec?'none':'contents';
+  if(dateLabel) dateLabel.textContent = isSpec ? 'С' : 'Дата';
+  if(periodLabel) periodLabel.textContent = 'По';
+  if(objectWrap) objectWrap.style.display = isSpec ? 'none' : '';
 }
 if(kind){ kind.addEventListener('change', syncEntryKind); syncEntryKind(); }
 </script>
