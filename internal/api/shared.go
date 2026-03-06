@@ -36,6 +36,7 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 		{PageID: "objects", Path: "/objects", Label: "Объекты"},
 		{PageID: "schedule", Path: "/schedule", Label: "Расписание"},
 		{PageID: "timesheets", Path: "/timesheets", Label: "Табель"},
+		{PageID: "improvements", Path: "/improvements", Label: "Улучшения/ошибки"},
 	}
 	if userStatus == "admin" {
 		navItems = append(navItems,
