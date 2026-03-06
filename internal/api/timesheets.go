@@ -1063,9 +1063,12 @@ func TimesheetsPage(c *gin.Context) {
 				if !contains {
 					continue
 				}
+				entryReturn := template.URLQueryEscaper("/timesheets?month=" + selectedMonth)
+				editURL := "/timesheets/edit/" + template.HTMLEscapeString(entry.ID) + "?return=" + entryReturn
+				editAction := `<div class="timesheet-entry-actions"><a class="btn btn-secondary btn-compact" href="` + editURL + `" data-modal-url="` + editURL + `" data-modal-title="Редактировать запись" data-modal-return="/timesheets?month=` + template.HTMLEscapeString(selectedMonth) + `">Редактировать</a></div>`
 				if isSpecialMark(entry.UserMark) {
 					cellMark = specialMarkLabel(entry.UserMark)
-					details = append(details, "Отметка: "+cellMark)
+					details = append(details, `<div class="timesheet-entry-item"><p>Отметка: `+template.HTMLEscapeString(cellMark)+`</p>`+editAction+`</div>`)
 					continue
 				}
 				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
@@ -1076,7 +1079,8 @@ func TimesheetsPage(c *gin.Context) {
 				if creator == "" {
 					creator = "—"
 				}
-				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s · создал: %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(creator)))
+				detailBody := fmt.Sprintf(`<p>%s-%s · %s ч</p><p>Объекты: %s</p><p>Комментарий: %s</p><p>Создал: %s</p>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), template.HTMLEscapeString(hoursStr), objects, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(creator))
+				details = append(details, `<div class="timesheet-entry-item">`+detailBody+editAction+`</div>`)
 			}
 			if len(details) == 0 {
 				if d, err := time.Parse("2006-01-02", date); err == nil && d.Before(time.Now()) {
@@ -1085,13 +1089,13 @@ func TimesheetsPage(c *gin.Context) {
 				}
 			}
 			if len(details) == 0 {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><button type="button" class="timesheet-quick-add" onclick="this.nextElementSibling.classList.toggle('open')">+</button>%s</td>`, menu))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><button type="button" class="timesheet-quick-add" data-timesheet-menu-toggle aria-expanded="false">+</button>%s</td>`, menu))
 				continue
 			}
 			if cellMark != "" {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty marked"><span class="empty-value">%s</span><button type="button" class="timesheet-quick-add" onclick="this.nextElementSibling.classList.toggle('open')">+</button>%s<div class="hours-tooltip">%s</div></td>`, template.HTMLEscapeString(cellMark), menu, strings.Join(details, "<br>")))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty marked"><span class="empty-value">%s</span><button type="button" class="timesheet-quick-add" data-timesheet-menu-toggle aria-expanded="false">+</button>%s<div class="hours-tooltip">%s</div></td>`, template.HTMLEscapeString(cellMark), menu, strings.Join(details, "")))
 			} else {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "")))
 				workerTotal += total
 			}
 		}
