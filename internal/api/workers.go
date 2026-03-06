@@ -349,28 +349,28 @@ func WorkerProfilePage(c *gin.Context) {
 </head>
 <body>
     {{SIDEBAR_HTML}}
-    <div class="main-content"> 
+    <div class="main-content worker-profile-page"> 
         <a href="/workers" class="back-link">К списку работников</a>
 
-        <div class="profile-header-container">
+        <div class="profile-header-container worker-profile-header-container">
             <div class="profile-header">
-                <div class="worker-avatar">{{INITIALS}}</div>
+                <div class="worker-avatar worker-profile-avatar">{{INITIALS}}</div>
                 <div class="profile-header-info">
-                    <h1>Профиль: {{WORKER_NAME}}</h1>
-                    <p>{{POSITION}}</p>
+                    <h1>{{WORKER_NAME}}</h1>
+                    <p>Должность: {{POSITION}}</p>
                 </div>
             </div>
-			<div class="profile-actions">
+			<div class="profile-actions worker-profile-actions">
 				{{STATUS_BADGE}}
 				<a href="/schedule/new?worker_id={{WORKER_ID}}&return={{WORKER_RETURN_QUERY}}&special_mark=vacation" class="btn btn-primary" data-modal-url="/schedule/new?worker_id={{WORKER_ID}}&return={{WORKER_RETURN_QUERY}}&special_mark=vacation" data-modal-title="Добавить отметку" data-modal-return="/worker/{{WORKER_ID}}">Добавить отпуск/больничный/выходной</a>
 				<a href="/workers/edit/{{WORKER_ID}}" class="btn btn-secondary" data-modal-url="/workers/edit/{{WORKER_ID}}" data-modal-title="Редактировать работника" data-modal-return="/worker/{{WORKER_ID}}">Редактировать</a>
 			</div>
 		</div>
 
-        <ul class="profile-details">
-            <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M6 8V7a4 4 0 118 0v1h2V7a6 6 0 10-12 0v1h2zm6 2H8v6h4v-6z"/></svg>Дата рождения: {{BIRTH_DATE}}</li>
-            <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg>{{PHONE}}</li>
-            <li><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11a1 1 0 11-2 0v-2a1 1 0 112 0v2zm-1-4a1 1 0 01-1-1V7a1 1 0 112 0v1a1 1 0 01-1 1z"/></svg>Ставка: {{RATE}} руб/час</li>
+        <ul class="profile-details worker-profile-details">
+            <li><span class="profile-detail-icon" aria-hidden="true"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M6 8V7a4 4 0 118 0v1h2V7a6 6 0 10-12 0v1h2zm6 2H8v6h4v-6z"/></svg></span><div><small>Дата рождения</small><strong>{{BIRTH_DATE}}</strong></div></li>
+            <li><span class="profile-detail-icon" aria-hidden="true"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg></span><div><small>Телефон</small><strong>{{PHONE}}</strong></div></li>
+            <li><span class="profile-detail-icon" aria-hidden="true"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11a1 1 0 11-2 0v-2a1 1 0 112 0v2zm-1-4a1 1 0 01-1-1V7a1 1 0 112 0v1a1 1 0 01-1 1z"/></svg></span><div><small>Ставка</small><strong>{{RATE}} руб/час</strong></div></li>
         </ul>
 
 
