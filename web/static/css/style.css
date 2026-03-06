@@ -772,6 +772,28 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
   width: min(100%, 880px);
 }
 
+.schedule-page-surface {
+  background: transparent;
+  border: 0;
+  padding: 0;
+}
+
+.assignment-card-mark {
+  border-color: color-mix(in srgb, var(--system-orange), transparent 68%);
+  background: color-mix(in srgb, var(--system-orange), transparent 94%);
+}
+
+.assignment-card-mark .assignment-time {
+  width: 100%;
+  justify-content: space-between;
+}
+
+.assignment-card-mark .status-badge {
+  color: var(--system-orange);
+  background: color-mix(in srgb, var(--system-orange), transparent 86%);
+  border-color: color-mix(in srgb, var(--system-orange), transparent 68%);
+}
+
 .assignment-time {
   display: inline-flex;
   align-items: baseline;
