@@ -158,6 +158,21 @@ func specialMarkLabel(mark string) string {
 	}
 }
 
+func specialMarkTitle(mark string) string {
+	switch normalizeSpecialMark(mark) {
+	case "ОТ":
+		return "Отпуск"
+	case "Б":
+		return "Больничный"
+	case "ПР":
+		return "Прогул"
+	case "В":
+		return "Выходной"
+	default:
+		return "Отметка"
+	}
+}
+
 func isSpecialMark(mark string) bool {
 	m := normalizeSpecialMark(mark)
 	return m == "ОТ" || m == "Б" || m == "ПР" || m == "В"
@@ -283,6 +298,8 @@ func SchedulePage(c *gin.Context) {
 	} else {
 		currentDate := ""
 		for _, entry := range entries {
+			returnPath := "/schedule?month=" + selectedMonth
+			editURL := "/schedule/edit/" + template.HTMLEscapeString(entry.ID) + "?return=" + template.URLQueryEscaper(returnPath)
 			if entry.Date != currentDate {
 				if currentDate != "" {
 					scheduleRows.WriteString(`</div></div>`)
@@ -298,7 +315,21 @@ func SchedulePage(c *gin.Context) {
 			if strings.TrimSpace(entry.CreatedByName) != "" {
 				creatorHTML = `<div class="assignment-meta"><span>Создал</span><p>` + template.HTMLEscapeString(entry.CreatedByName) + `</p></div>`
 			}
-			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><div class="assignment-time"><strong>%s — %s</strong><span>%s ч</span></div></div><div class="assignment-body"><div class="assignment-section"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div></div><div class="assignment-section"><div class="assignment-meta"><span>Работники</span><p>%s</p></div></div>%s%s</div><div class="info-card-actions assignment-actions"><a href="/schedule/edit/%s" class="btn btn-secondary btn-compact" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></article>`,
+			if isSpecialMark(entry.UserMark) {
+				scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card assignment-card-mark"><div class="assignment-head"><div class="assignment-time"><strong>%s</strong><span class="status-badge">%s</span></div></div><div class="assignment-body"><div class="assignment-section"><div class="assignment-meta"><span>Тип записи</span><p>%s</p></div></div><div class="assignment-section"><div class="assignment-meta"><span>Работники</span><p>%s</p></div></div>%s%s</div><div class="info-card-actions assignment-actions"><a href="%s" class="btn btn-secondary btn-compact" data-modal-url="%s" data-modal-title="Редактирование записи" data-modal-return="%s">Редактировать</a></div></article>`,
+					template.HTMLEscapeString(specialMarkTitle(entry.UserMark)),
+					template.HTMLEscapeString(specialMarkLabel(entry.UserMark)),
+					template.HTMLEscapeString(specialMarkTitle(entry.UserMark)),
+					joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"),
+					creatorHTML,
+					commentHTML,
+					editURL,
+					editURL,
+					template.HTMLEscapeString(returnPath),
+				))
+				continue
+			}
+			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><div class="assignment-time"><strong>%s — %s</strong><span>%s ч</span></div></div><div class="assignment-body"><div class="assignment-section"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div></div><div class="assignment-section"><div class="assignment-meta"><span>Работники</span><p>%s</p></div></div>%s%s</div><div class="info-card-actions assignment-actions"><a href="%s" class="btn btn-secondary btn-compact" data-modal-url="%s" data-modal-title="Редактирование назначения" data-modal-return="%s">Редактировать</a></div></article>`,
 				template.HTMLEscapeString(entry.StartTime),
 				template.HTMLEscapeString(entry.EndTime),
 				template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
@@ -306,18 +337,20 @@ func SchedulePage(c *gin.Context) {
 				joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"),
 				creatorHTML,
 				commentHTML,
-				template.HTMLEscapeString(entry.ID),
-				template.HTMLEscapeString(entry.ID),
+				editURL,
+				editURL,
+				template.HTMLEscapeString(returnPath),
 			))
 		}
 		scheduleRows.WriteString(`</div></div>`)
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Расписание</h1><form method="GET" action="/schedule" class="month-selector"><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select></form><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule">Добавить назначение</a></div>
-<div class="card"><div class="schedule-vertical">{{SCHEDULE_ROWS}}</div></div>
+<section class="schedule-page-surface"><div class="schedule-vertical">{{SCHEDULE_ROWS}}</div></section>
 </div>
 </body></html>`
 
@@ -440,7 +473,8 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 		headerBlock = ""
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{LAYOUT_START}}
 <div class="main-content{{MAIN_CONTENT_CLASS}}">
 {{BACK_LINK}}
@@ -1061,9 +1095,12 @@ func TimesheetsPage(c *gin.Context) {
 				if !contains {
 					continue
 				}
+				entryReturn := template.URLQueryEscaper("/timesheets?month=" + selectedMonth)
+				editURL := "/timesheets/edit/" + template.HTMLEscapeString(entry.ID) + "?return=" + entryReturn
+				editAction := `<div class="timesheet-entry-actions"><a class="btn btn-secondary btn-compact" href="` + editURL + `" data-modal-url="` + editURL + `" data-modal-title="Редактировать запись" data-modal-return="/timesheets?month=` + template.HTMLEscapeString(selectedMonth) + `">Редактировать</a></div>`
 				if isSpecialMark(entry.UserMark) {
 					cellMark = specialMarkLabel(entry.UserMark)
-					details = append(details, "Отметка: "+cellMark)
+					details = append(details, `<div class="timesheet-entry-item"><p>Отметка: `+template.HTMLEscapeString(cellMark)+`</p>`+editAction+`</div>`)
 					continue
 				}
 				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
@@ -1074,7 +1111,8 @@ func TimesheetsPage(c *gin.Context) {
 				if creator == "" {
 					creator = "—"
 				}
-				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s · создал: %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(creator)))
+				detailBody := fmt.Sprintf(`<p>%s-%s · %s ч</p><p>Объекты: %s</p><p>Комментарий: %s</p><p>Создал: %s</p>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), template.HTMLEscapeString(hoursStr), objects, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(creator))
+				details = append(details, `<div class="timesheet-entry-item">`+detailBody+editAction+`</div>`)
 			}
 			if len(details) == 0 {
 				if d, err := time.Parse("2006-01-02", date); err == nil && d.Before(time.Now()) {
@@ -1083,13 +1121,13 @@ func TimesheetsPage(c *gin.Context) {
 				}
 			}
 			if len(details) == 0 {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><button type="button" class="timesheet-quick-add" onclick="this.nextElementSibling.classList.toggle('open')">+</button>%s</td>`, menu))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><button type="button" class="timesheet-quick-add" data-timesheet-menu-toggle aria-expanded="false">+</button>%s</td>`, menu))
 				continue
 			}
 			if cellMark != "" {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty marked"><span class="empty-value">%s</span><button type="button" class="timesheet-quick-add" onclick="this.nextElementSibling.classList.toggle('open')">+</button>%s<div class="hours-tooltip">%s</div></td>`, template.HTMLEscapeString(cellMark), menu, strings.Join(details, "<br>")))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty marked"><span class="empty-value">%s</span><button type="button" class="timesheet-quick-add" data-timesheet-menu-toggle aria-expanded="false">+</button>%s<div class="hours-tooltip">%s</div></td>`, template.HTMLEscapeString(cellMark), menu, strings.Join(details, "")))
 			} else {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "")))
 				workerTotal += total
 			}
 		}
@@ -1101,7 +1139,8 @@ func TimesheetsPage(c *gin.Context) {
 		rows = `<tr><td colspan="100%">Нет работников.</td></tr>`
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Табель</h1><a class="btn btn-secondary" href="/timesheets/export?month={{SELECTED_MONTH}}">Экспорт в Excel</a></div>
