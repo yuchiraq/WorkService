@@ -329,13 +329,22 @@ func ProfilePage(c *gin.Context) {
 	final = strings.Replace(final, "{{BIRTH_DATE}}", "", 1)
 	final = strings.Replace(final, "{{RATE}}", "0", 1)
 	if !isAdmin(c) {
-		if worker, err := storage.GetWorkerByUserID(userID); err == nil {
-			final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(worker.Name), 1)
-			final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(worker.Phone), 1)
-			final = strings.Replace(final, "{{POSITION}}", template.HTMLEscapeString(worker.Position), 1)
-			final = strings.Replace(final, "{{BIRTH_DATE}}", template.HTMLEscapeString(worker.BirthDate), 1)
-			final = strings.Replace(final, "{{RATE}}", fmt.Sprintf("%.2f", worker.HourlyRate), 1)
+		worker, err := storage.GetWorkerByUserID(userID)
+		if err != nil {
+			worker, _ = storage.CreateWorker(models.Worker{
+				Name:          user.Name,
+				Position:      "Сотрудник",
+				Phone:         user.Phone,
+				CreatedBy:     userID,
+				CreatedByName: user.Name,
+				UserID:        userID,
+			})
 		}
+		final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(worker.Name), 1)
+		final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(worker.Phone), 1)
+		final = strings.Replace(final, "{{POSITION}}", template.HTMLEscapeString(worker.Position), 1)
+		final = strings.Replace(final, "{{BIRTH_DATE}}", template.HTMLEscapeString(worker.BirthDate), 1)
+		final = strings.Replace(final, "{{RATE}}", fmt.Sprintf("%.2f", worker.HourlyRate), 1)
 	}
 	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
@@ -352,8 +361,18 @@ func UpdateProfile(c *gin.Context) {
 	if !isAdmin(c) {
 		worker, err := storage.GetWorkerByUserID(userID)
 		if err != nil {
-			c.String(http.StatusBadRequest, "К профилю не привязан работник")
-			return
+			worker, err = storage.CreateWorker(models.Worker{
+				Name:          user.Name,
+				Position:      "Сотрудник",
+				Phone:         user.Phone,
+				CreatedBy:     userID,
+				CreatedByName: user.Name,
+				UserID:        userID,
+			})
+			if err != nil {
+				c.String(http.StatusBadRequest, "Не удалось создать профиль работника: %v", err)
+				return
+			}
 		}
 		user.Username = c.PostForm("username")
 		newPassword := c.PostForm("password")
