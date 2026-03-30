@@ -13,6 +13,7 @@ func NotFoundPage(c *gin.Context) {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Ошибка 404 - Страница не найдена</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>

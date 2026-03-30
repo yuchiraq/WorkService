@@ -23,6 +23,9 @@ func main() {
 	if err := storage.LoadTimesheets(); err != nil {
 		log.Fatalf("Failed to load timesheets: %v", err)
 	}
+	if err := storage.LoadImprovements(); err != nil {
+		log.Fatalf("Failed to load improvements: %v", err)
+	}
 
 	r := gin.Default()
 

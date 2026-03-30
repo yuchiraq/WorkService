@@ -62,7 +62,8 @@ func SettingsPage(c *gin.Context) {
 		okMsg = `<p style="color:#1f9d55;">Резервная копия успешно создана.</p>`
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Настройки</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Настройки</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Настройки</h1></div>
