@@ -36,6 +36,7 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 		{PageID: "objects", Path: "/objects", Label: "Объекты"},
 		{PageID: "schedule", Path: "/schedule", Label: "Расписание"},
 		{PageID: "timesheets", Path: "/timesheets", Label: "Табель"},
+		{PageID: "improvements", Path: "/improvements", Label: "Улучшения/ошибки"},
 	}
 	if userStatus == "admin" {
 		navItems = append(navItems,
@@ -160,6 +161,34 @@ document.addEventListener('click',function(e){
   if(!t) return;
   e.preventDefault();
   openModal(t.getAttribute('data-modal-url'), t.getAttribute('data-modal-title'), t.getAttribute('data-modal-return'));
+});
+function closeTimesheetMenus(){
+  document.querySelectorAll('.timesheet-quick-menu.open').forEach(function(menu){
+    menu.classList.remove('open','open-up');
+    const btn = menu.parentElement ? menu.parentElement.querySelector('[data-timesheet-menu-toggle]') : null;
+    if(btn) btn.setAttribute('aria-expanded','false');
+  });
+}
+document.addEventListener('click', function(e){
+  const btn=e.target.closest('[data-timesheet-menu-toggle]');
+  if(btn){
+    e.preventDefault();
+    const menu=btn.nextElementSibling;
+    if(!menu || !menu.classList.contains('timesheet-quick-menu')) return;
+    const isOpen=menu.classList.contains('open');
+    closeTimesheetMenus();
+    if(isOpen) return;
+    menu.classList.add('open');
+    menu.classList.remove('open-up');
+    btn.setAttribute('aria-expanded','true');
+    const rect=menu.getBoundingClientRect();
+    const needDown=rect.height + 12;
+    const freeDown=window.innerHeight - btn.getBoundingClientRect().bottom;
+    const freeUp=btn.getBoundingClientRect().top;
+    if(freeDown < needDown && freeUp > freeDown){ menu.classList.add('open-up'); }
+    return;
+  }
+  if(!e.target.closest('.timesheet-quick-menu')) closeTimesheetMenus();
 });
 if(closeBtn) closeBtn.addEventListener('click',closeModal);
 if(modal) modal.addEventListener('click',function(e){ if(e.target===modal) closeModal();});

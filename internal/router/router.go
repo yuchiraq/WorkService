@@ -79,6 +79,9 @@ func SetupRouter(r *gin.Engine) {
 
 		authRequired.GET("/profile", api.ProfilePage)
 		authRequired.POST("/profile", api.UpdateProfile)
+		authRequired.GET("/improvements", api.ImprovementsPage)
+		authRequired.POST("/improvements/new", api.CreateImprovement)
+		authRequired.POST("/improvements/complete/:id", api.CompleteImprovement)
 	}
 
 	adminRequired := r.Group("/")
