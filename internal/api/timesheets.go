@@ -526,6 +526,33 @@ function makeSelectRow(name, optionsHTML){
   row.innerHTML='<select name="'+name+'" class="dynamic-select">'+optionsHTML+'</select><button type="button" class="btn btn-secondary btn-mini" data-remove-select>✕</button>';
   return row;
 }
+function parseOptionsHTML(optionsHTML){
+  const temp=document.createElement('select');
+  temp.innerHTML=optionsHTML;
+  return Array.from(temp.options).map(function(opt){ return {value: opt.value, text: opt.textContent}; });
+}
+function rebuildOptions(select, allOptions, takenValues){
+  const current=select.value;
+  const options=['<option value="">Выберите...</option>'];
+  allOptions.forEach(function(opt){
+    if(!opt.value) return;
+    if(takenValues.has(opt.value) && opt.value !== current) return;
+    const selected = opt.value === current ? ' selected' : '';
+    options.push('<option value="'+opt.value.replace(/"/g,'&quot;')+'"'+selected+'>'+opt.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</option>');
+  });
+  select.innerHTML=options.join('');
+}
+function refreshGroupOptions(group){
+  const template=group.getAttribute('data-options-template') || '';
+  if(!template) return;
+  const allOptions=parseOptionsHTML(template);
+  const selects=Array.from(group.querySelectorAll('select'));
+  const chosen=selects.map(function(s){ return s.value; }).filter(Boolean);
+  selects.forEach(function(select){
+    const taken=new Set(chosen.filter(function(v){ return v!==select.value; }));
+    rebuildOptions(select, allOptions, taken);
+  });
+}
 function normalizeDynamicGroup(group){
   const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
   rows.forEach(function(row){
@@ -538,6 +565,7 @@ function normalizeDynamicGroup(group){
         }
         row.remove();
         normalizeDynamicGroup(group);
+        refreshGroupOptions(group);
       };
     }
   });
@@ -548,11 +576,17 @@ function ensureDynamicSelectRows(group){
   const last=rows[rows.length-1];
   const select=last.querySelector('select');
   if(select && select.value){
-    group.appendChild(makeSelectRow(select.name, select.innerHTML));
+    const template=group.getAttribute('data-options-template') || select.innerHTML;
+    group.appendChild(makeSelectRow(select.name, template));
   }
   normalizeDynamicGroup(group);
+  refreshGroupOptions(group);
 }
 document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group){
+  const firstSelect=group.querySelector('select');
+  if(firstSelect){
+    group.setAttribute('data-options-template', firstSelect.innerHTML);
+  }
   group.addEventListener('change', function(e){
     if(e.target.matches('select')) ensureDynamicSelectRows(group);
   });
@@ -1022,7 +1056,7 @@ func ExportTimesheetsExcel(c *gin.Context) {
 			f.SetCellStyle(sheet, cell, cell, cellStyle)
 		}
 
-		formula := fmt.Sprintf("=SUM(B%d:%s%d)", row, lastCol, row)
+		formula := fmt.Sprintf("SUM(B%d:%s%d)", row, lastCol, row)
 		totalCell := fmt.Sprintf("%s%d", totalCol, row)
 		f.SetCellFormula(sheet, totalCell, formula)
 		f.SetCellStyle(sheet, totalCell, totalCell, cellStyle)
