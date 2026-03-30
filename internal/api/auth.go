@@ -140,7 +140,7 @@ func LoginPage(c *gin.Context) {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="theme-color" content="#007AFF">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="/manifest.webmanifest">
@@ -215,7 +215,11 @@ func Login(c *gin.Context) {
 
 	setSessionCookie(c, token, expires)
 	security.LogEvent("login_success", fmt.Sprintf("user=%s ip=%s", username, c.ClientIP()))
-	c.Redirect(http.StatusFound, "/dashboard")
+	if user.Status == "admin" {
+		c.Redirect(http.StatusFound, "/dashboard")
+		return
+	}
+	c.Redirect(http.StatusFound, "/schedule")
 }
 
 // Logout clears the session cookie and redirects to the login page.

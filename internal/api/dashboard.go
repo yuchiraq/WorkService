@@ -13,6 +13,10 @@ import (
 
 // DashboardPage renders the main dashboard page using manual HTML string building.
 func DashboardPage(c *gin.Context) {
+	if c.GetString("userStatus") != "admin" {
+		c.Redirect(http.StatusFound, "/schedule")
+		return
+	}
 	userName, _ := c.Get("userName")
 
 	workers, _ := storage.GetWorkers()
@@ -44,6 +48,7 @@ func DashboardPage(c *gin.Context) {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Панель управления</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
