@@ -158,6 +158,21 @@ func specialMarkLabel(mark string) string {
 	}
 }
 
+func specialMarkTitle(mark string) string {
+	switch normalizeSpecialMark(mark) {
+	case "ОТ":
+		return "Отпуск"
+	case "Б":
+		return "Больничный"
+	case "ПР":
+		return "Прогул"
+	case "В":
+		return "Выходной"
+	default:
+		return "Отметка"
+	}
+}
+
 func isSpecialMark(mark string) bool {
 	m := normalizeSpecialMark(mark)
 	return m == "ОТ" || m == "Б" || m == "ПР" || m == "В"
@@ -278,11 +293,14 @@ func SchedulePage(c *gin.Context) {
 	})
 
 	var scheduleRows strings.Builder
+	monthHours := 0.0
 	if len(entries) == 0 {
 		scheduleRows.WriteString(`<div class="info-card"><p>Записей за выбранный месяц нет.</p></div>`)
 	} else {
 		currentDate := ""
 		for _, entry := range entries {
+			returnPath := "/schedule?month=" + selectedMonth
+			editURL := "/schedule/edit/" + template.HTMLEscapeString(entry.ID) + "?return=" + template.URLQueryEscaper(returnPath)
 			if entry.Date != currentDate {
 				if currentDate != "" {
 					scheduleRows.WriteString(`</div></div>`)
@@ -298,7 +316,21 @@ func SchedulePage(c *gin.Context) {
 			if strings.TrimSpace(entry.CreatedByName) != "" {
 				creatorHTML = `<div class="assignment-meta"><span>Создал</span><p>` + template.HTMLEscapeString(entry.CreatedByName) + `</p></div>`
 			}
-			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><div class="assignment-time"><strong>%s — %s</strong><span>%s ч</span></div></div><div class="assignment-body"><div class="assignment-section"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div></div><div class="assignment-section"><div class="assignment-meta"><span>Работники</span><p>%s</p></div></div>%s%s</div><div class="info-card-actions assignment-actions"><a href="/schedule/edit/%s" class="btn btn-secondary btn-compact" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование назначения" data-modal-return="/schedule">Редактировать</a></div></article>`,
+			if isSpecialMark(entry.UserMark) {
+				scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card assignment-card-mark"><div class="assignment-head"><div class="assignment-time"><strong>%s</strong><span class="status-badge">%s</span></div></div><div class="assignment-body"><div class="assignment-section"><div class="assignment-meta"><span>Тип записи</span><p>%s</p></div></div><div class="assignment-section"><div class="assignment-meta"><span>Работники</span><p>%s</p></div></div>%s%s</div><div class="info-card-actions assignment-actions"><a href="%s" class="btn btn-secondary btn-compact" data-modal-url="%s" data-modal-title="Редактирование записи" data-modal-return="%s">Редактировать</a></div></article>`,
+					template.HTMLEscapeString(specialMarkTitle(entry.UserMark)),
+					template.HTMLEscapeString(specialMarkLabel(entry.UserMark)),
+					template.HTMLEscapeString(specialMarkTitle(entry.UserMark)),
+					joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"),
+					creatorHTML,
+					commentHTML,
+					editURL,
+					editURL,
+					template.HTMLEscapeString(returnPath),
+				))
+				continue
+			}
+			scheduleRows.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><div class="assignment-time"><strong>%s — %s</strong><span>%s ч</span></div></div><div class="assignment-body"><div class="assignment-section"><div class="assignment-meta"><span>Объекты</span><p>%s</p></div></div><div class="assignment-section"><div class="assignment-meta"><span>Работники</span><p>%s</p></div></div>%s%s</div><div class="info-card-actions assignment-actions"><a href="%s" class="btn btn-secondary btn-compact" data-modal-url="%s" data-modal-title="Редактирование назначения" data-modal-return="%s">Редактировать</a></div></article>`,
 				template.HTMLEscapeString(entry.StartTime),
 				template.HTMLEscapeString(entry.EndTime),
 				template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)),
@@ -306,23 +338,33 @@ func SchedulePage(c *gin.Context) {
 				joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"),
 				creatorHTML,
 				commentHTML,
-				template.HTMLEscapeString(entry.ID),
-				template.HTMLEscapeString(entry.ID),
+				editURL,
+				editURL,
+				template.HTMLEscapeString(returnPath),
 			))
+			if hoursVal, err := strconv.ParseFloat(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes), 64); err == nil {
+				monthHours += hoursVal
+			}
 		}
 		scheduleRows.WriteString(`</div></div>`)
 	}
+	hoursBlock := ""
+	if c.GetString("userStatus") != "admin" {
+		hoursBlock = `<span class="status-badge">Часы за месяц: ` + template.HTMLEscapeString(fmt.Sprintf("%.2f", monthHours)) + `</span>`
+	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-<div class="page-header"><h1>Расписание</h1><form method="GET" action="/schedule" class="month-selector"><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select></form><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule">Добавить назначение</a></div>
-<div class="card"><div class="schedule-vertical">{{SCHEDULE_ROWS}}</div></div>
+<div class="page-header"><h1>Расписание</h1>{{USER_MONTH_HOURS}}<form method="GET" action="/schedule" class="month-selector"><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select></form><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule">Добавить назначение</a></div>
+<section class="schedule-page-surface"><div class="schedule-vertical">{{SCHEDULE_ROWS}}</div></section>
 </div>
 </body></html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "schedule"), 1)
 	final = strings.Replace(final, "{{MONTH_OPTIONS}}", monthOptionsHTML(selectedMonth), 1)
+	final = strings.Replace(final, "{{USER_MONTH_HOURS}}", hoursBlock, 1)
 	final = strings.Replace(final, "{{SCHEDULE_ROWS}}", scheduleRows.String(), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
@@ -367,9 +409,16 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 	if c.GetString("userStatus") != "admin" {
 		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
-			workers = []models.Worker{ownWorker}
-		} else {
-			workers = []models.Worker{}
+			found := false
+			for _, wid := range entry.WorkerIDs {
+				if wid == ownWorker.ID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				entry.WorkerIDs = append([]string{ownWorker.ID}, entry.WorkerIDs...)
+			}
 		}
 	}
 
@@ -440,7 +489,8 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 		headerBlock = ""
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{LAYOUT_START}}
 <div class="main-content{{MAIN_CONTENT_CLASS}}">
 {{BACK_LINK}}
@@ -452,9 +502,9 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 <input type="hidden" name="special_mark" id="special_mark" value="{{SPECIAL_MARK}}">
 {{ERROR_BLOCK}}
 <div class="form-group-edit timesheet-span-2"><label for="entry_kind">Тип отметки</label><select id="entry_kind" name="entry_kind"><option value="work"{{MARK_WORK}}>Работа</option><option value="vacation"{{MARK_VACATION}}>Отпуск (ОТ)</option><option value="sick"{{MARK_SICK}}>Больничный (Б)</option><option value="absence"{{MARK_ABSENT}}>Прогул (ПР)</option><option value="weekend"{{MARK_WEEKEND}}>Выходной (В)</option></select></div>
-<div class="form-group-edit timesheet-span-2" id="period_wrap" style="display:none;"><label for="period_end">Период по дату (для отпуска/больничного)</label><input id="period_end" name="period_end" type="date" value="{{PERIOD_END}}"></div>
 <div class="timesheet-time-row timesheet-span-2">
-  <div class="form-group-edit"><label for="date">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
+  <div class="form-group-edit"><label for="date" id="date_label">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
+  <div class="form-group-edit" id="period_wrap" style="display:none;"><label for="period_end" id="period_end_label">По</label><input id="period_end" name="period_end" type="date" value="{{PERIOD_END}}"></div>
   <div id="work_fields_wrap" class="timesheet-work-fields">
     <div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
     <div class="form-group-edit"><label for="end_time">Окончание смены</label><input id="end_time" name="end_time" type="time" value="{{END_TIME}}" required></div>
@@ -462,7 +512,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
   </div>
 </div>
 
-<div class="form-group-edit timesheet-span-2">
+<div class="form-group-edit timesheet-span-2" id="object_wrap">
   <label>Объекты</label>
   <div class="dynamic-select-group" data-dynamic-select-group>
     {{OBJECT_SELECTED}}
@@ -472,7 +522,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 <div class="form-group-edit timesheet-span-2">
   <label>Работники</label>
-  <div class="dynamic-select-group" data-dynamic-select-group>
+  <div class="dynamic-select-group" data-dynamic-select-group data-required-worker-id="{{REQUIRED_WORKER_ID}}">
     {{WORKER_SELECTED}}
   </div>
 </div>
@@ -492,6 +542,49 @@ function makeSelectRow(name, optionsHTML){
   row.innerHTML='<select name="'+name+'" class="dynamic-select">'+optionsHTML+'</select><button type="button" class="btn btn-secondary btn-mini" data-remove-select>✕</button>';
   return row;
 }
+function parseOptionsHTML(optionsHTML){
+  const temp=document.createElement('select');
+  temp.innerHTML=optionsHTML;
+  return Array.from(temp.options).map(function(opt){ return {value: opt.value, text: opt.textContent}; });
+}
+function rebuildOptions(select, allOptions, takenValues){
+  const current=select.value;
+  const options=['<option value="">Выберите...</option>'];
+  allOptions.forEach(function(opt){
+    if(!opt.value) return;
+    if(takenValues.has(opt.value) && opt.value !== current) return;
+    const selected = opt.value === current ? ' selected' : '';
+    options.push('<option value="'+opt.value.replace(/"/g,'&quot;')+'"'+selected+'>'+opt.text.replace(/</g,'&lt;').replace(/>/g,'&gt;')+'</option>');
+  });
+  select.innerHTML=options.join('');
+}
+function refreshGroupOptions(group){
+  const template=group.getAttribute('data-options-template') || '';
+  if(!template) return;
+  const allOptions=parseOptionsHTML(template);
+  const selects=Array.from(group.querySelectorAll('select'));
+  const chosen=selects.map(function(s){ return s.value; }).filter(Boolean);
+  selects.forEach(function(select){
+    const taken=new Set(chosen.filter(function(v){ return v!==select.value; }));
+    rebuildOptions(select, allOptions, taken);
+  });
+}
+function ensureRequiredWorker(group){
+  const required=group.getAttribute('data-required-worker-id');
+  if(!required) return;
+  const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
+  let requiredSelect=rows.map(function(r){ return r.querySelector('select'); }).find(function(s){ return s && s.value===required; });
+  if(!requiredSelect){
+    const target=rows.map(function(r){ return r.querySelector('select'); }).find(function(s){ return s && s.querySelector('option[value="'+required+'"]'); });
+    if(target) target.value=required;
+  }
+  rows.forEach(function(row){
+    const select=row.querySelector('select');
+    const btn=row.querySelector('[data-remove-select]');
+    const locked=select && select.value===required;
+    if(btn) btn.disabled=!!locked;
+  });
+}
 function normalizeDynamicGroup(group){
   const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
   rows.forEach(function(row){
@@ -504,6 +597,8 @@ function normalizeDynamicGroup(group){
         }
         row.remove();
         normalizeDynamicGroup(group);
+        refreshGroupOptions(group);
+        ensureRequiredWorker(group);
       };
     }
   });
@@ -514,11 +609,18 @@ function ensureDynamicSelectRows(group){
   const last=rows[rows.length-1];
   const select=last.querySelector('select');
   if(select && select.value){
-    group.appendChild(makeSelectRow(select.name, select.innerHTML));
+    const template=group.getAttribute('data-options-template') || select.innerHTML;
+    group.appendChild(makeSelectRow(select.name, template));
   }
   normalizeDynamicGroup(group);
+  refreshGroupOptions(group);
+  ensureRequiredWorker(group);
 }
 document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group){
+  const firstSelect=group.querySelector('select');
+  if(firstSelect){
+    group.setAttribute('data-options-template', firstSelect.innerHTML);
+  }
   group.addEventListener('change', function(e){
     if(e.target.matches('select')) ensureDynamicSelectRows(group);
   });
@@ -536,6 +638,9 @@ const st=document.getElementById('start_time');
 const et=document.getElementById('end_time');
 const lunch=document.getElementById('lunch_break_minutes');
 const workFieldsWrap=document.getElementById('work_fields_wrap');
+const dateLabel=document.getElementById('date_label');
+const periodLabel=document.getElementById('period_end_label');
+const objectWrap=document.getElementById('object_wrap');
 function syncEntryKind(){
   if(!kind) return;
   const v=kind.value;
@@ -546,6 +651,9 @@ function syncEntryKind(){
   }
   if(st&&et&&lunch){ st.disabled=isSpec; et.disabled=isSpec; lunch.disabled=isSpec; if(isSpec){ st.value=''; et.value=''; lunch.value='0'; }}
   if(workFieldsWrap) workFieldsWrap.style.display=isSpec?'none':'contents';
+  if(dateLabel) dateLabel.textContent = isSpec ? 'С' : 'Дата';
+  if(periodLabel) periodLabel.textContent = 'По';
+  if(objectWrap) objectWrap.style.display = isSpec ? 'none' : '';
 }
 if(kind){ kind.addEventListener('change', syncEntryKind); syncEntryKind(); }
 </script>
@@ -608,6 +716,15 @@ if(kind){ kind.addEventListener('change', syncEntryKind); syncEntryKind(); }
 	final = strings.Replace(final, "{{PERIOD_END}}", template.HTMLEscapeString(c.Query("period_end")), 1)
 	final = strings.Replace(final, "{{WORKER_OPTIONS}}", workerOptions, 1)
 	final = strings.Replace(final, "{{WORKER_SELECTED}}", workerSelected, 1)
+	if c.GetString("userStatus") != "admin" {
+		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
+			final = strings.Replace(final, "{{REQUIRED_WORKER_ID}}", template.HTMLEscapeString(ownWorker.ID), 1)
+		} else {
+			final = strings.Replace(final, "{{REQUIRED_WORKER_ID}}", "", 1)
+		}
+	} else {
+		final = strings.Replace(final, "{{REQUIRED_WORKER_ID}}", "", 1)
+	}
 	final = strings.Replace(final, "{{OBJECT_OPTIONS}}", objectOptions, 1)
 	final = strings.Replace(final, "{{OBJECT_SELECTED}}", objectSelected, 1)
 	final = strings.Replace(final, "{{NOTES}}", template.HTMLEscapeString(entry.Notes), 1)
@@ -627,6 +744,20 @@ func AddSchedulePage(c *gin.Context) {
 	}
 	if workerID := strings.TrimSpace(c.Query("worker_id")); workerID != "" {
 		entry.WorkerIDs = []string{workerID}
+	}
+	if c.GetString("userStatus") != "admin" {
+		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
+			found := false
+			for _, wid := range entry.WorkerIDs {
+				if wid == ownWorker.ID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				entry.WorkerIDs = append([]string{ownWorker.ID}, entry.WorkerIDs...)
+			}
+		}
 	}
 	if objectID := strings.TrimSpace(c.Query("object_id")); objectID != "" {
 		entry.ObjectIDs = []string{objectID}
@@ -684,7 +815,16 @@ func CreateScheduleEntry(c *gin.Context) {
 
 	if c.GetString("userStatus") != "admin" {
 		if worker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil {
-			entry.WorkerIDs = []string{worker.ID}
+			hasOwn := false
+			for _, wid := range entry.WorkerIDs {
+				if wid == worker.ID {
+					hasOwn = true
+					break
+				}
+			}
+			if !hasOwn {
+				entry.WorkerIDs = append([]string{worker.ID}, entry.WorkerIDs...)
+			}
 		}
 		entry.UserMark = normalizeSpecialMark(c.PostForm("special_mark"))
 	}
@@ -790,7 +930,16 @@ func UpdateScheduleEntry(c *gin.Context) {
 	entry.UserMark = normalizeSpecialMark(c.PostForm("special_mark"))
 	if c.GetString("userStatus") != "admin" {
 		if worker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil {
-			entry.WorkerIDs = []string{worker.ID}
+			hasOwn := false
+			for _, wid := range entry.WorkerIDs {
+				if wid == worker.ID {
+					hasOwn = true
+					break
+				}
+			}
+			if !hasOwn {
+				entry.WorkerIDs = append([]string{worker.ID}, entry.WorkerIDs...)
+			}
 		}
 		entry.UserMark = normalizeSpecialMark(c.PostForm("special_mark"))
 	}
@@ -869,6 +1018,13 @@ func ExportTimesheetsExcel(c *gin.Context) {
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
 		return
+	}
+	if c.GetString("userStatus") != "admin" {
+		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
+			workers = []models.Worker{ownWorker}
+		} else {
+			workers = []models.Worker{}
+		}
 	}
 	objectsMap, err := buildObjectsMap()
 	if err != nil {
@@ -982,7 +1138,7 @@ func ExportTimesheetsExcel(c *gin.Context) {
 			f.SetCellStyle(sheet, cell, cell, cellStyle)
 		}
 
-		formula := fmt.Sprintf("=SUM(B%d:%s%d)", row, lastCol, row)
+		formula := fmt.Sprintf("SUM(B%d:%s%d)", row, lastCol, row)
 		totalCell := fmt.Sprintf("%s%d", totalCol, row)
 		f.SetCellFormula(sheet, totalCell, formula)
 		f.SetCellStyle(sheet, totalCell, totalCell, cellStyle)
@@ -1021,6 +1177,13 @@ func TimesheetsPage(c *gin.Context) {
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
 		return
+	}
+	if c.GetString("userStatus") != "admin" {
+		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
+			workers = []models.Worker{ownWorker}
+		} else {
+			workers = []models.Worker{}
+		}
 	}
 	objectsMap, err := buildObjectsMap()
 	if err != nil {
@@ -1061,9 +1224,12 @@ func TimesheetsPage(c *gin.Context) {
 				if !contains {
 					continue
 				}
+				entryReturn := template.URLQueryEscaper("/timesheets?month=" + selectedMonth)
+				editURL := "/timesheets/edit/" + template.HTMLEscapeString(entry.ID) + "?return=" + entryReturn
+				editAction := `<div class="timesheet-entry-actions"><a class="btn btn-secondary btn-compact" href="` + editURL + `" data-modal-url="` + editURL + `" data-modal-title="Редактировать запись" data-modal-return="/timesheets?month=` + template.HTMLEscapeString(selectedMonth) + `">Редактировать</a></div>`
 				if isSpecialMark(entry.UserMark) {
 					cellMark = specialMarkLabel(entry.UserMark)
-					details = append(details, "Отметка: "+cellMark)
+					details = append(details, `<div class="timesheet-entry-item"><p>Отметка: `+template.HTMLEscapeString(cellMark)+`</p>`+editAction+`</div>`)
 					continue
 				}
 				hoursStr := formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
@@ -1074,7 +1240,8 @@ func TimesheetsPage(c *gin.Context) {
 				if creator == "" {
 					creator = "—"
 				}
-				details = append(details, fmt.Sprintf("%s-%s · %s ч · %s · %s · создал: %s", entry.StartTime, entry.EndTime, hoursStr, objects, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(creator)))
+				detailBody := fmt.Sprintf(`<p>%s-%s · %s ч</p><p>Объекты: %s</p><p>Комментарий: %s</p><p>Создал: %s</p>`, template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), template.HTMLEscapeString(hoursStr), objects, template.HTMLEscapeString(entry.Notes), template.HTMLEscapeString(creator))
+				details = append(details, `<div class="timesheet-entry-item">`+detailBody+editAction+`</div>`)
 			}
 			if len(details) == 0 {
 				if d, err := time.Parse("2006-01-02", date); err == nil && d.Before(time.Now()) {
@@ -1083,13 +1250,13 @@ func TimesheetsPage(c *gin.Context) {
 				}
 			}
 			if len(details) == 0 {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><button type="button" class="timesheet-quick-add" onclick="this.nextElementSibling.classList.toggle('open')">+</button>%s</td>`, menu))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty"><span class="empty-value">—</span><button type="button" class="timesheet-quick-add" data-timesheet-menu-toggle aria-expanded="false">+</button>%s</td>`, menu))
 				continue
 			}
 			if cellMark != "" {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty marked"><span class="empty-value">%s</span><button type="button" class="timesheet-quick-add" onclick="this.nextElementSibling.classList.toggle('open')">+</button>%s<div class="hours-tooltip">%s</div></td>`, template.HTMLEscapeString(cellMark), menu, strings.Join(details, "<br>")))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell empty marked"><span class="empty-value">%s</span><button type="button" class="timesheet-quick-add" data-timesheet-menu-toggle aria-expanded="false">+</button>%s<div class="hours-tooltip">%s</div></td>`, template.HTMLEscapeString(cellMark), menu, strings.Join(details, "")))
 			} else {
-				cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "<br>")))
+				cells.WriteString(fmt.Sprintf(`<td class="hours-cell"><span>%.1f</span><div class="hours-tooltip">%s</div></td>`, total, strings.Join(details, "")))
 				workerTotal += total
 			}
 		}
@@ -1101,7 +1268,8 @@ func TimesheetsPage(c *gin.Context) {
 		rows = `<tr><td colspan="100%">Нет работников.</td></tr>`
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Табель</h1><a class="btn btn-secondary" href="/timesheets/export?month={{SELECTED_MONTH}}">Экспорт в Excel</a></div>

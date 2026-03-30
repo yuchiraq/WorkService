@@ -89,6 +89,7 @@ func ObjectsPage(c *gin.Context) {
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Объекты</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -152,6 +153,7 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{{TITLE}}</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
@@ -312,7 +314,8 @@ func ObjectProfilePage(c *gin.Context) {
 		}
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><title>Объект: {{OBJECT_NAME}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Объект: {{OBJECT_NAME}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
   <a href="/objects" class="back-link">← К списку объектов</a>
@@ -338,10 +341,16 @@ func ObjectProfilePage(c *gin.Context) {
 }
 
 func AddObjectPage(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	renderObjectForm(c, models.Object{Status: "in_progress"}, "/objects/new", "Новый объект", "Сохранить", false)
 }
 
 func CreateObject(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	newObject := models.Object{
 		Name:              c.PostForm("name"),
 		Status:            c.PostForm("status"),
@@ -364,6 +373,9 @@ func CreateObject(c *gin.Context) {
 }
 
 func EditObjectPage(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	object, err := storage.GetObjectByID(c.Param("id"))
 	if err != nil {
 		c.String(http.StatusNotFound, "Object not found")
@@ -373,6 +385,9 @@ func EditObjectPage(c *gin.Context) {
 }
 
 func UpdateObject(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	object, err := storage.GetObjectByID(c.Param("id"))
 	if err != nil {
 		c.String(http.StatusNotFound, "Object not found")
@@ -400,6 +415,9 @@ func UpdateObject(c *gin.Context) {
 }
 
 func DeleteObject(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	if err := storage.DeleteObject(c.Param("id")); err != nil {
 		c.String(http.StatusBadRequest, "Failed to delete object: %v", err)
 		return
