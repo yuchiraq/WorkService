@@ -296,8 +296,10 @@ func ProfilePage(c *gin.Context) {
 
 	workerBlock := `
 <div class="form-group-edit form-group-name"><label for="name">ФИО</label><input type="text" id="name" name="name" value="{{NAME}}" required></div>
+<div class="form-group-edit form-group-position"><label for="username">Логин</label><input type="text" id="username" name="username" value="{{USERNAME}}" required></div>
+<div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="password" id="password" name="password" value="" placeholder="Оставьте пустым, чтобы не менять"></div>
+<div class="form-group-edit form-group-rate"><label for="phone">Телефон</label><input type="tel" id="phone" name="phone" value="{{PHONE}}"></div>
 <div class="form-group-edit form-group-position"><label for="position">Должность</label><input type="text" id="position" name="position" value="{{POSITION}}"></div>
-<div class="form-group-edit form-group-phone"><label for="phone">Телефон</label><input type="tel" id="phone" name="phone" value="{{PHONE}}"></div>
 <div class="form-group-edit form-group-rate"><label for="birth_date">Дата рождения</label><input type="date" id="birth_date" name="birth_date" value="{{BIRTH_DATE}}"></div>
 <div class="form-group-edit form-group-rate"><label for="hourly_rate">Ставка, руб/час</label><input type="number" step="0.01" min="0" id="hourly_rate" name="hourly_rate" value="{{RATE}}"></div>`
 	if isAdmin(c) {
@@ -319,6 +321,7 @@ func ProfilePage(c *gin.Context) {
 </form></div></div>
 </body></html>`
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "my-profile"), 1)
+	final = strings.Replace(final, "{{PROFILE_FIELDS}}", workerBlock, 1)
 	final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(user.Name), 1)
 	final = strings.Replace(final, "{{USERNAME}}", template.HTMLEscapeString(user.Username), 1)
 	final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(user.Phone), 1)
@@ -334,7 +337,6 @@ func ProfilePage(c *gin.Context) {
 			final = strings.Replace(final, "{{RATE}}", fmt.Sprintf("%.2f", worker.HourlyRate), 1)
 		}
 	}
-	final = strings.Replace(final, "{{PROFILE_FIELDS}}", workerBlock, 1)
 	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
@@ -351,6 +353,15 @@ func UpdateProfile(c *gin.Context) {
 		worker, err := storage.GetWorkerByUserID(userID)
 		if err != nil {
 			c.String(http.StatusBadRequest, "К профилю не привязан работник")
+			return
+		}
+		user.Username = c.PostForm("username")
+		newPassword := c.PostForm("password")
+		if newPassword != "" {
+			user.Password = newPassword
+		}
+		if err := storage.UpdateUser(user); err != nil {
+			c.String(http.StatusBadRequest, "Failed to update profile: %v", err)
 			return
 		}
 		worker.Name = c.PostForm("name")

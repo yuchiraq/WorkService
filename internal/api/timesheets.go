@@ -293,6 +293,7 @@ func SchedulePage(c *gin.Context) {
 	})
 
 	var scheduleRows strings.Builder
+	monthHours := 0.0
 	if len(entries) == 0 {
 		scheduleRows.WriteString(`<div class="info-card"><p>Записей за выбранный месяц нет.</p></div>`)
 	} else {
@@ -341,21 +342,29 @@ func SchedulePage(c *gin.Context) {
 				editURL,
 				template.HTMLEscapeString(returnPath),
 			))
+			if hoursVal, err := strconv.ParseFloat(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes), 64); err == nil {
+				monthHours += hoursVal
+			}
 		}
 		scheduleRows.WriteString(`</div></div>`)
+	}
+	hoursBlock := ""
+	if c.GetString("userStatus") != "admin" {
+		hoursBlock = `<span class="status-badge">Часы за месяц: ` + template.HTMLEscapeString(fmt.Sprintf("%.2f", monthHours)) + `</span>`
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-<div class="page-header"><h1>Расписание</h1><form method="GET" action="/schedule" class="month-selector"><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select></form><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule">Добавить назначение</a></div>
+<div class="page-header"><h1>Расписание</h1>{{USER_MONTH_HOURS}}<form method="GET" action="/schedule" class="month-selector"><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select></form><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/schedule">Добавить назначение</a></div>
 <section class="schedule-page-surface"><div class="schedule-vertical">{{SCHEDULE_ROWS}}</div></section>
 </div>
 </body></html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "schedule"), 1)
 	final = strings.Replace(final, "{{MONTH_OPTIONS}}", monthOptionsHTML(selectedMonth), 1)
+	final = strings.Replace(final, "{{USER_MONTH_HOURS}}", hoursBlock, 1)
 	final = strings.Replace(final, "{{SCHEDULE_ROWS}}", scheduleRows.String(), 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
@@ -1010,6 +1019,13 @@ func ExportTimesheetsExcel(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
 		return
 	}
+	if c.GetString("userStatus") != "admin" {
+		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
+			workers = []models.Worker{ownWorker}
+		} else {
+			workers = []models.Worker{}
+		}
+	}
 	objectsMap, err := buildObjectsMap()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load objects: %v", err)
@@ -1161,6 +1177,13 @@ func TimesheetsPage(c *gin.Context) {
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
 		return
+	}
+	if c.GetString("userStatus") != "admin" {
+		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
+			workers = []models.Worker{ownWorker}
+		} else {
+			workers = []models.Worker{}
+		}
 	}
 	objectsMap, err := buildObjectsMap()
 	if err != nil {
