@@ -47,6 +47,75 @@
     --overlay-backdrop: rgb(2 6 18 / 0.62);
     --overlay-backdrop-soft: rgb(2 6 18 / 0.48);
   }
+
+  body {
+    background:
+      radial-gradient(900px 620px at 8% -10%, rgb(90 116 189 / 0.16), transparent 62%),
+      radial-gradient(780px 560px at 95% 2%, rgb(105 74 154 / 0.14), transparent 64%),
+      radial-gradient(980px 720px at 50% 105%, rgb(57 120 126 / 0.12), transparent 72%),
+      var(--system-background);
+  }
+
+  .top-nav,
+  .side-nav,
+  .floating-create-wrap {
+    background: color-mix(in srgb, var(--surface-strong), transparent 4%);
+  }
+
+  .card,
+  .worker-card,
+  .info-card,
+  .placeholder-card,
+  .table-row,
+  .center-card,
+  .timesheet-card,
+  .assignment-card,
+  .structured-assignment,
+  .modal-content,
+  .action-modal-sheet {
+    background: linear-gradient(155deg, rgb(22 32 59 / 0.92), rgb(17 25 47 / 0.94));
+  }
+
+  .metric,
+  .profile-details li,
+  .detail-row,
+  .timesheet-entry-item,
+  .assignment-section {
+    background: linear-gradient(150deg, rgb(25 36 65 / 0.9), rgb(20 30 55 / 0.94));
+  }
+
+  .table,
+  .timesheet-matrix {
+    background: linear-gradient(160deg, rgb(19 28 52 / 0.9), rgb(15 22 42 / 0.94));
+  }
+
+  input, select, textarea, .form-control {
+    background: linear-gradient(145deg, rgb(23 33 61 / 0.92), rgb(18 26 48 / 0.96));
+    color: var(--label);
+  }
+
+  .btn-secondary, .btn-ghost, .btn-light {
+    background: rgb(25 37 68 / 0.78);
+    color: var(--system-blue);
+  }
+
+  .btn-danger, .btn-destructive {
+    background: rgb(43 25 39 / 0.62);
+  }
+
+  .user-avatar,
+  .worker-avatar {
+    background: linear-gradient(150deg, rgb(31 45 82 / 0.9), rgb(24 35 64 / 0.94));
+  }
+
+  .action-modal iframe {
+    background: rgb(14 22 40 / 0.9);
+  }
+
+  .action-modal-close,
+  .close-button {
+    background: rgb(24 35 64 / 0.88);
+  }
 }
 
 * { box-sizing: border-box; }
