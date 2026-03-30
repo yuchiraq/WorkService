@@ -215,7 +215,11 @@ func Login(c *gin.Context) {
 
 	setSessionCookie(c, token, expires)
 	security.LogEvent("login_success", fmt.Sprintf("user=%s ip=%s", username, c.ClientIP()))
-	c.Redirect(http.StatusFound, "/dashboard")
+	if user.Status == "admin" {
+		c.Redirect(http.StatusFound, "/dashboard")
+		return
+	}
+	c.Redirect(http.StatusFound, "/schedule")
 }
 
 // Logout clears the session cookie and redirects to the login page.

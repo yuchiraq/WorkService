@@ -13,6 +13,10 @@ import (
 
 // DashboardPage renders the main dashboard page using manual HTML string building.
 func DashboardPage(c *gin.Context) {
+	if c.GetString("userStatus") != "admin" {
+		c.Redirect(http.StatusFound, "/schedule")
+		return
+	}
 	userName, _ := c.Get("userName")
 
 	workers, _ := storage.GetWorkers()

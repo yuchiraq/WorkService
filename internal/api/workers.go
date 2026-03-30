@@ -59,6 +59,9 @@ func uniquePositions(workers []models.Worker) []string {
 }
 
 func WorkersPage(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	workers, err := storage.GetWorkers()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)
@@ -423,6 +426,9 @@ func WorkerProfilePage(c *gin.Context) {
 
 // AddWorkerPage renders the page with a form to add a new worker.
 func AddWorkerPage(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	pageTemplate := `
 <!DOCTYPE html>
 <html lang="ru">
@@ -492,6 +498,9 @@ func AddWorkerPage(c *gin.Context) {
 
 // CreateWorker handles the creation of a new worker.
 func CreateWorker(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	rate := 0.0
 	rateRaw := strings.TrimSpace(c.PostForm("hourly_rate"))
 	if rateRaw != "" {
@@ -527,6 +536,9 @@ func CreateWorker(c *gin.Context) {
 
 // EditWorkerPage renders the page for editing an existing worker.
 func EditWorkerPage(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	workerID := c.Param("id")
 	worker, err := storage.GetWorkerByID(workerID)
 	if err != nil {
@@ -652,6 +664,9 @@ func EditWorkerPage(c *gin.Context) {
 
 // UpdateWorker handles the update of an existing worker's details.
 func UpdateWorker(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	workerID := c.Param("id")
 
 	worker, err := storage.GetWorkerByID(workerID)
@@ -688,6 +703,9 @@ func UpdateWorker(c *gin.Context) {
 
 // DeleteWorker handles the deletion of a worker.
 func DeleteWorker(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	workerID := c.Param("id")
 
 	if err := storage.DeleteWorker(workerID); err != nil {

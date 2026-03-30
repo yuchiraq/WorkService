@@ -341,10 +341,16 @@ func ObjectProfilePage(c *gin.Context) {
 }
 
 func AddObjectPage(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	renderObjectForm(c, models.Object{Status: "in_progress"}, "/objects/new", "Новый объект", "Сохранить", false)
 }
 
 func CreateObject(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	newObject := models.Object{
 		Name:              c.PostForm("name"),
 		Status:            c.PostForm("status"),
@@ -367,6 +373,9 @@ func CreateObject(c *gin.Context) {
 }
 
 func EditObjectPage(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	object, err := storage.GetObjectByID(c.Param("id"))
 	if err != nil {
 		c.String(http.StatusNotFound, "Object not found")
@@ -376,6 +385,9 @@ func EditObjectPage(c *gin.Context) {
 }
 
 func UpdateObject(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	object, err := storage.GetObjectByID(c.Param("id"))
 	if err != nil {
 		c.String(http.StatusNotFound, "Object not found")
@@ -403,6 +415,9 @@ func UpdateObject(c *gin.Context) {
 }
 
 func DeleteObject(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	if err := storage.DeleteObject(c.Param("id")); err != nil {
 		c.String(http.StatusBadRequest, "Failed to delete object: %v", err)
 		return

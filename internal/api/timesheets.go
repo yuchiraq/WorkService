@@ -400,9 +400,16 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 	if c.GetString("userStatus") != "admin" {
 		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
-			workers = []models.Worker{ownWorker}
-		} else {
-			workers = []models.Worker{}
+			found := false
+			for _, wid := range entry.WorkerIDs {
+				if wid == ownWorker.ID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				entry.WorkerIDs = append([]string{ownWorker.ID}, entry.WorkerIDs...)
+			}
 		}
 	}
 
@@ -506,7 +513,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 <div class="form-group-edit timesheet-span-2">
   <label>Работники</label>
-  <div class="dynamic-select-group" data-dynamic-select-group>
+  <div class="dynamic-select-group" data-dynamic-select-group data-required-worker-id="{{REQUIRED_WORKER_ID}}">
     {{WORKER_SELECTED}}
   </div>
 </div>
@@ -553,6 +560,22 @@ function refreshGroupOptions(group){
     rebuildOptions(select, allOptions, taken);
   });
 }
+function ensureRequiredWorker(group){
+  const required=group.getAttribute('data-required-worker-id');
+  if(!required) return;
+  const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
+  let requiredSelect=rows.map(function(r){ return r.querySelector('select'); }).find(function(s){ return s && s.value===required; });
+  if(!requiredSelect){
+    const target=rows.map(function(r){ return r.querySelector('select'); }).find(function(s){ return s && s.querySelector('option[value="'+required+'"]'); });
+    if(target) target.value=required;
+  }
+  rows.forEach(function(row){
+    const select=row.querySelector('select');
+    const btn=row.querySelector('[data-remove-select]');
+    const locked=select && select.value===required;
+    if(btn) btn.disabled=!!locked;
+  });
+}
 function normalizeDynamicGroup(group){
   const rows=Array.from(group.querySelectorAll('.dynamic-select-row'));
   rows.forEach(function(row){
@@ -566,6 +589,7 @@ function normalizeDynamicGroup(group){
         row.remove();
         normalizeDynamicGroup(group);
         refreshGroupOptions(group);
+        ensureRequiredWorker(group);
       };
     }
   });
@@ -581,6 +605,7 @@ function ensureDynamicSelectRows(group){
   }
   normalizeDynamicGroup(group);
   refreshGroupOptions(group);
+  ensureRequiredWorker(group);
 }
 document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group){
   const firstSelect=group.querySelector('select');
@@ -682,6 +707,15 @@ if(kind){ kind.addEventListener('change', syncEntryKind); syncEntryKind(); }
 	final = strings.Replace(final, "{{PERIOD_END}}", template.HTMLEscapeString(c.Query("period_end")), 1)
 	final = strings.Replace(final, "{{WORKER_OPTIONS}}", workerOptions, 1)
 	final = strings.Replace(final, "{{WORKER_SELECTED}}", workerSelected, 1)
+	if c.GetString("userStatus") != "admin" {
+		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
+			final = strings.Replace(final, "{{REQUIRED_WORKER_ID}}", template.HTMLEscapeString(ownWorker.ID), 1)
+		} else {
+			final = strings.Replace(final, "{{REQUIRED_WORKER_ID}}", "", 1)
+		}
+	} else {
+		final = strings.Replace(final, "{{REQUIRED_WORKER_ID}}", "", 1)
+	}
 	final = strings.Replace(final, "{{OBJECT_OPTIONS}}", objectOptions, 1)
 	final = strings.Replace(final, "{{OBJECT_SELECTED}}", objectSelected, 1)
 	final = strings.Replace(final, "{{NOTES}}", template.HTMLEscapeString(entry.Notes), 1)
@@ -701,6 +735,20 @@ func AddSchedulePage(c *gin.Context) {
 	}
 	if workerID := strings.TrimSpace(c.Query("worker_id")); workerID != "" {
 		entry.WorkerIDs = []string{workerID}
+	}
+	if c.GetString("userStatus") != "admin" {
+		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
+			found := false
+			for _, wid := range entry.WorkerIDs {
+				if wid == ownWorker.ID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				entry.WorkerIDs = append([]string{ownWorker.ID}, entry.WorkerIDs...)
+			}
+		}
 	}
 	if objectID := strings.TrimSpace(c.Query("object_id")); objectID != "" {
 		entry.ObjectIDs = []string{objectID}
@@ -758,7 +806,16 @@ func CreateScheduleEntry(c *gin.Context) {
 
 	if c.GetString("userStatus") != "admin" {
 		if worker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil {
-			entry.WorkerIDs = []string{worker.ID}
+			hasOwn := false
+			for _, wid := range entry.WorkerIDs {
+				if wid == worker.ID {
+					hasOwn = true
+					break
+				}
+			}
+			if !hasOwn {
+				entry.WorkerIDs = append([]string{worker.ID}, entry.WorkerIDs...)
+			}
 		}
 		entry.UserMark = normalizeSpecialMark(c.PostForm("special_mark"))
 	}
@@ -864,7 +921,16 @@ func UpdateScheduleEntry(c *gin.Context) {
 	entry.UserMark = normalizeSpecialMark(c.PostForm("special_mark"))
 	if c.GetString("userStatus") != "admin" {
 		if worker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil {
-			entry.WorkerIDs = []string{worker.ID}
+			hasOwn := false
+			for _, wid := range entry.WorkerIDs {
+				if wid == worker.ID {
+					hasOwn = true
+					break
+				}
+			}
+			if !hasOwn {
+				entry.WorkerIDs = append([]string{worker.ID}, entry.WorkerIDs...)
+			}
 		}
 		entry.UserMark = normalizeSpecialMark(c.PostForm("special_mark"))
 	}
