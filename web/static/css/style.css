@@ -1027,3 +1027,84 @@ input:focus, select:focus, textarea:focus, .form-control:focus {
     min-height: 58px;
   }
 }
+
+/* Final dark-mode overrides (kept at end to win cascade over base glass gradients). */
+@media (prefers-color-scheme: dark) {
+  body {
+    background:
+      radial-gradient(860px 600px at 10% -8%, rgb(68 89 146 / 0.14), transparent 62%),
+      radial-gradient(760px 560px at 96% 2%, rgb(90 63 134 / 0.12), transparent 64%),
+      radial-gradient(920px 720px at 50% 104%, rgb(42 96 104 / 0.1), transparent 72%),
+      rgb(8 12 24);
+    color: rgb(235 240 255);
+  }
+
+  .top-nav,
+  .side-nav,
+  .floating-create-wrap,
+  .mobile-nav-toggle,
+  .side-nav-user,
+  .action-modal-close,
+  .close-button {
+    background: rgb(19 27 50 / 0.9);
+    border-color: rgb(129 149 209 / 0.28);
+  }
+
+  .card,
+  .worker-card,
+  .info-card,
+  .placeholder-card,
+  .table-row,
+  .center-card,
+  .timesheet-card,
+  .assignment-card,
+  .structured-assignment,
+  .modal-content,
+  .action-modal-sheet,
+  .metric,
+  .profile-details li,
+  .detail-row,
+  .timesheet-entry-item,
+  .assignment-section {
+    background: linear-gradient(155deg, rgb(19 28 52 / 0.96), rgb(14 21 40 / 0.98));
+    border-color: rgb(129 149 209 / 0.24);
+    box-shadow: 0 16px 34px rgb(1 4 13 / 0.5);
+  }
+
+  .table,
+  .timesheet-matrix {
+    background: linear-gradient(160deg, rgb(16 24 44 / 0.96), rgb(12 18 34 / 0.98));
+    border-color: rgb(129 149 209 / 0.24);
+  }
+
+  input, select, textarea, .form-control {
+    background: linear-gradient(145deg, rgb(21 31 58 / 0.95), rgb(15 22 42 / 0.98));
+    border-color: rgb(129 149 209 / 0.26);
+    color: rgb(235 240 255);
+  }
+
+  .btn-secondary, .btn-ghost, .btn-light {
+    background: rgb(24 36 68 / 0.9);
+    border-color: rgb(129 149 209 / 0.28);
+  }
+
+  .btn-danger, .btn-destructive {
+    background: rgb(65 28 40 / 0.7);
+  }
+
+  .user-avatar,
+  .worker-avatar,
+  .profile-detail-icon {
+    background: rgb(24 36 68 / 0.9);
+    color: rgb(190 206 252);
+  }
+
+  .text-muted,
+  small,
+  label,
+  .back-link,
+  .metric .label,
+  .worker-info p {
+    color: rgb(170 182 220);
+  }
+}
