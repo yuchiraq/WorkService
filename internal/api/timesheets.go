@@ -518,7 +518,6 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
     {{OBJECT_SELECTED}}
   </div>
 </div>
-</div>
 
 <div class="form-group-edit timesheet-span-2">
   <label>Работники</label>
