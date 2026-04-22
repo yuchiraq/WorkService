@@ -89,6 +89,8 @@ const modalSheet=document.querySelector('.action-modal-sheet');
 const modalTitle=document.getElementById('app-action-modal-title');
 const burger=document.querySelector('[data-mobile-nav-toggle]');
 const navOverlay=document.querySelector('[data-nav-overlay]');
+const themeButtons=document.querySelectorAll('[data-theme-option]');
+const themeStorageKey='workservice-theme';
 
 function closeModal(){
   if(!modal) return;
@@ -123,7 +125,7 @@ function ensureBrandAssets(){
   if(!head.querySelector('link[rel="apple-touch-icon"]')){
     const png=document.createElement('link');
     png.rel='apple-touch-icon';
-    png.href='/static/img/logo.png';
+    png.href='/static/img/logo-192.png';
     head.appendChild(png);
   }
   if(!head.querySelector('link[rel="manifest"]')){
@@ -135,7 +137,7 @@ function ensureBrandAssets(){
   if(!head.querySelector('meta[name="theme-color"]')){
     const theme=document.createElement('meta');
     theme.name='theme-color';
-    theme.content='#007AFF';
+    theme.content='#efe7db';
     head.appendChild(theme);
   }
   if(!head.querySelector('meta[name="apple-mobile-web-app-capable"]')){
@@ -144,6 +146,57 @@ function ensureBrandAssets(){
     capable.content='yes';
     head.appendChild(capable);
   }
+}
+
+function storedTheme(){
+  try{
+    const value=window.localStorage.getItem(themeStorageKey);
+    return value==='dark'||value==='light' ? value : '';
+  }catch(_){
+    return '';
+  }
+}
+function systemTheme(){
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+function syncThemeMeta(){
+  const meta=document.querySelector('meta[name="theme-color"]');
+  if(!meta) return;
+  const themeColor=getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
+  if(themeColor) meta.setAttribute('content', themeColor);
+}
+function syncThemeButtons(theme){
+  themeButtons.forEach(function(btn){
+    const active=btn.getAttribute('data-theme-option')===theme;
+    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
+    btn.classList.toggle('is-active', active);
+  });
+}
+function applyTheme(theme, persist){
+  const resolved=theme==='dark' ? 'dark' : 'light';
+  document.documentElement.setAttribute('data-theme', resolved);
+  document.documentElement.style.colorScheme=resolved;
+  if(persist){
+    try{ window.localStorage.setItem(themeStorageKey, resolved); }catch(_){}
+  }
+  syncThemeButtons(resolved);
+  syncThemeMeta();
+}
+function initTheme(){
+  applyTheme(storedTheme() || systemTheme(), false);
+  themeButtons.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      applyTheme(btn.getAttribute('data-theme-option'), true);
+    });
+  });
+  if(!window.matchMedia) return;
+  const media=window.matchMedia('(prefers-color-scheme: dark)');
+  const handleChange=function(){
+    if(storedTheme()) return;
+    applyTheme(systemTheme(), false);
+  };
+  if(media.addEventListener) media.addEventListener('change', handleChange);
+  else if(media.addListener) media.addListener(handleChange);
 }
 
 function sameTarget(current, target){
@@ -157,6 +210,7 @@ function sameTarget(current, target){
 }
 
 ensureBrandAssets();
+initTheme();
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); });
 }
@@ -228,7 +282,16 @@ if(iframe){
     <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню">
       <span></span><span></span><span></span>
     </button>
-    <h1 class="top-nav-title">%s</h1>
+    <div class="top-nav-title-wrap">
+      <span class="top-nav-eyebrow">WorkService</span>
+      <h1 class="top-nav-title">%s</h1>
+    </div>
+    <div class="top-nav-actions">
+      <div class="theme-toggle" role="group" aria-label="Theme">
+        <button class="theme-toggle-option" type="button" data-theme-option="light" aria-pressed="false">Day</button>
+        <button class="theme-toggle-option" type="button" data-theme-option="dark" aria-pressed="false">Night</button>
+      </div>
+    </div>
   </div>
 </header>
 <div class="side-nav-overlay" data-nav-overlay></div>

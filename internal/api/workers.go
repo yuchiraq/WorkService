@@ -148,7 +148,7 @@ func WorkersPage(c *gin.Context) {
         </div>
         <div class="card">
             <p>Просмотр, добавление, редактирование или увольнение работников.</p>
-            <div class="tab-switcher" style="margin-bottom:10px;display:flex;gap:8px;">
+            <div class="tab-switcher">
                 <a class="btn btn-secondary{{TAB_ACTIVE_CLASS}}" href="/workers?tab=active">Текущие</a>
                 <a class="btn btn-secondary{{TAB_FIRED_CLASS}}" href="/workers?tab=fired">Уволенные</a>
             </div>
@@ -377,7 +377,7 @@ func WorkerProfilePage(c *gin.Context) {
         </ul>
 
 
-        <div class="profile-grid" style="grid-template-columns: 1.2fr .8fr; align-items:start;">
+        <div class="profile-grid profile-grid-split">
             <div class="placeholder-card">
                  <div class="history-header"><h2>История назначений</h2></div>
 			 <form method="GET" action="/worker/{{WORKER_ID}}" class="month-selector"><label for="month">Месяц:</label><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select><span><strong>Итого часов:</strong> {{TOTAL_HOURS}}</span>{{MONTH_SALARY}}</form>
