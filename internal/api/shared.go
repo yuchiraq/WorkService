@@ -89,8 +89,11 @@ const modalSheet=document.querySelector('.action-modal-sheet');
 const modalTitle=document.getElementById('app-action-modal-title');
 const burger=document.querySelector('[data-mobile-nav-toggle]');
 const navOverlay=document.querySelector('[data-nav-overlay]');
-const themeButtons=document.querySelectorAll('[data-theme-option]');
-const themeStorageKey='workservice-theme';
+
+function syncNavState(){
+  if(!burger) return;
+  burger.setAttribute('aria-expanded', body.classList.contains('nav-open') ? 'true' : 'false');
+}
 
 function closeModal(){
   if(!modal) return;
@@ -99,7 +102,10 @@ function closeModal(){
   body.classList.remove('modal-open');
   if(iframe){ iframe.removeAttribute('src'); iframe.removeAttribute('data-return-path'); iframe.style.removeProperty('height'); }
 }
-function closeNav(){ body.classList.remove('nav-open'); }
+function closeNav(){
+  body.classList.remove('nav-open');
+  syncNavState();
+}
 function openModal(url,t,ret){
   if(!modal||!iframe){ window.location.href=url; return; }
   const effectiveRet = ret || (window.location.pathname + window.location.search);
@@ -148,52 +154,18 @@ function ensureBrandAssets(){
   }
 }
 
-function storedTheme(){
-  try{
-    const value=window.localStorage.getItem(themeStorageKey);
-    return value==='dark'||value==='light' ? value : '';
-  }catch(_){
-    return '';
-  }
-}
-function systemTheme(){
-  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
 function syncThemeMeta(){
   const meta=document.querySelector('meta[name="theme-color"]');
   if(!meta) return;
   const themeColor=getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
   if(themeColor) meta.setAttribute('content', themeColor);
 }
-function syncThemeButtons(theme){
-  themeButtons.forEach(function(btn){
-    const active=btn.getAttribute('data-theme-option')===theme;
-    btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-    btn.classList.toggle('is-active', active);
-  });
-}
-function applyTheme(theme, persist){
-  const resolved=theme==='dark' ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', resolved);
-  document.documentElement.style.colorScheme=resolved;
-  if(persist){
-    try{ window.localStorage.setItem(themeStorageKey, resolved); }catch(_){}
-  }
-  syncThemeButtons(resolved);
+function initThemeMeta(){
   syncThemeMeta();
-}
-function initTheme(){
-  applyTheme(storedTheme() || systemTheme(), false);
-  themeButtons.forEach(function(btn){
-    btn.addEventListener('click', function(){
-      applyTheme(btn.getAttribute('data-theme-option'), true);
-    });
-  });
   if(!window.matchMedia) return;
   const media=window.matchMedia('(prefers-color-scheme: dark)');
   const handleChange=function(){
-    if(storedTheme()) return;
-    applyTheme(systemTheme(), false);
+    window.requestAnimationFrame(syncThemeMeta);
   };
   if(media.addEventListener) media.addEventListener('change', handleChange);
   else if(media.addListener) media.addListener(handleChange);
@@ -210,7 +182,7 @@ function sameTarget(current, target){
 }
 
 ensureBrandAssets();
-initTheme();
+initThemeMeta();
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); });
 }
@@ -227,6 +199,33 @@ function closeTimesheetMenus(){
     if(btn) btn.setAttribute('aria-expanded','false');
   });
 }
+function positionHoursTooltip(cell){
+  const tooltip=cell ? cell.querySelector('.hours-tooltip') : null;
+  if(!tooltip) return;
+  tooltip.classList.remove('open-down','align-left','align-right');
+  const cellRect=cell.getBoundingClientRect();
+  const tooltipRect=tooltip.getBoundingClientRect();
+  const safeTop = Math.max(tooltipRect.height + 140, 460);
+  if(cellRect.top < safeTop){
+    tooltip.classList.add('open-down');
+  }
+  if(cellRect.left + (tooltipRect.width / 2) > window.innerWidth - 20){
+    tooltip.classList.add('align-right');
+  } else if(cellRect.right - (tooltipRect.width / 2) < 20){
+    tooltip.classList.add('align-left');
+  }
+}
+function bindHoursTooltipListeners(){
+  document.querySelectorAll('.hours-cell').forEach(function(cell){
+    if(!cell.querySelector('.hours-tooltip') || cell.hasAttribute('data-hours-tooltip-bound')) return;
+    cell.setAttribute('data-hours-tooltip-bound', 'true');
+    ['mouseenter','focusin','touchstart'].forEach(function(name){
+      cell.addEventListener(name, function(){ positionHoursTooltip(cell); }, { passive: true });
+    });
+  });
+}
+window.setTimeout(bindHoursTooltipListeners, 0);
+window.addEventListener('load', bindHoursTooltipListeners);
 document.addEventListener('click', function(e){
   const btn=e.target.closest('[data-timesheet-menu-toggle]');
   if(btn){
@@ -250,11 +249,15 @@ document.addEventListener('click', function(e){
 });
 if(closeBtn) closeBtn.addEventListener('click',closeModal);
 if(modal) modal.addEventListener('click',function(e){ if(e.target===modal) closeModal();});
-if(burger) burger.addEventListener('click', function(){ body.classList.toggle('nav-open'); });
+if(burger) burger.addEventListener('click', function(){
+  body.classList.toggle('nav-open');
+  syncNavState();
+});
 if(navOverlay) navOverlay.addEventListener('click', closeNav);
 document.querySelectorAll('.side-nav-links a').forEach(function(a){ a.addEventListener('click', closeNav); });
 window.addEventListener('resize', function(){ if(window.innerWidth >= 1024) closeNav(); });
 document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeModal(); closeNav(); }});
+syncNavState();
 if(iframe){
   iframe.addEventListener('load',function(){
     const ret=iframe.getAttribute('data-return-path');
@@ -263,6 +266,8 @@ if(iframe){
       href=iframe.contentWindow.location.href;
       if(iframe.contentWindow && iframe.contentWindow.document){
         const d=iframe.contentWindow.document;
+        if(d.documentElement) d.documentElement.classList.add('modal-embedded');
+        if(d.body) d.body.classList.add('modal-embedded-body');
         const h=Math.max(d.body ? d.body.scrollHeight : 0, d.documentElement ? d.documentElement.scrollHeight : 0);
         if(h>0){
           const maxH = window.innerHeight - 140;
@@ -279,18 +284,18 @@ if(iframe){
 	return fmt.Sprintf(`
 <header class="top-nav">
   <div class="container nav-inner">
-    <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню">
-      <span></span><span></span><span></span>
+    <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню" aria-expanded="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <rect x="3.5" y="4.5" width="17" height="15" rx="4"></rect>
+        <path d="M8.5 8h8"></path>
+        <path d="M8.5 12h8"></path>
+        <path d="M8.5 16h5"></path>
+        <path d="M6.5 7.5v9"></path>
+      </svg>
     </button>
     <div class="top-nav-title-wrap">
       <span class="top-nav-eyebrow">WorkService</span>
       <h1 class="top-nav-title">%s</h1>
-    </div>
-    <div class="top-nav-actions">
-      <div class="theme-toggle" role="group" aria-label="Theme">
-        <button class="theme-toggle-option" type="button" data-theme-option="light" aria-pressed="false">Day</button>
-        <button class="theme-toggle-option" type="button" data-theme-option="dark" aria-pressed="false">Night</button>
-      </div>
     </div>
   </div>
 </header>
@@ -304,8 +309,8 @@ if(iframe){
 <div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение">+</a></div>
 <div class="action-modal" id="app-action-modal" aria-hidden="true">
   <div class="action-modal-sheet">
-    <div class="action-modal-header"><strong id="app-action-modal-title">Форма</strong><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">✕</button></div>
-    <iframe id="app-action-modal-iframe" title="Форма"></iframe>
+    <div class="action-modal-header"><strong id="app-action-modal-title">Форма</strong><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">&times;</button></div>
+    <div class="action-modal-body"><iframe id="app-action-modal-iframe" title="Форма"></iframe></div>
   </div>
 </div>%s%s`, pageTitle, userInitial, userName, roleLabel, nav.String(), csrfScript, uiScript)
 }

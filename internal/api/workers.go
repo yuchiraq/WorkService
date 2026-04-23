@@ -619,7 +619,7 @@ func EditWorkerPage(c *gin.Context) {
 
     <script>
         function showDeleteModal() {
-            document.getElementById('deleteModal').style.display = 'flex';
+            document.getElementById('deleteModal').style.display = 'grid';
         }
         function closeDeleteModal() {
             document.getElementById('deleteModal').style.display = 'none';

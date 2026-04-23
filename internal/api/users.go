@@ -41,7 +41,7 @@ func UsersPage(c *gin.Context) {
 
 	var rows strings.Builder
 	for _, user := range users {
-		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><div class="table-actions"><a href="/users/edit/%s" class="btn btn-secondary" data-modal-url="/users/edit/%s" data-modal-title="Редактировать пользователя" data-modal-return="/users">Редактировать</a><form action="/users/delete/%s" method="POST" style="display:inline;"><button class="btn btn-danger" type="submit">Удалить</button></form></div></td></tr>`,
+		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><div class="table-actions"><a href="/users/edit/%s" class="btn btn-secondary" data-modal-url="/users/edit/%s" data-modal-title="Редактировать пользователя" data-modal-return="/users">Редактировать</a><form action="/users/delete/%s" method="POST" class="table-action-form"><button class="btn btn-danger" type="submit">Удалить</button></form></div></td></tr>`,
 			template.HTMLEscapeString(user.Name),
 			template.HTMLEscapeString(user.Username),
 			template.HTMLEscapeString(user.Phone),
@@ -58,7 +58,7 @@ func UsersPage(c *gin.Context) {
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Пользователи</h1><a href="/users/new" class="btn btn-primary" data-modal-url="/users/new" data-modal-title="Новый пользователь" data-modal-return="/users">Добавить пользователя</a></div>
-<div class="card"><table class="table"><thead><tr><th>ФИО</th><th>Логин</th><th>Телефон</th><th>Статус</th><th>Последний вход</th><th>Действия</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
+<div class="card"><table class="table responsive-table users-table"><thead><tr><th>ФИО</th><th>Логин</th><th>Телефон</th><th>Статус</th><th>Последний вход</th><th>Действия</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div></body></html>`
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "users"), 1)
 	final = strings.Replace(final, "{{ROWS}}", rows.String(), 1)

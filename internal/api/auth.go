@@ -146,27 +146,9 @@ func LoginPage(c *gin.Context) {
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/static/img/logo-192.png">
     <title>Вход в систему</title>
-    <script>
-      (function(){
-        try {
-          var saved = window.localStorage.getItem('workservice-theme');
-          var theme = (saved === 'light' || saved === 'dark')
-            ? saved
-            : ((window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light');
-          document.documentElement.setAttribute('data-theme', theme);
-          document.documentElement.style.colorScheme = theme;
-        } catch (_) {}
-      })();
-    </script>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
 <body class="login-screen">
-    <div class="login-themebar">
-        <div class="theme-toggle" role="group" aria-label="Theme">
-            <button class="theme-toggle-option" type="button" data-theme-option="light" aria-pressed="false">Day</button>
-            <button class="theme-toggle-option" type="button" data-theme-option="dark" aria-pressed="false">Night</button>
-        </div>
-    </div>
     <div class="center-page">
         <div class="card center-card login-card">
             <div class="login-card-head">
@@ -189,34 +171,19 @@ func LoginPage(c *gin.Context) {
     </div>
 <script>
 (function(){
-  const buttons=document.querySelectorAll('[data-theme-option]');
-  function syncThemeButtons(theme){
-    buttons.forEach(function(btn){
-      const active=btn.getAttribute('data-theme-option')===theme;
-      btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-      btn.classList.toggle('is-active', active);
-    });
-  }
-  function applyTheme(theme, persist){
-    const resolved=theme==='dark' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', resolved);
-    document.documentElement.style.colorScheme=resolved;
-    if(persist){
-      try { window.localStorage.setItem('workservice-theme', resolved); } catch (_) {}
-    }
+  function syncThemeMeta(){
     const meta=document.querySelector('meta[name="theme-color"]');
-    if(meta){
-      const color=getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
-      if(color) meta.setAttribute('content', color);
-    }
-    syncThemeButtons(resolved);
+    if(!meta) return;
+    const color=getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
+    if(color) meta.setAttribute('content', color);
   }
-  syncThemeButtons(document.documentElement.getAttribute('data-theme') || 'light');
-  buttons.forEach(function(btn){
-    btn.addEventListener('click', function(){
-      applyTheme(btn.getAttribute('data-theme-option'), true);
-    });
-  });
+  syncThemeMeta();
+  if(window.matchMedia){
+    const media=window.matchMedia('(prefers-color-scheme: dark)');
+    const handleChange=function(){ window.requestAnimationFrame(syncThemeMeta); };
+    if(media.addEventListener) media.addEventListener('change', handleChange);
+    else if(media.addListener) media.addListener(handleChange);
+  }
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){
     navigator.serviceWorker.register('/sw.js').catch(function(){});
