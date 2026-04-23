@@ -41,8 +41,6 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 			{PageID: "workers", Path: "/workers", Label: "Работники"},
 			{PageID: "objects", Path: "/objects", Label: "Объекты"},
 		}, navItems...)
-	}
-	if userStatus == "admin" {
 		navItems = append(navItems,
 			navItem{PageID: "users", Path: "/users", Label: "Пользователи"},
 			navItem{PageID: "settings", Path: "/settings", Label: "Настройки"},
@@ -83,43 +81,172 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 	uiScript := `<script>(function(){
 const body=document.body;
 const modal=document.getElementById('app-action-modal');
-const iframe=document.getElementById('app-action-modal-iframe');
+const modalBody=modal ? modal.querySelector('.action-modal-body') : null;
+const modalContent=document.getElementById('app-action-modal-content');
 const closeBtn=document.querySelector('[data-modal-close]');
-const modalSheet=document.querySelector('.action-modal-sheet');
 const modalTitle=document.getElementById('app-action-modal-title');
 const burger=document.querySelector('[data-mobile-nav-toggle]');
 const navOverlay=document.querySelector('[data-nav-overlay]');
+const parser=new DOMParser();
+const defaultModalTitle='Форма';
+let modalRequestSeq=0;
+let modalCleanupFns=[];
+let lastModalTrigger=null;
+let tooltipPortal=null;
+let activeHoursCell=null;
+let tooltipHideTimer=0;
 
 function syncNavState(){
   if(!burger) return;
   burger.setAttribute('aria-expanded', body.classList.contains('nav-open') ? 'true' : 'false');
 }
 
-function closeModal(){
-  if(!modal) return;
-  modal.classList.remove('visible');
-  modal.setAttribute('aria-hidden','true');
-  body.classList.remove('modal-open');
-  if(iframe){ iframe.removeAttribute('src'); iframe.removeAttribute('data-return-path'); iframe.style.removeProperty('height'); }
+function normalizePathname(pathname){
+  const normalized=(pathname || '/').replace(/\/$/, '');
+  return normalized || '/';
 }
+
+function normalizeLocation(target){
+  try{
+    const u=new URL(target, window.location.origin);
+    return normalizePathname(u.pathname) + u.search + u.hash;
+  }catch(_){
+    return target || '';
+  }
+}
+
+function sameLocation(current, target){
+  return normalizeLocation(current) === normalizeLocation(target);
+}
+
+function stripModalParams(target){
+  try{
+    const u=new URL(target, window.location.origin);
+    u.searchParams.delete('modal');
+    return normalizePathname(u.pathname) + u.search + u.hash;
+  }catch(_){
+    return target;
+  }
+}
+
+function getDefaultReturnPath(){
+  return window.location.pathname + window.location.search;
+}
+
+function getModalReturnPath(){
+  return modal ? (modal.getAttribute('data-return-path') || getDefaultReturnPath()) : getDefaultReturnPath();
+}
+
+function buildModalURL(url, ret){
+  try{
+    const u=new URL(url, window.location.origin);
+    if(!u.searchParams.has('modal')) u.searchParams.set('modal', '1');
+    if(ret && !u.searchParams.has('return')) u.searchParams.set('return', ret);
+    return u.pathname + u.search + u.hash;
+  }catch(_){
+    return url;
+  }
+}
+
+function clearModalCleanup(){
+  while(modalCleanupFns.length){
+    const fn=modalCleanupFns.pop();
+    try{ fn(); }catch(_){}
+  }
+}
+
+function scheduleHideHoursTooltip(){
+  if(!tooltipPortal) return;
+  window.clearTimeout(tooltipHideTimer);
+  tooltipHideTimer=window.setTimeout(hideHoursTooltip, 120);
+}
+
+function cancelHideHoursTooltip(){
+  window.clearTimeout(tooltipHideTimer);
+}
+
+function ensureTooltipPortal(){
+  if(tooltipPortal || !document.body) return;
+  tooltipPortal=document.createElement('div');
+  tooltipPortal.id='app-hours-tooltip-portal';
+  tooltipPortal.className='hours-tooltip-portal';
+  tooltipPortal.setAttribute('aria-hidden', 'true');
+  tooltipPortal.addEventListener('mouseenter', cancelHideHoursTooltip);
+  tooltipPortal.addEventListener('mouseleave', scheduleHideHoursTooltip);
+  document.body.appendChild(tooltipPortal);
+  body.classList.add('hours-tooltip-portal-ready');
+}
+
+function positionHoursTooltip(cell){
+  if(!tooltipPortal || !cell || !tooltipPortal.classList.contains('visible')) return;
+  const cellRect=cell.getBoundingClientRect();
+  const tooltipRect=tooltipPortal.getBoundingClientRect();
+  let left=cellRect.left + (cellRect.width / 2) - (tooltipRect.width / 2);
+  left=Math.max(12, Math.min(left, window.innerWidth - tooltipRect.width - 12));
+  let top=cellRect.top - tooltipRect.height - 12;
+  if(top < 96){
+    top=cellRect.bottom + 12;
+  }
+  if(top + tooltipRect.height > window.innerHeight - 12){
+    top=Math.max(12, window.innerHeight - tooltipRect.height - 12);
+  }
+  tooltipPortal.style.left=Math.round(left) + 'px';
+  tooltipPortal.style.top=Math.round(top) + 'px';
+}
+
+function showHoursTooltip(cell){
+  const source=cell ? cell.querySelector('.hours-tooltip') : null;
+  if(!source || !source.innerHTML.trim()) return;
+  ensureTooltipPortal();
+  if(!tooltipPortal) return;
+  cancelHideHoursTooltip();
+  activeHoursCell=cell;
+  tooltipPortal.innerHTML=source.innerHTML;
+  tooltipPortal.classList.add('visible');
+  tooltipPortal.setAttribute('aria-hidden', 'false');
+  positionHoursTooltip(cell);
+}
+
+function hideHoursTooltip(){
+  cancelHideHoursTooltip();
+  activeHoursCell=null;
+  if(!tooltipPortal) return;
+  tooltipPortal.classList.remove('visible');
+  tooltipPortal.setAttribute('aria-hidden', 'true');
+  tooltipPortal.innerHTML='';
+  tooltipPortal.style.removeProperty('left');
+  tooltipPortal.style.removeProperty('top');
+}
+
+function bindHoursTooltipListeners(root){
+  (root || document).querySelectorAll('.hours-cell').forEach(function(cell){
+    if(!cell.querySelector('.hours-tooltip') || cell.hasAttribute('data-hours-tooltip-bound')) return;
+    cell.setAttribute('data-hours-tooltip-bound', 'true');
+    cell.addEventListener('mouseenter', function(){ showHoursTooltip(cell); });
+    cell.addEventListener('mouseleave', function(){
+      if(!tooltipPortal || !tooltipPortal.matches(':hover')) scheduleHideHoursTooltip();
+    });
+    cell.addEventListener('focusin', function(){ showHoursTooltip(cell); });
+    cell.addEventListener('focusout', scheduleHideHoursTooltip);
+    cell.addEventListener('touchstart', function(){ showHoursTooltip(cell); }, { passive: true });
+  });
+}
+
+function closeTimesheetMenus(){
+  document.querySelectorAll('.timesheet-quick-menu.open').forEach(function(menu){
+    menu.classList.remove('open', 'open-up');
+    const btn=menu.parentElement ? menu.parentElement.querySelector('[data-timesheet-menu-toggle]') : null;
+    if(btn) btn.setAttribute('aria-expanded', 'false');
+  });
+}
+
 function closeNav(){
   body.classList.remove('nav-open');
   syncNavState();
 }
-function openModal(url,t,ret){
-  if(!modal||!iframe){ window.location.href=url; return; }
-  const effectiveRet = ret || (window.location.pathname + window.location.search);
-  try{ const u=new URL(url,window.location.origin); if(!u.searchParams.has('modal')) u.searchParams.set('modal','1'); if(effectiveRet && !u.searchParams.has('return')) u.searchParams.set('return', effectiveRet); url=u.pathname+u.search; }catch(_){ }
-  modal.classList.add('visible');
-  modal.setAttribute('aria-hidden','false');
-  body.classList.add('modal-open');
-  if(modalTitle) modalTitle.textContent=t||'Форма';
-  iframe.setAttribute('data-return-path', effectiveRet);
-  iframe.src=url;
-}
 
 function ensureBrandAssets(){
-  const head=document.head||document.getElementsByTagName('head')[0];
+  const head=document.head || document.getElementsByTagName('head')[0];
   if(!head) return;
   if(!head.querySelector('link[rel="icon"]')){
     const ico=document.createElement('link');
@@ -160,6 +287,7 @@ function syncThemeMeta(){
   const themeColor=getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim();
   if(themeColor) meta.setAttribute('content', themeColor);
 }
+
 function initThemeMeta(){
   syncThemeMeta();
   if(!window.matchMedia) return;
@@ -171,62 +299,199 @@ function initThemeMeta(){
   else if(media.addListener) media.addListener(handleChange);
 }
 
-function sameTarget(current, target){
-  try{
-    const c=new URL(current, window.location.origin);
-    const t=new URL(target, window.location.origin);
-    const cp=c.pathname.replace(/\/$/, '');
-    const tp=t.pathname.replace(/\/$/, '');
-    return cp===tp;
-  }catch(_){ return false; }
+function showModalLoading(title){
+  if(modalTitle) modalTitle.textContent=title || defaultModalTitle;
+  if(!modalContent) return;
+  modalContent.innerHTML='<div class="action-modal-loading"><div class="action-modal-loading-bar"></div><p>Загрузка...</p></div>';
+  if(modalBody) modalBody.scrollTop=0;
+}
+
+function executeModalScripts(scope){
+  Array.from(scope.querySelectorAll('script')).forEach(function(oldScript){
+    const replacement=document.createElement('script');
+    Array.from(oldScript.attributes).forEach(function(attr){
+      replacement.setAttribute(attr.name, attr.value);
+    });
+    replacement.text=oldScript.textContent || '';
+    const originalAdd=EventTarget.prototype.addEventListener;
+    EventTarget.prototype.addEventListener=function(type, listener, options){
+      modalCleanupFns.push(function(){
+        try{ this.removeEventListener(type, listener, options); }catch(_){}
+      }.bind(this));
+      return originalAdd.call(this, type, listener, options);
+    };
+    try{
+      oldScript.replaceWith(replacement);
+    } finally {
+      EventTarget.prototype.addEventListener=originalAdd;
+    }
+  });
+}
+
+function focusFirstModalField(){
+  if(!modalContent) return;
+  const field=modalContent.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
+  if(field && typeof field.focus === 'function'){
+    window.requestAnimationFrame(function(){
+      try{ field.focus({ preventScroll: true }); }catch(_){ field.focus(); }
+    });
+  }
+}
+
+function renderModalHTML(html, fallbackTitle, returnPath){
+  if(!modalContent) return;
+  clearModalCleanup();
+  const doc=parser.parseFromString(html, 'text/html');
+  const pageTitle=(doc.querySelector('title') && doc.querySelector('title').textContent.trim()) || (doc.querySelector('h1') && doc.querySelector('h1').textContent.trim()) || fallbackTitle || defaultModalTitle;
+  if(modalTitle) modalTitle.textContent=pageTitle;
+  modalContent.innerHTML=doc.body ? doc.body.innerHTML : html;
+  if(modal) modal.setAttribute('data-return-path', returnPath || getDefaultReturnPath());
+  if(modalBody) modalBody.scrollTop=0;
+  bindHoursTooltipListeners(modalContent);
+  executeModalScripts(modalContent);
+  focusFirstModalField();
+}
+
+function navigateAfterModal(target){
+  const cleanTarget=stripModalParams(target || getModalReturnPath());
+  closeModal();
+  if(sameLocation(window.location.href, cleanTarget)){
+    window.location.reload();
+    return;
+  }
+  window.location.assign(cleanTarget);
+}
+
+function closeModal(){
+  modalRequestSeq += 1;
+  hideHoursTooltip();
+  clearModalCleanup();
+  if(!modal) return;
+  modal.classList.remove('visible');
+  modal.setAttribute('aria-hidden', 'true');
+  modal.removeAttribute('data-return-path');
+  body.classList.remove('modal-open');
+  if(modalContent) modalContent.innerHTML='';
+  if(lastModalTrigger && document.contains(lastModalTrigger)){
+    try{ lastModalTrigger.focus({ preventScroll: true }); }catch(_){ lastModalTrigger.focus(); }
+  }
+  lastModalTrigger=null;
+}
+
+function openModal(url, title, ret, trigger){
+  if(!modal || !modalContent || !window.fetch){
+    window.location.href=url;
+    return;
+  }
+  const effectiveRet=ret || getDefaultReturnPath();
+  const requestURL=buildModalURL(url, effectiveRet);
+  const seq=++modalRequestSeq;
+  lastModalTrigger=trigger || document.activeElement;
+  hideHoursTooltip();
+  clearModalCleanup();
+  modal.classList.add('visible');
+  modal.setAttribute('aria-hidden', 'false');
+  modal.setAttribute('data-return-path', effectiveRet);
+  body.classList.add('modal-open');
+  showModalLoading(title);
+  fetch(requestURL, {
+    credentials: 'same-origin',
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+  }).then(function(response){
+    return response.text().then(function(text){
+      return { response: response, text: text };
+    });
+  }).then(function(payload){
+    if(seq !== modalRequestSeq) return;
+    if(payload.response.redirected){
+      navigateAfterModal(payload.response.url);
+      return;
+    }
+    renderModalHTML(payload.text, title, effectiveRet);
+  }).catch(function(){
+    if(seq !== modalRequestSeq) return;
+    window.location.assign(stripModalParams(requestURL));
+  });
+}
+
+function submitModalForm(form, submitter){
+  const method=(form.getAttribute('method') || 'GET').toUpperCase();
+  const action=form.getAttribute('action') || window.location.href;
+  const returnPath=getModalReturnPath();
+  if(method === 'GET'){
+    const data=new URLSearchParams(new FormData(form));
+    const target=new URL(action, window.location.origin);
+    target.search=data.toString();
+    openModal(target.pathname + target.search + target.hash, modalTitle ? modalTitle.textContent : defaultModalTitle, returnPath, submitter);
+    return;
+  }
+
+  const formData=new FormData(form);
+  if(submitter && submitter.name && !formData.has(submitter.name)){
+    formData.append(submitter.name, submitter.value || '');
+  }
+
+  const hasBinary=Array.from(formData.values()).some(function(value){
+    return typeof File !== 'undefined' && value instanceof File && value.name;
+  });
+  const headers={ 'X-Requested-With': 'XMLHttpRequest' };
+  let requestBody=formData;
+  if(!hasBinary){
+    const params=new URLSearchParams();
+    formData.forEach(function(value, key){
+      if(typeof value === 'string') params.append(key, value);
+    });
+    requestBody=params;
+    headers['Content-Type']='application/x-www-form-urlencoded; charset=UTF-8';
+  }
+
+  const seq=++modalRequestSeq;
+  if(submitter && typeof submitter.disabled !== 'undefined'){
+    submitter.disabled=true;
+  }
+
+  fetch(action, {
+    method: method,
+    body: requestBody,
+    credentials: 'same-origin',
+    headers: headers
+  }).then(function(response){
+    return response.text().then(function(text){
+      return { response: response, text: text };
+    });
+  }).then(function(payload){
+    if(seq !== modalRequestSeq) return;
+    if(payload.response.redirected){
+      navigateAfterModal(payload.response.url);
+      return;
+    }
+    renderModalHTML(payload.text, modalTitle ? modalTitle.textContent : defaultModalTitle, returnPath);
+  }).catch(function(){
+    if(seq !== modalRequestSeq) return;
+    window.location.assign(stripModalParams(action));
+  }).finally(function(){
+    if(submitter && typeof submitter.disabled !== 'undefined'){
+      submitter.disabled=false;
+    }
+  });
 }
 
 ensureBrandAssets();
 initThemeMeta();
+ensureTooltipPortal();
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); });
 }
-document.addEventListener('click',function(e){
-  const t=e.target.closest('[data-modal-url]');
-  if(!t) return;
-  e.preventDefault();
-  openModal(t.getAttribute('data-modal-url'), t.getAttribute('data-modal-title'), t.getAttribute('data-modal-return'));
-});
-function closeTimesheetMenus(){
-  document.querySelectorAll('.timesheet-quick-menu.open').forEach(function(menu){
-    menu.classList.remove('open','open-up');
-    const btn = menu.parentElement ? menu.parentElement.querySelector('[data-timesheet-menu-toggle]') : null;
-    if(btn) btn.setAttribute('aria-expanded','false');
-  });
-}
-function positionHoursTooltip(cell){
-  const tooltip=cell ? cell.querySelector('.hours-tooltip') : null;
-  if(!tooltip) return;
-  tooltip.classList.remove('open-down','align-left','align-right');
-  const cellRect=cell.getBoundingClientRect();
-  const tooltipRect=tooltip.getBoundingClientRect();
-  const safeTop = Math.max(tooltipRect.height + 140, 460);
-  if(cellRect.top < safeTop){
-    tooltip.classList.add('open-down');
-  }
-  if(cellRect.left + (tooltipRect.width / 2) > window.innerWidth - 20){
-    tooltip.classList.add('align-right');
-  } else if(cellRect.right - (tooltipRect.width / 2) < 20){
-    tooltip.classList.add('align-left');
-  }
-}
-function bindHoursTooltipListeners(){
-  document.querySelectorAll('.hours-cell').forEach(function(cell){
-    if(!cell.querySelector('.hours-tooltip') || cell.hasAttribute('data-hours-tooltip-bound')) return;
-    cell.setAttribute('data-hours-tooltip-bound', 'true');
-    ['mouseenter','focusin','touchstart'].forEach(function(name){
-      cell.addEventListener(name, function(){ positionHoursTooltip(cell); }, { passive: true });
-    });
-  });
-}
-window.setTimeout(bindHoursTooltipListeners, 0);
-window.addEventListener('load', bindHoursTooltipListeners);
+
 document.addEventListener('click', function(e){
+  const trigger=e.target.closest('[data-modal-url]');
+  if(trigger){
+    e.preventDefault();
+    openModal(trigger.getAttribute('data-modal-url'), trigger.getAttribute('data-modal-title'), trigger.getAttribute('data-modal-return'), trigger);
+    return;
+  }
+
   const btn=e.target.closest('[data-timesheet-menu-toggle]');
   if(btn){
     e.preventDefault();
@@ -237,48 +502,85 @@ document.addEventListener('click', function(e){
     if(isOpen) return;
     menu.classList.add('open');
     menu.classList.remove('open-up');
-    btn.setAttribute('aria-expanded','true');
+    btn.setAttribute('aria-expanded', 'true');
     const rect=menu.getBoundingClientRect();
     const needDown=rect.height + 12;
-    const freeDown=window.innerHeight - btn.getBoundingClientRect().bottom;
-    const freeUp=btn.getBoundingClientRect().top;
-    if(freeDown < needDown && freeUp > freeDown){ menu.classList.add('open-up'); }
+    const triggerRect=btn.getBoundingClientRect();
+    const freeDown=window.innerHeight - triggerRect.bottom;
+    const freeUp=triggerRect.top;
+    if(freeDown < needDown && freeUp > freeDown){
+      menu.classList.add('open-up');
+    }
     return;
   }
+
   if(!e.target.closest('.timesheet-quick-menu')) closeTimesheetMenus();
+  if(!e.target.closest('.hours-cell') && !e.target.closest('#app-hours-tooltip-portal')) hideHoursTooltip();
 });
-if(closeBtn) closeBtn.addEventListener('click',closeModal);
-if(modal) modal.addEventListener('click',function(e){ if(e.target===modal) closeModal();});
+
+if(modalContent){
+  modalContent.addEventListener('submit', function(e){
+    const form=e.target.closest('form');
+    if(!form) return;
+    if(form.target && form.target !== '_self') return;
+    e.preventDefault();
+    submitModalForm(form, e.submitter || document.activeElement);
+  });
+
+  modalContent.addEventListener('click', function(e){
+    const link=e.target.closest('a[href]');
+    if(!link || link.hasAttribute('data-modal-url')) return;
+    if(link.hasAttribute('download')) return;
+    if(link.target && link.target !== '_self') return;
+    const rawHref=link.getAttribute('href');
+    if(!rawHref || rawHref.charAt(0) === '#' || /^javascript:/i.test(rawHref) || /^mailto:/i.test(rawHref) || /^tel:/i.test(rawHref)) return;
+    let target;
+    try{
+      target=new URL(rawHref, window.location.origin);
+    }catch(_){
+      return;
+    }
+    if(target.origin !== window.location.origin) return;
+    e.preventDefault();
+    navigateAfterModal(target.pathname + target.search + target.hash);
+  });
+}
+
+if(closeBtn) closeBtn.addEventListener('click', closeModal);
+if(modal) modal.addEventListener('click', function(e){
+  if(e.target === modal) closeModal();
+});
 if(burger) burger.addEventListener('click', function(){
   body.classList.toggle('nav-open');
   syncNavState();
 });
 if(navOverlay) navOverlay.addEventListener('click', closeNav);
-document.querySelectorAll('.side-nav-links a').forEach(function(a){ a.addEventListener('click', closeNav); });
-window.addEventListener('resize', function(){ if(window.innerWidth >= 1024) closeNav(); });
-document.addEventListener('keydown',function(e){ if(e.key==='Escape'){ closeModal(); closeNav(); }});
+document.querySelectorAll('.side-nav-links a').forEach(function(a){
+  a.addEventListener('click', closeNav);
+});
+window.addEventListener('load', function(){
+  bindHoursTooltipListeners(document);
+});
+window.setTimeout(function(){
+  bindHoursTooltipListeners(document);
+}, 0);
+window.addEventListener('resize', function(){
+  if(window.innerWidth >= 1024) closeNav();
+  if(activeHoursCell) positionHoursTooltip(activeHoursCell);
+});
+window.addEventListener('scroll', function(){
+  if(activeHoursCell) positionHoursTooltip(activeHoursCell);
+}, true);
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape'){
+    hideHoursTooltip();
+    closeTimesheetMenus();
+    closeModal();
+    closeNav();
+  }
+});
+
 syncNavState();
-if(iframe){
-  iframe.addEventListener('load',function(){
-    const ret=iframe.getAttribute('data-return-path');
-    let href='';
-    try{
-      href=iframe.contentWindow.location.href;
-      if(iframe.contentWindow && iframe.contentWindow.document){
-        const d=iframe.contentWindow.document;
-        if(d.documentElement) d.documentElement.classList.add('modal-embedded');
-        if(d.body) d.body.classList.add('modal-embedded-body');
-        const h=Math.max(d.body ? d.body.scrollHeight : 0, d.documentElement ? d.documentElement.scrollHeight : 0);
-        if(h>0){
-          const maxH = window.innerHeight - 140;
-          iframe.style.height = Math.min(Math.max(h + 14, 320), maxH) + 'px';
-          if(modalSheet) modalSheet.style.height = 'auto';
-        }
-      }
-    }catch(_){ return; }
-    if(ret && sameTarget(href, ret)){ closeModal(); window.location.assign(ret); }
-  });
-}
 })();</script>`
 
 	return fmt.Sprintf(`
@@ -307,10 +609,10 @@ if(iframe){
   <a class="btn btn-secondary side-nav-logout" href="/logout">Выйти</a>
 </aside>
 <div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение">+</a></div>
-<div class="action-modal" id="app-action-modal" aria-hidden="true">
+<div class="action-modal" id="app-action-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="app-action-modal-title">
   <div class="action-modal-sheet">
     <div class="action-modal-header"><strong id="app-action-modal-title">Форма</strong><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">&times;</button></div>
-    <div class="action-modal-body"><iframe id="app-action-modal-iframe" title="Форма"></iframe></div>
+    <div class="action-modal-body"><div id="app-action-modal-content" class="action-modal-content"></div></div>
   </div>
 </div>%s%s`, pageTitle, userInitial, userName, roleLabel, nav.String(), csrfScript, uiScript)
 }

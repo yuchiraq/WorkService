@@ -215,7 +215,7 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
     </div>
 
     <script>
-        function showDeleteModal(){document.getElementById('deleteModal').style.display='flex';}
+        function showDeleteModal(){document.getElementById('deleteModal').style.display='grid';}
         function closeDeleteModal(){document.getElementById('deleteModal').style.display='none';}
     </script>
 </body>

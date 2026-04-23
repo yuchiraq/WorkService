@@ -625,11 +625,11 @@ func EditWorkerPage(c *gin.Context) {
             document.getElementById('deleteModal').style.display = 'none';
         }
         // Close modal if user clicks outside of it
-        window.onclick = function(event) {
+        window.addEventListener('click', function(event) {
             if (event.target == document.getElementById('deleteModal')) {
                 closeDeleteModal();
             }
-        }
+        });
     </script>
 
 </body>

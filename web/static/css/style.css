@@ -955,21 +955,32 @@ textarea:focus,
   visibility: hidden;
   pointer-events: none;
 }
-.hours-tooltip.open-down {
-  top: calc(100% + 10px);
-  bottom: auto;
+body.hours-tooltip-portal-ready .hours-cell > .hours-tooltip { display: none !important; }
+.hours-tooltip-portal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: min(340px, calc(100vw - 24px));
+  max-height: min(60vh, 420px);
+  overflow: auto;
+  padding: 12px;
+  z-index: 260;
+  border-radius: 18px;
+  border: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--surface-strong), transparent 4%);
+  box-shadow: var(--shadow-strong), var(--shadow-inset);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity var(--t), visibility var(--t);
 }
-.hours-tooltip.align-left {
-  left: 10px;
-  transform: none;
+.hours-tooltip-portal.visible {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
-.hours-tooltip.align-right {
-  left: auto;
-  right: 10px;
-  transform: none;
-}
-.hours-cell:hover .hours-tooltip,
-.hours-cell:focus-within .hours-tooltip { opacity: 1; visibility: visible; pointer-events: auto; }
 .timesheet-entry-item { padding: 10px 12px; text-align: left; }
 .timesheet-entry-item + .timesheet-entry-item { margin-top: 8px; }
 .timesheet-entry-item p + p { margin-top: 4px; }
@@ -1022,7 +1033,7 @@ textarea:focus,
 .action-modal.visible { display: grid; }
 .modal-content,
 .action-modal-sheet {
-  width: min(100%, 980px);
+  width: min(100%, 920px);
   max-height: calc(100dvh - 32px);
 }
 .action-modal-sheet {
@@ -1031,6 +1042,7 @@ textarea:focus,
   padding: 0;
   overflow: hidden;
   background: color-mix(in srgb, var(--surface-strong), transparent 1%);
+  border-radius: 30px;
 }
 .action-modal-header {
   position: sticky;
@@ -1042,16 +1054,29 @@ textarea:focus,
   z-index: 2;
 }
 .action-modal-body {
-  padding: 18px 22px 22px;
+  padding: 0;
   overflow: auto;
+  scrollbar-gutter: stable;
 }
-.action-modal iframe {
-  display: block;
-  width: 100%;
-  min-height: min(74vh, 780px);
-  border: 0;
-  border-radius: 18px;
-  background: transparent;
+.action-modal-content {
+  display: grid;
+  min-height: 0;
+}
+.action-modal-loading {
+  display: grid;
+  gap: 12px;
+  padding: 24px 22px 28px;
+}
+.action-modal-loading p {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+.action-modal-loading-bar {
+  width: min(220px, 100%);
+  height: 4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--accent), transparent 16%), color-mix(in srgb, var(--accent-cool), transparent 24%));
+  animation: modal-loading 1s ease-in-out infinite alternate;
 }
 .action-modal-close {
   position: static;
@@ -1098,32 +1123,30 @@ textarea:focus,
 .modal-form-layout .timesheet-card,
 .modal-form-layout .placeholder-card,
 .modal-form-layout .modal-form-card { border-color: transparent; background: transparent; box-shadow: none; padding: 0; }
-body.modal-embedded-body {
-  background: transparent;
-  overflow-x: hidden;
-}
-body.modal-embedded-body::before,
-body.modal-embedded-body::after { display: none; }
-body.modal-embedded-body .modal-form-layout {
+.action-modal-content .modal-form-layout {
   min-height: auto;
   padding: 0;
 }
-body.modal-embedded-body .main-content.modal-form-content {
+.action-modal-content .main-content.modal-form-content {
   width: 100%;
   max-width: none;
   margin: 0;
-  padding: 0;
+  padding: 22px;
   gap: 18px;
 }
-body.modal-embedded-body .main-content.modal-form-content > .page-header,
-body.modal-embedded-body .main-content.modal-form-content > .back-link { display: none; }
-body.modal-embedded-body .modal-form-card,
-body.modal-embedded-body .modal-form-card::before {
+.action-modal-content .main-content.modal-form-content > .page-header,
+.action-modal-content .main-content.modal-form-content > .back-link { display: none; }
+.action-modal-content .modal-form-card,
+.action-modal-content .modal-form-card::before,
+.action-modal-content .main-content.modal-form-content > .card:not(.modal-content),
+.action-modal-content .main-content.modal-form-content > .timesheet-card,
+.action-modal-content .main-content.modal-form-content > .placeholder-card {
   border: 0;
   background: transparent;
   box-shadow: none;
+  padding: 0;
 }
-body.modal-embedded-body .modal-form-card > p:first-child {
+.action-modal-content .modal-form-card > p:first-child {
   margin-bottom: 2px;
   color: var(--muted-strong);
 }
@@ -1263,7 +1286,8 @@ textarea:focus-visible,
   .action-modal,
   .modal { padding: 12px; }
   .action-modal-header { padding: 14px 18px 12px; }
-  .action-modal-body { padding: 14px 18px 18px; }
+  .action-modal-body { padding: 0; }
+  .action-modal-content .main-content.modal-form-content { padding: 18px; }
   .floating-create-wrap { right: 14px; bottom: calc(14px + env(safe-area-inset-bottom)); }
   .floating-create-btn { width: 58px; height: 58px; border-radius: 20px; font-size: 1.8rem; }
   .login-screen .center-page { padding-top: 126px; }
@@ -1342,4 +1366,8 @@ textarea:focus-visible,
 @keyframes float-pulse {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(-4px); }
+}
+@keyframes modal-loading {
+  from { transform: scaleX(0.72); opacity: 0.72; transform-origin: left center; }
+  to { transform: scaleX(1); opacity: 1; transform-origin: left center; }
 }
