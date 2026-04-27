@@ -14,6 +14,15 @@ type navItem struct {
 	Label  string
 }
 
+const topNavActionsContextKey = "topNavActions"
+
+func SetTopNavActions(c *gin.Context, html string) {
+	if c == nil {
+		return
+	}
+	c.Set(topNavActionsContextKey, strings.TrimSpace(html))
+}
+
 // RenderSidebar keeps historical name, but renders topbar with off-canvas navigation.
 func RenderSidebar(c *gin.Context, activePage string) string {
 	userName := "Пользователь"
@@ -76,6 +85,17 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 	csrfScript := ""
 	if token, ok := csrfToken.(string); ok && token != "" {
 		csrfScript = fmt.Sprintf(`<script>(function(){const t=%q;document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(f){if(f.querySelector('input[name="_csrf_token"]')) return; var i=document.createElement('input'); i.type='hidden'; i.name='_csrf_token'; i.value=t; f.appendChild(i);});})();</script>`, token)
+	}
+
+	topNavActions := ""
+	if actionsValue, ok := c.Get(topNavActionsContextKey); ok {
+		if value, castOK := actionsValue.(string); castOK {
+			topNavActions = strings.TrimSpace(value)
+		}
+	}
+	navInnerClass := "container nav-inner"
+	if topNavActions != "" {
+		navInnerClass += " has-actions"
 	}
 
 	uiScript := `<script>(function(){
@@ -585,7 +605,7 @@ syncNavState();
 
 	return fmt.Sprintf(`
 <header class="top-nav">
-  <div class="container nav-inner">
+  <div class="%s">
     <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню" aria-expanded="false">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <rect x="3.5" y="4.5" width="17" height="15" rx="4"></rect>
@@ -596,14 +616,15 @@ syncNavState();
       </svg>
     </button>
     <div class="top-nav-title-wrap">
-      <span class="top-nav-eyebrow">WorkService</span>
+      <span class="top-nav-eyebrow">АВАЮССТРОЙ</span>
       <h1 class="top-nav-title">%s</h1>
     </div>
+    <div class="top-nav-actions">%s</div>
   </div>
 </header>
 <div class="side-nav-overlay" data-nav-overlay></div>
 <aside class="side-nav" aria-label="Навигация">
-  <div class="side-nav-brand"><img src="/static/img/logo.svg" alt="logo"><span>АВАЮССТРОЙ</span></div>
+  <div class="side-nav-brand"><img src="/static/img/logo.svg" alt="АВАЮССТРОЙ"><div class="side-nav-brand-copy"><strong>ЧСУП "АВАЮССТРОЙ"</strong><small>система управления работами</small></div></div>
   <a class="side-nav-user" href="/profile"><span class="user-avatar">%s</span><div><strong>%s</strong><small>%s</small></div></a>
   <nav class="side-nav-links">%s</nav>
   <a class="btn btn-secondary side-nav-logout" href="/logout">Выйти</a>
@@ -614,7 +635,7 @@ syncNavState();
     <div class="action-modal-header"><strong id="app-action-modal-title">Форма</strong><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">&times;</button></div>
     <div class="action-modal-body"><div id="app-action-modal-content" class="action-modal-content"></div></div>
   </div>
-</div>%s%s`, pageTitle, userInitial, userName, roleLabel, nav.String(), csrfScript, uiScript)
+</div>%s%s`, navInnerClass, pageTitle, topNavActions, userInitial, userName, roleLabel, nav.String(), csrfScript, uiScript)
 }
 
 func IsModalRequest(c *gin.Context) bool {

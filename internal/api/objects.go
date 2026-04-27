@@ -83,6 +83,8 @@ func ObjectsPage(c *gin.Context) {
 	if cards.Len() == 0 {
 		cards.WriteString(`<div class="info-card"><p>Объекты пока не добавлены.</p></div>`)
 	}
+	currentObjectsPath := "/objects?tab=" + template.URLQueryEscaper(selectedTab)
+	SetTopNavActions(c, `<div class="top-nav-toolbar"><a href="/objects/new" class="btn btn-primary" data-modal-url="/objects/new" data-modal-title="Новый объект" data-modal-return="`+currentObjectsPath+`">Новый объект</a></div>`)
 
 	page := `
 <!DOCTYPE html>
@@ -96,7 +98,7 @@ func ObjectsPage(c *gin.Context) {
 <body>
     {{SIDEBAR_HTML}}
     <div class="main-content">
-        <div class="page-header">
+        <div class="page-header page-header-desktop-hidden">
             <h1>Объекты</h1>
             <a href="/objects/new" class="btn btn-primary" data-modal-url="/objects/new" data-modal-title="Новый объект" data-modal-return="/objects?tab={{TAB}}">Добавить объект</a>
         </div>

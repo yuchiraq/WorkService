@@ -129,6 +129,8 @@ func WorkersPage(c *gin.Context) {
 		)
 		workersGridHTML.WriteString(cardHTML)
 	}
+	currentWorkersPath := "/workers?tab=" + template.URLQueryEscaper(selectedTab)
+	SetTopNavActions(c, `<div class="top-nav-toolbar"><a href="/workers/new" class="btn btn-primary" data-modal-url="/workers/new" data-modal-title="Добавить работника" data-modal-return="`+currentWorkersPath+`">Новый работник</a></div>`)
 
 	pageTemplate := `
 <!DOCTYPE html>
@@ -142,9 +144,9 @@ func WorkersPage(c *gin.Context) {
 <body>
     {{SIDEBAR_HTML}}
     <div class="main-content">
-        <div class="page-header">
+        <div class="page-header page-header-desktop-hidden">
             <h1>Работники</h1>
-            <a href="/workers/new" class="btn btn-primary" data-modal-url="/workers/new" data-modal-title="Добавить работника" data-modal-return="/workers">Добавить работника</a>
+            <a href="/workers/new" class="btn btn-primary" data-modal-url="/workers/new" data-modal-title="Добавить работника" data-modal-return="{{WORKERS_RETURN}}">Добавить работника</a>
         </div>
         <div class="card">
             <p>Просмотр, добавление, редактирование или увольнение работников.</p>
@@ -213,6 +215,7 @@ func WorkersPage(c *gin.Context) {
 	finalHTML = strings.Replace(finalHTML, "{{FILTERED_COUNT}}", strconv.Itoa(len(filteredWorkers)), 1)
 	finalHTML = strings.Replace(finalHTML, "{{TOTAL_COUNT}}", strconv.Itoa(len(scopedWorkers)), 1)
 	finalHTML = strings.Replace(finalHTML, "{{TAB}}", template.HTMLEscapeString(selectedTab), -1)
+	finalHTML = strings.Replace(finalHTML, "{{WORKERS_RETURN}}", currentWorkersPath, 1)
 	tabActiveClass := ""
 	tabFiredClass := ""
 	if selectedTab == "fired" {

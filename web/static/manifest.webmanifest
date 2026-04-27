@@ -1,6 +1,6 @@
 {
-  "name": "АВАЮССТРОЙ — WorkService",
-  "short_name": "WorkService",
+  "name": "ЧСУП \"АВАЮССТРОЙ\"",
+  "short_name": "АВАЮССТРОЙ",
   "description": "Внутренний сервис управления сотрудниками, объектами и расписанием.",
   "start_url": "/",
   "scope": "/",

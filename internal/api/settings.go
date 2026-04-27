@@ -48,6 +48,7 @@ func CreateBackup(c *gin.Context) {
 func SettingsPage(c *gin.Context) {
 	stats := GetSecurityStats()
 	logs := security.ReadRecent(20)
+
 	var logsHTML strings.Builder
 	if len(logs) == 0 {
 		logsHTML.WriteString("<li>Событий безопасности пока нет.</li>")
@@ -59,17 +60,69 @@ func SettingsPage(c *gin.Context) {
 
 	okMsg := ""
 	if c.Query("ok") == "backup" {
-		okMsg = `<p style="color:#1f9d55;">Резервная копия успешно создана.</p>`
+		okMsg = `<div class="dashboard-alert-item is-success"><strong>Резервная копия создана</strong><p>Файлы users, workers, objects и timesheets сохранены в локальный backup.</p></div>`
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Настройки</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+	page := `<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Настройки</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-<div class="page-header"><h1>Настройки</h1></div>
-<div class="card" style="margin-bottom:14px;"><h2>Резервное копирование</h2><p>Создание локальной резервной копии файлов данных (users/workers/objects/timesheets).</p>{{OK_MSG}}<form method="POST" action="/settings/backup"><button type="submit" class="btn btn-primary">Создать резервную копию</button></form></div>
-<div class="card"><h2>Мониторинг безопасности</h2><p><strong>Активные сессии:</strong> {{ACTIVE}}</p><p><strong>Заблокированные попытки входа:</strong> {{LOCKED}}</p><h3 style="margin-top:12px;">Последние события security.log</h3><ul>{{LOGS}}</ul></div>
-</div></body></html>`
+    <div class="page-header">
+        <h1>Настройки</h1>
+        <p>Резервирование данных, установка приложения на телефон и контроль безопасности.</p>
+    </div>
+
+    <div class="compact-grid dashboard-panels">
+        <div class="info-card">
+            <div class="info-card-header">
+                <h2>Резервное копирование</h2>
+                <span class="status-badge">backup</span>
+            </div>
+            <p>Создайте локальную копию файлов данных перед крупными изменениями или обновлениями.</p>
+            {{OK_MSG}}
+            <form method="POST" action="/settings/backup">
+                <button type="submit" class="btn btn-primary">Создать резервную копию</button>
+            </form>
+        </div>
+
+        <div class="info-card">
+            <div class="info-card-header">
+                <h2>Установка на телефон</h2>
+                <span class="status-badge">PWA</span>
+            </div>
+            <p>Сервис «АВАЮССТРОЙ» можно поставить как обычное приложение: иконка появится на главном экране, а система будет открываться без лишних вкладок браузера.</p>
+            <div class="pwa-steps">
+                <div class="pwa-step">
+                    <strong>iPhone / Safari</strong>
+                    <p>Откройте сайт в Safari, нажмите «Поделиться», выберите «На экран Домой», при наличии включите «Открывать как веб-приложение», затем нажмите «Добавить».</p>
+                </div>
+                <div class="pwa-step">
+                    <strong>Android / Chrome</strong>
+                    <p>Откройте сайт в Chrome, откройте меню браузера и выберите «Добавить на главный экран» или «Установить приложение», затем подтвердите установку.</p>
+                </div>
+            </div>
+            <p class="pwa-meta">Если кнопка не появилась, откройте сайт именно в Safari или Chrome, дождитесь полной загрузки страницы и попробуйте снова.</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Мониторинг безопасности</h2>
+        <p><strong>Активные сессии:</strong> {{ACTIVE}}</p>
+        <p><strong>Заблокированные попытки входа:</strong> {{LOCKED}}</p>
+        <h3 style="margin-top:12px;">Последние события security.log</h3>
+        <ul>{{LOGS}}</ul>
+    </div>
+</div>
+</body>
+</html>`
+
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "settings"), 1)
 	final = strings.Replace(final, "{{ACTIVE}}", fmt.Sprintf("%d", stats.ActiveSessions), 1)
 	final = strings.Replace(final, "{{LOCKED}}", fmt.Sprintf("%d", stats.LockedAttempts), 1)

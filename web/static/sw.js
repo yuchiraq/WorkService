@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'workservice-v1';
+const CACHE_VERSION = 'avayusstroy-v2';
 const APP_SHELL = [
   '/',
   '/login',
