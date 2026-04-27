@@ -26,6 +26,12 @@ func main() {
 	if err := storage.LoadImprovements(); err != nil {
 		log.Fatalf("Failed to load improvements: %v", err)
 	}
+	if err := storage.LoadAppSettings(); err != nil {
+		log.Fatalf("Failed to load app settings: %v", err)
+	}
+	if err := storage.LoadTelegramContacts(); err != nil {
+		log.Fatalf("Failed to load telegram contacts: %v", err)
+	}
 
 	r := gin.Default()
 

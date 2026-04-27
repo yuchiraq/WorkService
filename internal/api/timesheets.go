@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"project/internal/models"
 	"project/internal/storage"
@@ -246,6 +247,26 @@ func formatScheduleDateLabel(date string) string {
 	weekdays := []string{"воскресенье", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота"}
 	months := []string{"января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"}
 	return fmt.Sprintf("%s, %d %s %d", weekdays[int(t.Weekday())], t.Day(), months[int(t.Month())-1], t.Year())
+}
+
+func shortWorkerDisplayName(fullName string) string {
+	parts := strings.Fields(strings.TrimSpace(fullName))
+	if len(parts) <= 1 {
+		return strings.TrimSpace(fullName)
+	}
+
+	var b strings.Builder
+	b.WriteString(parts[0])
+	for _, part := range parts[1:] {
+		r, _ := utf8.DecodeRuneInString(part)
+		if r == utf8.RuneError {
+			continue
+		}
+		b.WriteString(" ")
+		b.WriteString(strings.ToUpper(string(r)))
+		b.WriteString(".")
+	}
+	return b.String()
 }
 
 func SchedulePage(c *gin.Context) {
@@ -1328,7 +1349,7 @@ func TimesheetsPage(c *gin.Context) {
 				workerTotal += cellData.Total
 			}
 		}
-		workerRows = append(workerRows, fmt.Sprintf(`<tr><th><a class="entity-link" href="/worker/%s">%s</a></th>%s<td class="hours-cell month-total">%.1f</td></tr>`, template.HTMLEscapeString(worker.ID), template.HTMLEscapeString(worker.Name), cells.String(), workerTotal))
+		workerRows = append(workerRows, fmt.Sprintf(`<tr><th><a class="entity-link" href="/worker/%s" title="%s">%s</a></th>%s<td class="hours-cell month-total">%.1f</td></tr>`, template.HTMLEscapeString(worker.ID), template.HTMLEscapeString(worker.Name), template.HTMLEscapeString(shortWorkerDisplayName(worker.Name)), cells.String(), workerTotal))
 	}
 
 	rows := strings.Join(workerRows, "")
@@ -1369,17 +1390,17 @@ func TimesheetsPage(c *gin.Context) {
 				cellData := buildTimesheetCellData(worker, date)
 				dayTime, _ := time.Parse("2006-01-02", date)
 				weekdayNames := []string{"вс", "пн", "вт", "ср", "чт", "пт", "сб"}
-				cardClass := "timesheet-mobile-day"
+				rowClass := "timesheet-mobile-row"
 				valueLabel := "—"
 				statusLabel := "Пусто"
 				actionLabel := "Добавить"
 				bodyHTML := `<p class="text-muted">Записей на этот день нет.</p>`
 				if cellData.DetailsHTML != "" {
-					bodyHTML = cellData.DetailsHTML
+					bodyHTML = `<div class="timesheet-mobile-entry-stack">` + cellData.DetailsHTML + `</div>`
 					actionLabel = "Новая запись"
 				}
 				if cellData.CellMark != "" {
-					cardClass += " is-marked"
+					rowClass += " is-marked"
 					valueLabel = cellData.CellMark
 					if cellData.AutoWeekend {
 						statusLabel = "Выходной"
@@ -1387,18 +1408,25 @@ func TimesheetsPage(c *gin.Context) {
 						statusLabel = "Отметка"
 					}
 				} else if cellData.DetailsHTML != "" {
-					cardClass += " is-filled"
+					rowClass += " is-filled"
 					valueLabel = fmt.Sprintf("%.1f ч", cellData.Total)
 					statusLabel = "Есть запись"
 					selectedWorkerMonthTotal += cellData.Total
 				} else {
-					cardClass += " is-empty"
+					rowClass += " is-empty"
 				}
-				dayCards.WriteString(fmt.Sprintf(`<article class="%s"><div class="timesheet-mobile-day-head"><div><strong>%d</strong><small>%s</small></div><div class="timesheet-mobile-day-status"><span class="status-badge">%s</span><span>%s</span></div></div><div class="timesheet-mobile-day-body">%s</div><div class="timesheet-mobile-day-actions"><button type="button" class="btn btn-secondary btn-compact" data-timesheet-menu-toggle aria-expanded="false">%s</button>%s</div></article>`, cardClass, dayTime.Day(), template.HTMLEscapeString(weekdayNames[int(dayTime.Weekday())]), template.HTMLEscapeString(valueLabel), template.HTMLEscapeString(statusLabel), bodyHTML, template.HTMLEscapeString(actionLabel), cellData.MenuHTML))
+				dayCards.WriteString(fmt.Sprintf(`<tr class="%s"><td class="timesheet-mobile-date"><strong>%d</strong><span>%s</span></td><td class="timesheet-mobile-entry"><div class="timesheet-mobile-entry-head"><span class="status-badge">%s</span><span>%s</span></div><div class="timesheet-mobile-entry-body">%s</div></td><td class="timesheet-mobile-action"><div class="timesheet-mobile-action-wrap"><button type="button" class="btn btn-secondary btn-compact" data-timesheet-menu-toggle aria-expanded="false">%s</button>%s</div></td></tr>`, rowClass, dayTime.Day(), template.HTMLEscapeString(weekdayNames[int(dayTime.Weekday())]), template.HTMLEscapeString(valueLabel), template.HTMLEscapeString(statusLabel), bodyHTML, template.HTMLEscapeString(actionLabel), cellData.MenuHTML))
 			}
 			break
 		}
-		mobileDaysHTML = dayCards.String()
+		if dayCards.Len() == 0 {
+			mobileDaysHTML = `<tr><td colspan="3">No workers.</td></tr>`
+		} else {
+			mobileDaysHTML = dayCards.String()
+		}
+	}
+	if len(visibleWorkers) == 0 {
+		mobileDaysHTML = `<tr><td colspan="3">No workers.</td></tr>`
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
@@ -1427,7 +1455,12 @@ func TimesheetsPage(c *gin.Context) {
       </div>
       <a class="btn btn-secondary btn-compact" href="{{SELECTED_WORKER_LINK}}">Профиль</a>
     </div>
-    <div class="timesheet-mobile-grid">{{MOBILE_DAYS}}</div>
+    <div class="timesheet-mobile-table-wrap">
+      <table class="table timesheet-mobile-table">
+        <thead><tr><th>Р”РµРЅСЊ</th><th>Р—Р°РїРёСЃСЊ</th><th></th></tr></thead>
+        <tbody>{{MOBILE_DAYS}}</tbody>
+      </table>
+    </div>
   </div>
   <div class="table-scroll timesheet-table-wrap timesheet-desktop-matrix"><table class="table timesheet-matrix"><thead><tr><th>Работник</th>{{HEADERS}}<th>Итого</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div>

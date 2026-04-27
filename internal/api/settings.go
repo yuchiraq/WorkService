@@ -6,10 +6,13 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	"project/internal/security"
+	"project/internal/storage"
+	"project/internal/telegrambot"
 
 	"github.com/gin-gonic/gin"
 )
@@ -45,9 +48,36 @@ func CreateBackup(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/settings?ok=backup")
 }
 
+func SaveTelegramSettings(c *gin.Context) {
+	settings, err := storage.GetAppSettings()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Failed to load app settings: %v", err)
+		return
+	}
+	settings.TelegramBotToken = c.PostForm("telegram_bot_token")
+	settings.TelegramBotUsername = c.PostForm("telegram_bot_username")
+	settings.TelegramSiteURL = c.PostForm("telegram_site_url")
+	if err := storage.UpdateAppSettings(settings); err != nil {
+		c.String(http.StatusInternalServerError, "Failed to save telegram settings: %v", err)
+		return
+	}
+	c.Redirect(http.StatusFound, "/settings?ok=telegram_saved")
+}
+
+func SyncTelegramContacts(c *gin.Context) {
+	summary, err := telegrambot.SyncContacts()
+	if err != nil {
+		c.Redirect(http.StatusFound, "/settings?telegram_error="+template.URLQueryEscaper(err.Error()))
+		return
+	}
+	c.Redirect(http.StatusFound, "/settings?ok=telegram_synced&processed="+strconv.Itoa(summary.Processed)+"&linked="+strconv.Itoa(summary.Linked))
+}
+
 func SettingsPage(c *gin.Context) {
 	stats := GetSecurityStats()
 	logs := security.ReadRecent(20)
+	settings, _ := storage.GetAppSettings()
+	telegramContacts, _ := storage.GetTelegramContacts()
 
 	var logsHTML strings.Builder
 	if len(logs) == 0 {
@@ -58,9 +88,42 @@ func SettingsPage(c *gin.Context) {
 		}
 	}
 
-	okMsg := ""
-	if c.Query("ok") == "backup" {
-		okMsg = `<div class="dashboard-alert-item is-success"><strong>Резервная копия создана</strong><p>Файлы users, workers, objects и timesheets сохранены в локальный backup.</p></div>`
+	statusBlock := ""
+	switch c.Query("ok") {
+	case "backup":
+		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Резервная копия создана</strong><p>Файлы users, workers, objects и timesheets сохранены в локальный backup.</p></div>`
+	case "telegram_saved":
+		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Настройки Telegram сохранены</strong><p>Токен, username бота и адрес сайта обновлены.</p></div>`
+	case "telegram_synced":
+		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Контакты Telegram синхронизированы</strong><p>Обновлений обработано: ` + template.HTMLEscapeString(c.Query("processed")) + `. Привязок по телефону обновлено: ` + template.HTMLEscapeString(c.Query("linked")) + `.</p></div>`
+	}
+	if errMsg := strings.TrimSpace(c.Query("telegram_error")); errMsg != "" {
+		statusBlock += `<div class="dashboard-alert-item is-warning"><strong>Telegram не синхронизирован</strong><p>` + template.HTMLEscapeString(errMsg) + `</p></div>`
+	}
+
+	startBotLink := ""
+	if strings.TrimSpace(settings.TelegramBotUsername) != "" {
+		startBotLink = `<a class="btn btn-secondary" href="https://t.me/` + template.HTMLEscapeString(settings.TelegramBotUsername) + `" target="_blank" rel="noreferrer">Открыть бота</a>`
+	}
+
+	var contactsHTML strings.Builder
+	if len(telegramContacts) == 0 {
+		contactsHTML.WriteString(`<div class="dashboard-list-item"><strong>Пока нет привязок</strong><p>После того как сотрудник откроет бота и отправит свой контакт, здесь появится связка телефона и Telegram-чата.</p></div>`)
+	} else {
+		for i, contact := range telegramContacts {
+			if i >= 6 {
+				break
+			}
+			label := strings.TrimSpace(strings.TrimSpace(contact.FirstName + " " + contact.LastName))
+			if label == "" {
+				label = contact.Phone
+			}
+			meta := contact.Phone
+			if strings.TrimSpace(contact.Username) != "" {
+				meta += " · @" + contact.Username
+			}
+			contactsHTML.WriteString(`<div class="dashboard-list-item"><strong>` + template.HTMLEscapeString(label) + `</strong><p>` + template.HTMLEscapeString(meta) + `</p></div>`)
+		}
 	}
 
 	page := `<!DOCTYPE html>
@@ -76,8 +139,10 @@ func SettingsPage(c *gin.Context) {
 <div class="main-content">
     <div class="page-header">
         <h1>Настройки</h1>
-        <p>Резервирование данных, установка приложения на телефон и контроль безопасности.</p>
+        <p>Резервирование данных, установка приложения на телефон, Telegram-бот и контроль безопасности.</p>
     </div>
+
+    {{STATUS_BLOCK}}
 
     <div class="compact-grid dashboard-panels">
         <div class="info-card">
@@ -86,7 +151,6 @@ func SettingsPage(c *gin.Context) {
                 <span class="status-badge">backup</span>
             </div>
             <p>Создайте локальную копию файлов данных перед крупными изменениями или обновлениями.</p>
-            {{OK_MSG}}
             <form method="POST" action="/settings/backup">
                 <button type="submit" class="btn btn-primary">Создать резервную копию</button>
             </form>
@@ -112,6 +176,48 @@ func SettingsPage(c *gin.Context) {
         </div>
     </div>
 
+    <div class="compact-grid dashboard-panels">
+        <div class="info-card">
+            <div class="info-card-header">
+                <h2>Telegram-бот</h2>
+                <span class="status-badge">` + template.HTMLEscapeString(strconv.Itoa(len(telegramContacts))) + ` контактов</span>
+            </div>
+            <p>Telegram не позволяет боту написать человеку первым только по номеру телефона. Рабочая схема такая: сотрудник сам открывает бота, нажимает Start, отправляет свой контакт, после этого система сможет сопоставить его телефон и отправлять сообщение о создании учётки.</p>
+            <form method="POST" action="/settings/telegram" class="form-grid-edit">
+                <div class="form-group-edit form-group-name"><label for="telegram_bot_token">Токен бота</label><input type="text" id="telegram_bot_token" name="telegram_bot_token" value="` + template.HTMLEscapeString(settings.TelegramBotToken) + `" placeholder="123456:ABC..."></div>
+                <div class="form-group-edit form-group-position"><label for="telegram_bot_username">Username бота</label><input type="text" id="telegram_bot_username" name="telegram_bot_username" value="` + template.HTMLEscapeString(settings.TelegramBotUsername) + `" placeholder="my_company_bot"></div>
+                <div class="form-group-edit timesheet-span-2"><label for="telegram_site_url">Адрес сайта</label><input type="url" id="telegram_site_url" name="telegram_site_url" value="` + template.HTMLEscapeString(settings.TelegramSiteURL) + `" placeholder="https://example.com"></div>
+                <div class="form-actions-edit"><button type="submit" class="btn btn-primary">Сохранить настройки бота</button></div>
+            </form>
+            <div class="info-card-actions">
+                <form method="POST" action="/settings/telegram/sync"><button type="submit" class="btn btn-secondary">Синхронизировать контакты из бота</button></form>
+                ` + startBotLink + `
+            </div>
+            <div class="dashboard-list">` + contactsHTML.String() + `</div>
+        </div>
+
+        <div class="info-card">
+            <div class="info-card-header">
+                <h2>Как подключить сотрудника</h2>
+                <span class="status-badge">bot flow</span>
+            </div>
+            <div class="pwa-steps">
+                <div class="pwa-step">
+                    <strong>1. Открыть бота</strong>
+                    <p>Сотрудник открывает вашего бота в Telegram и нажимает Start.</p>
+                </div>
+                <div class="pwa-step">
+                    <strong>2. Отправить контакт</strong>
+                    <p>Сотрудник отправляет в бот свой контакт с тем же номером, который указан у него в системе.</p>
+                </div>
+                <div class="pwa-step">
+                    <strong>3. Синхронизировать</strong>
+                    <p>В настройках нажмите «Синхронизировать контакты из бота». После этого при создании учётки система сможет отправить логин, сайт, PWA-инструкцию и пароль в этот Telegram-чат.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="card">
         <h2>Мониторинг безопасности</h2>
         <p><strong>Активные сессии:</strong> {{ACTIVE}}</p>
@@ -124,9 +230,9 @@ func SettingsPage(c *gin.Context) {
 </html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "settings"), 1)
+	final = strings.Replace(final, "{{STATUS_BLOCK}}", statusBlock, 1)
 	final = strings.Replace(final, "{{ACTIVE}}", fmt.Sprintf("%d", stats.ActiveSessions), 1)
 	final = strings.Replace(final, "{{LOCKED}}", fmt.Sprintf("%d", stats.LockedAttempts), 1)
 	final = strings.Replace(final, "{{LOGS}}", logsHTML.String(), 1)
-	final = strings.Replace(final, "{{OK_MSG}}", okMsg, 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }

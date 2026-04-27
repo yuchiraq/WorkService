@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 
 	"project/internal/models"
 	"project/internal/storage"
+	"project/internal/telegrambot"
 
 	"github.com/gin-gonic/gin"
 )
@@ -39,6 +41,18 @@ func UsersPage(c *gin.Context) {
 		return
 	}
 
+	noticeBlock := ""
+	switch c.Query("notice") {
+	case "telegram_sent":
+		noticeBlock = `<div class="dashboard-alert-item is-success"><strong>Учетка создана и сообщение отправлено</strong><p>Пользователь получил логин, адрес сайта, PWA-инструкцию и пароль в Telegram.</p></div>`
+	case "telegram_chat_missing":
+		noticeBlock = `<div class="dashboard-alert-item is-warning"><strong>Учетка создана, но Telegram не отправлен</strong><p>Для этого номера не найден подключенный Telegram-чат. Сотрудник должен открыть бота, нажать Start, отправить контакт и после этого нужно выполнить синхронизацию в настройках.</p></div>`
+	case "telegram_bot_missing":
+		noticeBlock = `<div class="dashboard-alert-item is-warning"><strong>Учетка создана, но бот не настроен</strong><p>Заполните токен, username бота и адрес сайта в настройках, чтобы отправлять данные в Telegram.</p></div>`
+	case "telegram_failed":
+		noticeBlock = `<div class="dashboard-alert-item is-warning"><strong>Учетка создана, но отправка в Telegram не удалась</strong><p>Проверьте настройки бота и синхронизацию контактов в разделе настроек.</p></div>`
+	}
+
 	var rows strings.Builder
 	for _, user := range users {
 		rows.WriteString(fmt.Sprintf(`<tr><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td><div class="table-actions"><a href="/users/edit/%s" class="btn btn-secondary" data-modal-url="/users/edit/%s" data-modal-title="Редактировать пользователя" data-modal-return="/users">Редактировать</a><form action="/users/delete/%s" method="POST" class="table-action-form"><button class="btn btn-danger" type="submit">Удалить</button></form></div></td></tr>`,
@@ -62,6 +76,9 @@ func UsersPage(c *gin.Context) {
 </div></body></html>`
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "users"), 1)
 	final = strings.Replace(final, "{{ROWS}}", rows.String(), 1)
+	if noticeBlock != "" {
+		final = strings.Replace(final, `<div class="card"><table class="table responsive-table users-table">`, noticeBlock+`<div class="card"><table class="table responsive-table users-table">`, 1)
+	}
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
 
@@ -96,6 +113,38 @@ func userWorkerOptions(userID, selectedWorkerID string) (string, string, error) 
 	}
 
 	return options.String(), selectedLabel, nil
+}
+
+func selectedWorkerPhone(workerID string) string {
+	if strings.TrimSpace(workerID) == "" {
+		return ""
+	}
+	worker, err := storage.GetWorkerByID(workerID)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(worker.Phone)
+}
+
+func syncWorkerPhoneByID(workerID, phone string) error {
+	if strings.TrimSpace(workerID) == "" {
+		return nil
+	}
+	worker, err := storage.GetWorkerByID(workerID)
+	if err != nil {
+		return err
+	}
+	worker.Phone = strings.TrimSpace(phone)
+	return storage.UpdateWorker(worker)
+}
+
+func syncLinkedWorkerPhone(userID, phone string) error {
+	worker, err := storage.GetWorkerByUserID(userID)
+	if err != nil {
+		return nil
+	}
+	worker.Phone = strings.TrimSpace(phone)
+	return storage.UpdateWorker(worker)
 }
 
 func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLabel string, adminEditable bool) {
@@ -183,14 +232,20 @@ func AddUserPage(c *gin.Context) {
 }
 
 func CreateUser(c *gin.Context) {
+	plainPassword := c.PostForm("password")
+	selectedWorkerID := c.PostForm("worker_id")
+	phone := strings.TrimSpace(c.PostForm("phone"))
+	if phone == "" {
+		phone = selectedWorkerPhone(selectedWorkerID)
+	}
+
 	newUser := models.User{
 		Name:     c.PostForm("name"),
 		Username: c.PostForm("username"),
-		Password: c.PostForm("password"),
-		Phone:    c.PostForm("phone"),
+		Password: plainPassword,
+		Phone:    phone,
 		Status:   c.PostForm("status"),
 	}
-	selectedWorkerID := c.PostForm("worker_id")
 
 	createdUser, err := storage.CreateUser(newUser)
 	if err != nil {
@@ -204,6 +259,7 @@ func CreateUser(c *gin.Context) {
 				c.String(http.StatusBadRequest, "Failed to link worker: %v", err)
 				return
 			}
+			_ = syncWorkerPhoneByID(selectedWorkerID, createdUser.Phone)
 		} else {
 			_, _ = storage.CreateWorker(models.Worker{
 				Name:          createdUser.Name,
@@ -215,7 +271,23 @@ func CreateUser(c *gin.Context) {
 			})
 		}
 	}
-	c.Redirect(http.StatusFound, "/users")
+
+	redirectURL := "/users"
+	if createdUser.Status == "user" {
+		notifyErr := telegrambot.SendAccountCreatedNotification(createdUser, plainPassword)
+		switch {
+		case notifyErr == nil:
+			redirectURL += "?notice=telegram_sent"
+		case errors.Is(notifyErr, telegrambot.ErrChatNotLinked):
+			redirectURL += "?notice=telegram_chat_missing"
+		case errors.Is(notifyErr, telegrambot.ErrBotNotConfigured):
+			redirectURL += "?notice=telegram_bot_missing"
+		default:
+			redirectURL += "?notice=telegram_failed"
+		}
+	}
+
+	c.Redirect(http.StatusFound, redirectURL)
 }
 
 func EditUserPage(c *gin.Context) {
@@ -254,6 +326,7 @@ func UpdateUser(c *gin.Context) {
 				c.String(http.StatusBadRequest, "Failed to link worker: %v", err)
 				return
 			}
+			_ = syncWorkerPhoneByID(selectedWorkerID, user.Phone)
 		} else {
 			if _, err := storage.GetWorkerByUserID(user.ID); err != nil {
 				_, _ = storage.CreateWorker(models.Worker{
@@ -264,6 +337,8 @@ func UpdateUser(c *gin.Context) {
 					CreatedByName: c.GetString("userName"),
 					UserID:        user.ID,
 				})
+			} else {
+				_ = syncLinkedWorkerPhone(user.ID, user.Phone)
 			}
 		}
 	} else {
@@ -375,10 +450,12 @@ func UpdateProfile(c *gin.Context) {
 			}
 		}
 		user.Username = c.PostForm("username")
+		user.Name = c.PostForm("name")
 		newPassword := c.PostForm("password")
 		if newPassword != "" {
 			user.Password = newPassword
 		}
+		user.Phone = c.PostForm("phone")
 		if err := storage.UpdateUser(user); err != nil {
 			c.String(http.StatusBadRequest, "Failed to update profile: %v", err)
 			return

@@ -6,7 +6,7 @@
         "name": "Test User",
         "phone": "+7 (900) 000-00-01",
         "status": "admin",
-        "lastLoginAt": "2026-04-27T20:09:27+03:00"
+        "lastLoginAt": "2026-04-27T21:03:37+03:00"
     },
     {
         "id": "2",
@@ -14,6 +14,23 @@
         "password": "$2a$10$nGXfzGqxC5CB2hqe6hUAg.CilNuiTlHoTazdZyewBTl5bekBwUgsi",
         "name": "Иван Петров",
         "phone": "+7 (900) 000-00-02",
+        "status": "user"
+    },
+    {
+        "id": "f186e173-e3fb-40a5-bf3c-8984b52e6185",
+        "username": "codex_smoke_admin",
+        "password": "$2a$10$YsMD1eS.vVJhOGxJWOqhTOxTzRjNzbv1m8Wli9ersdQNkMTsKCkbq",
+        "name": "Codex Smoke Admin",
+        "phone": "+375 (29) 000-00-01",
+        "status": "admin",
+        "lastLoginAt": "2026-04-27T21:00:42+03:00"
+    },
+    {
+        "id": "08a66968-b7ec-4ced-82d8-56d02ee0af66",
+        "username": "codex_smoke_user",
+        "password": "$2a$10$/BEwqhu3497lJudRR0DAWeztajOz4X3YZq5bDEiRmfyDxEEm2YDJC",
+        "name": "Codex Smoke Worker",
+        "phone": "+375 (29) 111-22-33",
         "status": "user"
     }
 ]
