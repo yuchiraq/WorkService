@@ -124,3 +124,17 @@ func FindTelegramContactByPhone(phone string) (models.TelegramContactLink, error
 	}
 	return models.TelegramContactLink{}, errors.New("telegram contact not found")
 }
+
+func DeleteTelegramContactByPhone(phone string) error {
+	telegramContactsMutex.Lock()
+	defer telegramContactsMutex.Unlock()
+
+	normalized := NormalizePhoneNumber(phone)
+	for i, contact := range telegramContacts {
+		if contact.Phone == normalized {
+			telegramContacts = append(telegramContacts[:i], telegramContacts[i+1:]...)
+			return saveTelegramContacts()
+		}
+	}
+	return errors.New("telegram contact not found")
+}

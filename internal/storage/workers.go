@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"os"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -55,6 +57,9 @@ func GetWorkers() ([]models.Worker, error) {
 
 	workersCopy := make([]models.Worker, len(workers))
 	copy(workersCopy, workers)
+	sort.SliceStable(workersCopy, func(i, j int) bool {
+		return strings.ToLower(workersCopy[i].Name) < strings.ToLower(workersCopy[j].Name)
+	})
 
 	return workersCopy, nil
 }

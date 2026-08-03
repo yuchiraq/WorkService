@@ -73,6 +73,14 @@ func SyncTelegramContacts(c *gin.Context) {
 	c.Redirect(http.StatusFound, "/settings?ok=telegram_synced&processed="+strconv.Itoa(summary.Processed)+"&linked="+strconv.Itoa(summary.Linked))
 }
 
+func DeleteTelegramContact(c *gin.Context) {
+	if err := storage.DeleteTelegramContactByPhone(c.PostForm("phone")); err != nil {
+		c.Redirect(http.StatusFound, "/settings?telegram_error="+template.URLQueryEscaper(err.Error()))
+		return
+	}
+	c.Redirect(http.StatusFound, "/settings?ok=telegram_deleted")
+}
+
 func SettingsPage(c *gin.Context) {
 	stats := GetSecurityStats()
 	logs := security.ReadRecent(20)
@@ -96,6 +104,8 @@ func SettingsPage(c *gin.Context) {
 		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Настройки Telegram сохранены</strong><p>Токен, username бота и адрес сайта обновлены.</p></div>`
 	case "telegram_synced":
 		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Контакты Telegram синхронизированы</strong><p>Обновлений обработано: ` + template.HTMLEscapeString(c.Query("processed")) + `. Привязок по телефону обновлено: ` + template.HTMLEscapeString(c.Query("linked")) + `.</p></div>`
+	case "telegram_deleted":
+		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Привязка Telegram удалена</strong><p>Сотрудник сможет отправить контакт в бота повторно, если привязку нужно восстановить.</p></div>`
 	}
 	if errMsg := strings.TrimSpace(c.Query("telegram_error")); errMsg != "" {
 		statusBlock += `<div class="dashboard-alert-item is-warning"><strong>Telegram не синхронизирован</strong><p>` + template.HTMLEscapeString(errMsg) + `</p></div>`
@@ -122,7 +132,7 @@ func SettingsPage(c *gin.Context) {
 			if strings.TrimSpace(contact.Username) != "" {
 				meta += " · @" + contact.Username
 			}
-			contactsHTML.WriteString(`<div class="dashboard-list-item"><strong>` + template.HTMLEscapeString(label) + `</strong><p>` + template.HTMLEscapeString(meta) + `</p></div>`)
+			contactsHTML.WriteString(`<div class="dashboard-list-item telegram-contact-item"><div><strong>` + template.HTMLEscapeString(label) + `</strong><p>` + template.HTMLEscapeString(meta) + `</p></div><form method="POST" action="/settings/telegram/delete" class="table-action-form">` + CSRFHiddenInput(c) + `<input type="hidden" name="phone" value="` + template.HTMLEscapeString(contact.Phone) + `"><button type="submit" class="btn btn-danger btn-compact">Удалить</button></form></div>`)
 		}
 	}
 
@@ -173,6 +183,7 @@ func SettingsPage(c *gin.Context) {
                 </div>
             </div>
             <p class="pwa-meta">Если кнопка не появилась, откройте сайт именно в Safari или Chrome, дождитесь полной загрузки страницы и попробуйте снова.</p>
+            <div class="site-notifications-panel"><button type="button" class="btn btn-secondary" data-enable-site-notifications>Включить уведомления сайта</button><span class="status-badge" data-site-notification-status>Проверка...</span></div>
         </div>
     </div>
 
@@ -208,7 +219,7 @@ func SettingsPage(c *gin.Context) {
                 </div>
                 <div class="pwa-step">
                     <strong>2. Отправить контакт</strong>
-                    <p>Сотрудник отправляет в бот свой контакт с тем же номером, который указан у него в системе.</p>
+                    <p>После Start бот покажет кнопку «Отправить контакт». Сотрудник нажимает её и подтверждает отправку своего номера. Номер должен совпадать с телефоном в карточке работника.</p>
                 </div>
                 <div class="pwa-step">
                     <strong>3. Синхронизировать</strong>

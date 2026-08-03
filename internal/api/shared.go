@@ -504,7 +504,70 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', function(){ navigator.serviceWorker.register('/sw.js').catch(function(){}); });
 }
 
+function siteNotificationsSupported(){
+  return 'Notification' in window;
+}
+function siteNotificationsStored(){
+  try { return localStorage.getItem('siteNotificationsEnabled') === '1'; } catch(e) { return false; }
+}
+function storeSiteNotificationsEnabled(){
+  try { localStorage.setItem('siteNotificationsEnabled', '1'); } catch(e) {}
+}
+function siteNotificationsEnabled(){
+  return siteNotificationsSupported() && Notification.permission === 'granted' && siteNotificationsStored();
+}
+function showSiteNotification(title, options){
+  if(!siteNotificationsEnabled()) return;
+  const payload=Object.assign({ icon: '/static/img/logo-192.png', badge: '/static/img/logo-192.png' }, options || {});
+  if(navigator.serviceWorker && navigator.serviceWorker.ready){
+    navigator.serviceWorker.ready.then(function(reg){ reg.showNotification(title, payload); }).catch(function(){
+      try { new Notification(title, payload); } catch(e) {}
+    });
+    return;
+  }
+  try { new Notification(title, payload); } catch(e) {}
+}
+function updateSiteNotificationControls(){
+  document.querySelectorAll('[data-site-notification-status]').forEach(function(el){
+    if(!siteNotificationsSupported()){
+      el.textContent='Браузер не поддерживает уведомления';
+      return;
+    }
+    if(Notification.permission === 'granted'){
+      el.textContent=siteNotificationsEnabled() ? 'Уведомления сайта включены' : 'Разрешение есть, уведомления сайта выключены';
+    } else if(Notification.permission === 'denied'){
+      el.textContent='Уведомления запрещены в настройках браузера';
+    } else {
+      el.textContent='Уведомления не включены';
+    }
+  });
+  document.querySelectorAll('[data-enable-site-notifications]').forEach(function(btn){
+    if(!siteNotificationsSupported()){
+      btn.disabled=true;
+      return;
+    }
+    btn.textContent=siteNotificationsEnabled() ? 'Уведомления включены' : 'Включить уведомления сайта';
+    btn.disabled=Notification.permission === 'denied';
+  });
+}
+window.appSiteNotify=showSiteNotification;
+updateSiteNotificationControls();
+
 document.addEventListener('click', function(e){
+  const notificationBtn=e.target.closest('[data-enable-site-notifications]');
+  if(notificationBtn){
+    e.preventDefault();
+    if(!siteNotificationsSupported()) return;
+    Notification.requestPermission().then(function(permission){
+      if(permission === 'granted'){
+        storeSiteNotificationsEnabled();
+        showSiteNotification('Уведомления включены', { body: 'Сайт сможет показывать уведомления на этом устройстве, пока приложение активно.' });
+      }
+      updateSiteNotificationControls();
+    });
+    return;
+  }
+
   const trigger=e.target.closest('[data-modal-url]');
   if(trigger){
     e.preventDefault();
@@ -627,6 +690,7 @@ syncNavState();
   <div class="side-nav-brand"><img src="/static/img/logo.svg" alt="АВАЮССТРОЙ"><div class="side-nav-brand-copy"><strong>ЧСУП "АВАЮССТРОЙ"</strong><small>система управления работами</small></div></div>
   <a class="side-nav-user" href="/profile"><span class="user-avatar">%s</span><div><strong>%s</strong><small>%s</small></div></a>
   <nav class="side-nav-links">%s</nav>
+  <button type="button" class="btn btn-secondary side-nav-notifications" data-enable-site-notifications>Уведомления</button>
   <a class="btn btn-secondary side-nav-logout" href="/logout">Выйти</a>
 </aside>
 <div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение">+</a></div>

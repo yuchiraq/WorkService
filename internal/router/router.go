@@ -97,9 +97,10 @@ func SetupRouter(r *gin.Engine) {
 		adminRequired.POST("/settings/backup", api.CreateBackup)
 		adminRequired.POST("/settings/telegram", api.SaveTelegramSettings)
 		adminRequired.POST("/settings/telegram/sync", api.SyncTelegramContacts)
+		adminRequired.POST("/settings/telegram/delete", api.DeleteTelegramContact)
 	}
 
 	r.GET("/", func(c *gin.Context) {
-		c.Redirect(http.StatusFound, "/login")
+		api.HomePage(c)
 	})
 }

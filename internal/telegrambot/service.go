@@ -45,6 +45,7 @@ type updateResult struct {
 			FirstName   string `json:"first_name"`
 			LastName    string `json:"last_name"`
 		} `json:"contact"`
+		Text string `json:"text"`
 	} `json:"message"`
 }
 
@@ -61,6 +62,69 @@ func loadSettings() (models.AppSettings, error) {
 		return models.AppSettings{}, ErrBotNotConfigured
 	}
 	return settings, nil
+}
+
+func sendTelegramMessage(settings models.AppSettings, chatID int64, message string, replyMarkup any) error {
+	body := map[string]any{
+		"chat_id":                  chatID,
+		"text":                     message,
+		"disable_web_page_preview": true,
+	}
+	if replyMarkup != nil {
+		body["reply_markup"] = replyMarkup
+	}
+
+	payloadBody, _ := json.Marshal(body)
+	req, err := http.NewRequest(http.MethodPost, apiURL(settings.TelegramBotToken, "sendMessage"), bytes.NewReader(payloadBody))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{Timeout: 8 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var payload botResponse[map[string]any]
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return err
+	}
+	if !payload.OK {
+		if strings.TrimSpace(payload.Description) != "" {
+			return errors.New(payload.Description)
+		}
+		return errors.New("telegram sendMessage failed")
+	}
+	return nil
+}
+
+func sendContactRequest(settings models.AppSettings, chatID int64) {
+	if chatID == 0 {
+		return
+	}
+	message := strings.Join([]string{
+		"Чтобы привязать Telegram к аккаунту, отправьте свой контакт.",
+		"",
+		"Нажмите кнопку ниже: «Отправить контакт». Важно отправить именно свой контакт, а не просто написать номер текстом.",
+		"После этого администратор нажмет «Синхронизировать контакты из бота» в настройках сайта.",
+	}, "\n")
+	replyMarkup := map[string]any{
+		"keyboard": [][]map[string]any{
+			{
+				{
+					"text":            "Отправить контакт",
+					"request_contact": true,
+				},
+			},
+		},
+		"resize_keyboard":         true,
+		"one_time_keyboard":       true,
+		"input_field_placeholder": "Нажмите кнопку, чтобы отправить контакт",
+	}
+	_ = sendTelegramMessage(settings, chatID, message, replyMarkup)
 }
 
 func SyncContacts() (SyncSummary, error) {
@@ -105,7 +169,11 @@ func SyncContacts() (SyncSummary, error) {
 		if update.UpdateID >= maxUpdateID {
 			maxUpdateID = update.UpdateID + 1
 		}
-		if update.Message.Contact == nil || update.Message.Chat.ID == 0 {
+		if update.Message.Chat.ID == 0 {
+			continue
+		}
+		if update.Message.Contact == nil {
+			sendContactRequest(settings, update.Message.Chat.ID)
 			continue
 		}
 
@@ -174,34 +242,114 @@ func SendAccountCreatedNotification(user models.User, plainPassword string) erro
 		"После первого входа удалите это сообщение с паролем.",
 	}, "\n")
 
-	body, _ := json.Marshal(map[string]any{
-		"chat_id":                  contact.ChatID,
-		"text":                     message,
-		"disable_web_page_preview": true,
-	})
+	return sendTelegramMessage(settings, contact.ChatID, message, nil)
+}
 
-	req, err := http.NewRequest(http.MethodPost, apiURL(settings.TelegramBotToken, "sendMessage"), bytes.NewReader(body))
+func formatAssignmentHours(startTime, endTime string, lunch int) string {
+	start, err := time.Parse("15:04", startTime)
 	if err != nil {
-		return err
+		return ""
 	}
-	req.Header.Set("Content-Type", "application/json")
-
-	client := &http.Client{Timeout: 8 * time.Second}
-	resp, err := client.Do(req)
+	end, err := time.Parse("15:04", endTime)
 	if err != nil {
-		return err
+		return ""
 	}
-	defer resp.Body.Close()
+	minutes := int(end.Sub(start).Minutes()) - lunch
+	if minutes < 0 {
+		minutes = 0
+	}
+	return fmt.Sprintf("%.2f", float64(minutes)/60.0)
+}
 
-	var payload botResponse[map[string]any]
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		return err
+func assignmentObjectNames(entry models.TimesheetEntry) string {
+	objects, err := storage.GetObjects()
+	if err != nil {
+		return "не указаны"
 	}
-	if !payload.OK {
-		if strings.TrimSpace(payload.Description) != "" {
-			return errors.New(payload.Description)
+	objectNames := make([]string, 0, len(entry.ObjectIDs))
+	for _, objectID := range entry.ObjectIDs {
+		for _, object := range objects {
+			if object.ID == objectID {
+				objectNames = append(objectNames, object.Name)
+				break
+			}
 		}
-		return errors.New("telegram sendMessage failed")
+	}
+	if len(objectNames) == 0 {
+		return "не указаны"
+	}
+	return strings.Join(objectNames, ", ")
+}
+
+func assignmentMessage(settings models.AppSettings, worker models.Worker, entry models.TimesheetEntry, title string) string {
+	lines := []string{
+		title,
+		"",
+		"Работник: " + strings.TrimSpace(worker.Name),
+		"Дата: " + strings.TrimSpace(entry.Date),
+	}
+
+	if strings.TrimSpace(entry.UserMark) != "" {
+		lines = append(lines, "Отметка: "+strings.TrimSpace(entry.UserMark))
+	} else {
+		hours := formatAssignmentHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)
+		timeLine := "Время: " + strings.TrimSpace(entry.StartTime) + "-" + strings.TrimSpace(entry.EndTime)
+		if hours != "" {
+			timeLine += " (" + hours + " ч)"
+		}
+		lines = append(lines, timeLine)
+		lines = append(lines, "Объекты: "+assignmentObjectNames(entry))
+	}
+
+	if notes := strings.TrimSpace(entry.Notes); notes != "" {
+		lines = append(lines, "Комментарий: "+notes)
+	}
+	if creator := strings.TrimSpace(entry.CreatedByName); creator != "" {
+		lines = append(lines, "Создал: "+creator)
+	}
+	if siteURL := strings.TrimSpace(settings.TelegramSiteURL); siteURL != "" {
+		lines = append(lines, "", "Сайт: "+strings.TrimRight(siteURL, "/")+"/schedule")
+	}
+	return strings.Join(lines, "\n")
+}
+
+func SendScheduleEntryNotification(entry models.TimesheetEntry, title string) error {
+	settings, err := loadSettings()
+	if err != nil {
+		return err
+	}
+
+	workers, err := storage.GetWorkers()
+	if err != nil {
+		return err
+	}
+	workersByID := make(map[string]models.Worker, len(workers))
+	for _, worker := range workers {
+		workersByID[worker.ID] = worker
+	}
+
+	_, _ = SyncContacts()
+	sentChats := map[int64]struct{}{}
+	failures := make([]string, 0)
+	for _, workerID := range entry.WorkerIDs {
+		worker, ok := workersByID[workerID]
+		if !ok || strings.TrimSpace(worker.Phone) == "" {
+			continue
+		}
+		contact, err := storage.FindTelegramContactByPhone(worker.Phone)
+		if err != nil {
+			continue
+		}
+		if _, exists := sentChats[contact.ChatID]; exists {
+			continue
+		}
+		sentChats[contact.ChatID] = struct{}{}
+		if err := sendTelegramMessage(settings, contact.ChatID, assignmentMessage(settings, worker, entry, title), nil); err != nil {
+			failures = append(failures, err.Error())
+		}
+	}
+	if len(failures) > 0 {
+		return errors.New(strings.Join(failures, "; "))
 	}
 	return nil
 }

@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"project/internal/models"
 	"project/internal/security"
 	"project/internal/storage"
 
@@ -38,7 +39,7 @@ var (
 	lockDuration  = 15 * time.Minute
 	attemptWindow = 15 * time.Minute
 	sessionCookie = "session_token"
-	sessionMaxAge = 24 * time.Hour
+	sessionMaxAge = 30 * 24 * time.Hour
 )
 
 func randomToken(lengthBytes int) string {
@@ -127,8 +128,52 @@ func registerSuccess(attemptKey string) {
 	delete(loginAttempts, attemptKey)
 }
 
+func authenticatedUserFromCookie(c *gin.Context) (models.User, bool) {
+	cleanExpiredSessions()
+	token, err := c.Cookie(sessionCookie)
+	if err != nil || token == "" {
+		return models.User{}, false
+	}
+
+	sessionMutex.RLock()
+	sess, exists := sessions[token]
+	sessionMutex.RUnlock()
+	if !exists || time.Now().After(sess.ExpiresAt) {
+		clearSessionCookie(c)
+		return models.User{}, false
+	}
+
+	user, err := storage.GetUserByID(sess.UserID)
+	if err != nil {
+		clearSessionCookie(c)
+		return models.User{}, false
+	}
+	return user, true
+}
+
+func redirectToUserHome(c *gin.Context, user models.User) {
+	if user.Status == "admin" {
+		c.Redirect(http.StatusFound, "/dashboard")
+		return
+	}
+	c.Redirect(http.StatusFound, "/schedule")
+}
+
+func HomePage(c *gin.Context) {
+	if user, ok := authenticatedUserFromCookie(c); ok {
+		redirectToUserHome(c, user)
+		return
+	}
+	c.Redirect(http.StatusFound, "/login")
+}
+
 // LoginPage renders the login page.
 func LoginPage(c *gin.Context) {
+	if user, ok := authenticatedUserFromCookie(c); ok {
+		redirectToUserHome(c, user)
+		return
+	}
+
 	errorBlock := ""
 	switch c.Query("error") {
 	case "invalid_credentials":
@@ -141,7 +186,7 @@ func LoginPage(c *gin.Context) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#efe7db">
+    <meta name="theme-color" content="#f6f7f9">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/static/img/logo-192.png">
@@ -230,11 +275,7 @@ func Login(c *gin.Context) {
 
 	setSessionCookie(c, token, expires)
 	security.LogEvent("login_success", fmt.Sprintf("user=%s ip=%s", username, c.ClientIP()))
-	if user.Status == "admin" {
-		c.Redirect(http.StatusFound, "/dashboard")
-		return
-	}
-	c.Redirect(http.StatusFound, "/schedule")
+	redirectToUserHome(c, user)
 }
 
 // Logout clears the session cookie and redirects to the login page.

@@ -14,6 +14,7 @@ import (
 
 	"project/internal/models"
 	"project/internal/storage"
+	"project/internal/telegrambot"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
@@ -119,11 +120,16 @@ func humanizeScheduleError(err error) string {
 
 func cleanIDList(ids []string) []string {
 	clean := make([]string, 0, len(ids))
+	seen := make(map[string]struct{}, len(ids))
 	for _, id := range ids {
 		id = strings.TrimSpace(id)
 		if id == "" {
 			continue
 		}
+		if _, exists := seen[id]; exists {
+			continue
+		}
+		seen[id] = struct{}{}
 		clean = append(clean, id)
 	}
 	return clean
@@ -269,6 +275,12 @@ func shortWorkerDisplayName(fullName string) string {
 	return b.String()
 }
 
+const (
+	telegramScheduleCreatedTitle = "\u041d\u043e\u0432\u043e\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u0438\u0435"
+	telegramScheduleUpdatedTitle = "\u041d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u0438\u0435 \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u043e"
+	telegramScheduleDeletedTitle = "\u041d\u0430\u0437\u043d\u0430\u0447\u0435\u043d\u0438\u0435 \u0443\u0434\u0430\u043b\u0435\u043d\u043e"
+)
+
 func SchedulePage(c *gin.Context) {
 	entries, err := storage.GetTimesheets()
 	if err != nil {
@@ -405,6 +417,7 @@ func SchedulePage(c *gin.Context) {
 
 func buildSelectAndSelectedList(items [][2]string, selectedIDs []string, selectID, inputName string) (string, string) {
 	_ = selectID
+	selectedIDs = cleanIDList(selectedIDs)
 	var options strings.Builder
 	options.WriteString(`<option value="">Выберите...</option>`)
 	for _, item := range items {
@@ -441,6 +454,8 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 		return
 	}
 
+	entry.WorkerIDs = cleanIDList(entry.WorkerIDs)
+	entry.ObjectIDs = cleanIDList(entry.ObjectIDs)
 	if c.GetString("userStatus") != "admin" {
 		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
 			found := false
@@ -463,6 +478,9 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 		}
 		workerItems = append(workerItems, [2]string{worker.ID, worker.Name})
 	}
+	sort.SliceStable(workerItems, func(i, j int) bool {
+		return strings.ToLower(workerItems[i][1]) < strings.ToLower(workerItems[j][1])
+	})
 	objectItems := make([][2]string, 0, len(objects))
 	for _, object := range objects {
 		if object.Status != "in_progress" {
@@ -548,14 +566,14 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 <div class="form-group-edit timesheet-span-2" id="object_wrap">
   <label>Объекты</label>
-  <div class="dynamic-select-group" data-dynamic-select-group>
+  <div class="dynamic-select-group" data-dynamic-select-group data-options-template="{{OBJECT_OPTIONS_ATTR}}">
     {{OBJECT_SELECTED}}
   </div>
 </div>
 
 <div class="form-group-edit timesheet-span-2">
   <label>Работники</label>
-  <div class="dynamic-select-group" data-dynamic-select-group data-required-worker-id="{{REQUIRED_WORKER_ID}}">
+  <div class="dynamic-select-group" data-dynamic-select-group data-options-template="{{WORKER_OPTIONS_ATTR}}" data-required-worker-id="{{REQUIRED_WORKER_ID}}">
     {{WORKER_SELECTED}}
   </div>
 </div>
@@ -651,7 +669,7 @@ function ensureDynamicSelectRows(group){
 }
 document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group){
   const firstSelect=group.querySelector('select');
-  if(firstSelect){
+  if(!group.getAttribute('data-options-template') && firstSelect){
     group.setAttribute('data-options-template', firstSelect.innerHTML);
   }
   group.addEventListener('change', function(e){
@@ -748,6 +766,7 @@ if(kind){ kind.addEventListener('change', syncEntryKind); syncEntryKind(); }
 	final = strings.Replace(final, "{{SPECIAL_MARK}}", template.HTMLEscapeString(normalizeSpecialMark(selectedMark)), 1)
 	final = strings.Replace(final, "{{PERIOD_END}}", template.HTMLEscapeString(c.Query("period_end")), 1)
 	final = strings.Replace(final, "{{WORKER_OPTIONS}}", workerOptions, 1)
+	final = strings.Replace(final, "{{WORKER_OPTIONS_ATTR}}", template.HTMLEscapeString(workerOptions), 1)
 	final = strings.Replace(final, "{{WORKER_SELECTED}}", workerSelected, 1)
 	if c.GetString("userStatus") != "admin" {
 		if ownWorker, err := storage.GetWorkerByUserID(c.GetString("userID")); err == nil && !ownWorker.IsFired {
@@ -759,6 +778,7 @@ if(kind){ kind.addEventListener('change', syncEntryKind); syncEntryKind(); }
 		final = strings.Replace(final, "{{REQUIRED_WORKER_ID}}", "", 1)
 	}
 	final = strings.Replace(final, "{{OBJECT_OPTIONS}}", objectOptions, 1)
+	final = strings.Replace(final, "{{OBJECT_OPTIONS_ATTR}}", template.HTMLEscapeString(objectOptions), 1)
 	final = strings.Replace(final, "{{OBJECT_SELECTED}}", objectSelected, 1)
 	final = strings.Replace(final, "{{NOTES}}", template.HTMLEscapeString(entry.Notes), 1)
 	final = strings.Replace(final, "{{SUBMIT}}", template.HTMLEscapeString(submit), 1)
@@ -880,7 +900,9 @@ func CreateScheduleEntry(c *gin.Context) {
 			for d := startDate; !d.After(endDate); d = d.AddDate(0, 0, 1) {
 				copyEntry := entry
 				copyEntry.Date = d.Format("2006-01-02")
-				_, _ = storage.CreateTimesheet(copyEntry)
+				if createdEntry, err := storage.CreateTimesheet(copyEntry); err == nil {
+					go telegrambot.SendScheduleEntryNotification(createdEntry, telegramScheduleCreatedTitle)
+				}
 			}
 			returnTo := c.PostForm("return_to")
 			if !strings.HasPrefix(returnTo, "/") {
@@ -890,10 +912,12 @@ func CreateScheduleEntry(c *gin.Context) {
 			return
 		}
 	}
-	if _, err := storage.CreateTimesheet(entry); err != nil {
+	createdEntry, err := storage.CreateTimesheet(entry)
+	if err != nil {
 		renderScheduleForm(c, entry, "/schedule/new", "Новое назначение", "Сохранить", false, humanizeScheduleError(err), c.PostForm("special_mark"))
 		return
 	}
+	go telegrambot.SendScheduleEntryNotification(createdEntry, telegramScheduleCreatedTitle)
 	returnTo := c.PostForm("return_to")
 	if !strings.HasPrefix(returnTo, "/") {
 		returnTo = "/schedule"
@@ -993,6 +1017,7 @@ func UpdateScheduleEntry(c *gin.Context) {
 		renderScheduleForm(c, entry, "/schedule/edit/"+entry.ID, "Редактирование назначения", "Сохранить изменения", true, humanizeScheduleError(err), c.PostForm("special_mark"))
 		return
 	}
+	go telegrambot.SendScheduleEntryNotification(entry, telegramScheduleUpdatedTitle)
 	returnTo := c.PostForm("return_to")
 	if !strings.HasPrefix(returnTo, "/") {
 		returnTo = "/schedule"
@@ -1028,6 +1053,7 @@ func DeleteScheduleEntry(c *gin.Context) {
 		c.String(http.StatusBadRequest, "Failed to delete schedule entry: %v", err)
 		return
 	}
+	go telegrambot.SendScheduleEntryNotification(entry, telegramScheduleDeletedTitle)
 	returnTo := c.PostForm("return_to")
 	if !strings.HasPrefix(returnTo, "/") {
 		returnTo = "/schedule"
@@ -1234,6 +1260,9 @@ func TimesheetsPage(c *gin.Context) {
 		}
 		visibleWorkers = append(visibleWorkers, worker)
 	}
+	sort.SliceStable(visibleWorkers, func(i, j int) bool {
+		return strings.ToLower(visibleWorkers[i].Name) < strings.ToLower(visibleWorkers[j].Name)
+	})
 	if selectedWorkerID == "" && len(visibleWorkers) > 0 {
 		selectedWorkerID = visibleWorkers[0].ID
 	}
@@ -1393,11 +1422,11 @@ func TimesheetsPage(c *gin.Context) {
 				rowClass := "timesheet-mobile-row"
 				valueLabel := "—"
 				statusLabel := "Пусто"
-				actionLabel := "Добавить"
+				actionLabel := "+"
 				bodyHTML := `<p class="text-muted">Записей на этот день нет.</p>`
 				if cellData.DetailsHTML != "" {
 					bodyHTML = `<div class="timesheet-mobile-entry-stack">` + cellData.DetailsHTML + `</div>`
-					actionLabel = "Новая запись"
+					actionLabel = "+"
 				}
 				if cellData.CellMark != "" {
 					rowClass += " is-marked"
@@ -1457,7 +1486,7 @@ func TimesheetsPage(c *gin.Context) {
     </div>
     <div class="timesheet-mobile-table-wrap">
       <table class="table timesheet-mobile-table">
-        <thead><tr><th>Р”РµРЅСЊ</th><th>Р—Р°РїРёСЃСЊ</th><th></th></tr></thead>
+        <thead><tr><th>День</th><th>Запись</th><th></th></tr></thead>
         <tbody>{{MOBILE_DAYS}}</tbody>
       </table>
     </div>
