@@ -162,6 +162,7 @@ function buildModalURL(url, ret){
     const u=new URL(url, window.location.origin);
     if(!u.searchParams.has('modal')) u.searchParams.set('modal', '1');
     if(ret && !u.searchParams.has('return')) u.searchParams.set('return', ret);
+    u.searchParams.set('_modal_ts', String(Date.now()));
     return u.pathname + u.search + u.hash;
   }catch(_){
     return url;
@@ -415,6 +416,7 @@ function openModal(url, title, ret, trigger){
   body.classList.add('modal-open');
   showModalLoading(title);
   fetch(requestURL, {
+    cache: 'no-store',
     credentials: 'same-origin',
     headers: { 'X-Requested-With': 'XMLHttpRequest' }
   }).then(function(response){
@@ -473,6 +475,7 @@ function submitModalForm(form, submitter){
   fetch(action, {
     method: method,
     body: requestBody,
+    cache: 'no-store',
     credentials: 'same-origin',
     headers: headers
   }).then(function(response){

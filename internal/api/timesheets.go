@@ -491,6 +491,10 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 	workerOptions, workerSelected := buildSelectAndSelectedList(workerItems, entry.WorkerIDs, "worker_select", "worker_ids")
 	objectOptions, objectSelected := buildSelectAndSelectedList(objectItems, entry.ObjectIDs, "object_select", "object_ids")
+	defaultTodayAttr := ""
+	if !isEdit && strings.TrimSpace(c.Query("date")) == "" && strings.TrimSpace(errorMsg) == "" {
+		defaultTodayAttr = ` data-default-today="1"`
+	}
 
 	if entry.Date == "" {
 		entry.Date = time.Now().Format("2006-01-02")
@@ -555,7 +559,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 {{ERROR_BLOCK}}
 <div class="form-group-edit timesheet-span-2"><label for="entry_kind">Тип отметки</label><select id="entry_kind" name="entry_kind"><option value="work"{{MARK_WORK}}>Работа</option><option value="vacation"{{MARK_VACATION}}>Отпуск (ОТ)</option><option value="sick"{{MARK_SICK}}>Больничный (Б)</option><option value="absence"{{MARK_ABSENT}}>Прогул (ПР)</option><option value="weekend"{{MARK_WEEKEND}}>Выходной (В)</option></select></div>
 <div class="timesheet-time-row timesheet-span-2">
-  <div class="form-group-edit"><label for="date" id="date_label">Дата</label><input id="date" name="date" type="date" value="{{DATE}}" required></div>
+  <div class="form-group-edit"><label for="date" id="date_label">Дата</label><input id="date" name="date" type="date" value="{{DATE}}"{{DEFAULT_TODAY_ATTR}} required></div>
   <div class="form-group-edit" id="period_wrap" style="display:none;"><label for="period_end" id="period_end_label">По</label><input id="period_end" name="period_end" type="date" value="{{PERIOD_END}}"></div>
   <div id="work_fields_wrap" class="timesheet-work-fields">
     <div class="form-group-edit"><label for="start_time">Начало смены</label><input id="start_time" name="start_time" type="time" value="{{START_TIME}}" required></div>
@@ -689,9 +693,18 @@ const st=document.getElementById('start_time');
 const et=document.getElementById('end_time');
 const lunch=document.getElementById('lunch_break_minutes');
 const workFieldsWrap=document.getElementById('work_fields_wrap');
+const dateInput=document.getElementById('date');
 const dateLabel=document.getElementById('date_label');
 const periodLabel=document.getElementById('period_end_label');
 const objectWrap=document.getElementById('object_wrap');
+function localTodayValue(){
+  const d=new Date();
+  d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
+  return d.toISOString().slice(0,10);
+}
+if(dateInput && dateInput.getAttribute('data-default-today')==='1'){
+  dateInput.value=localTodayValue();
+}
 function syncEntryKind(){
   if(!kind) return;
   const v=kind.value;
@@ -752,6 +765,7 @@ if(kind){ kind.addEventListener('change', syncEntryKind); syncEntryKind(); }
 	}
 	final = strings.Replace(final, "{{ERROR_BLOCK}}", errorBlock, 1)
 	final = strings.Replace(final, "{{DATE}}", template.HTMLEscapeString(entry.Date), 1)
+	final = strings.Replace(final, "{{DEFAULT_TODAY_ATTR}}", defaultTodayAttr, 1)
 	final = strings.Replace(final, "{{START_TIME}}", template.HTMLEscapeString(entry.StartTime), 1)
 	final = strings.Replace(final, "{{END_TIME}}", template.HTMLEscapeString(entry.EndTime), 1)
 	final = strings.Replace(final, "{{L0}}", l0, 1)

@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'avayusstroy-v4';
+const CACHE_VERSION = 'avayusstroy-v5';
 const APP_SHELL = [
   '/',
   '/login',
@@ -23,6 +23,7 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   if (request.method !== 'GET') return;
+  const url = new URL(request.url);
 
   if (request.mode === 'navigate') {
     event.respondWith(
@@ -37,6 +38,17 @@ self.addEventListener('fetch', (event) => {
           return cached || caches.match('/login');
         })
     );
+    return;
+  }
+
+  const isCacheableAsset = url.origin === self.location.origin && (
+    url.pathname.startsWith('/static/') ||
+    url.pathname === '/manifest.webmanifest' ||
+    url.pathname === '/sw.js'
+  );
+
+  if (!isCacheableAsset) {
+    event.respondWith(fetch(request));
     return;
   }
 
