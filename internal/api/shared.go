@@ -291,7 +291,7 @@ function ensureBrandAssets(){
   if(!head.querySelector('meta[name="theme-color"]')){
     const theme=document.createElement('meta');
     theme.name='theme-color';
-    theme.content='#efe7db';
+    theme.content='#f5f1ea';
     head.appendChild(theme);
   }
   if(!head.querySelector('meta[name="apple-mobile-web-app-capable"]')){

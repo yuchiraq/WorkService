@@ -399,7 +399,7 @@ func SchedulePage(c *gin.Context) {
 	SetTopNavActions(c, topNavScheduleActions)
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Расписание</title><link rel="stylesheet" href="/static/css/style.css?v=6"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header page-header-desktop-hidden"><h1>Расписание</h1>{{USER_MONTH_HOURS}}<form method="GET" action="/schedule" class="month-selector"><select id="month" name="month" onchange="this.form.submit()">{{MONTH_OPTIONS}}</select></form><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="{{CURRENT_PATH}}">Добавить назначение</a></div>
@@ -546,7 +546,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css?v=6"></head><body>
 {{LAYOUT_START}}
 <div class="main-content{{MAIN_CONTENT_CLASS}}">
 {{BACK_LINK}}
@@ -1473,7 +1473,7 @@ func TimesheetsPage(c *gin.Context) {
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Табель</title><link rel="stylesheet" href="/static/css/style.css?v=6"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header page-header-desktop-hidden"><h1>Табель</h1><a class="btn btn-secondary" href="/timesheets/export?month={{SELECTED_MONTH}}">Экспорт в Excel</a></div>

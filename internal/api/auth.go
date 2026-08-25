@@ -186,12 +186,12 @@ func LoginPage(c *gin.Context) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <meta name="theme-color" content="#f6f7f9">
+    <meta name="theme-color" content="#f5f1ea">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/static/img/logo-192.png">
     <title>Вход в систему</title>
-    <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="/static/css/style.css?v=6">
 </head>
 <body class="login-screen">
     <div class="center-page">
