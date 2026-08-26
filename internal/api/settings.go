@@ -35,11 +35,14 @@ func CreateBackup(c *gin.Context) {
 		return
 	}
 	ts := time.Now().Format("20060102-150405")
-	files := []string{"users.json", "workers.json", "objects.json", "timesheets.json"}
+	files := []string{"users.json", "workers.json", "objects.json", "timesheets.json", "vehicles.json"}
 	for _, f := range files {
 		src := filepath.Join("storage", f)
 		dst := filepath.Join(backupDir, strings.TrimSuffix(f, ".json")+"-"+ts+".json")
 		if err := copyFile(src, dst); err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
 			c.String(http.StatusInternalServerError, "backup failed for %s: %v", f, err)
 			return
 		}
@@ -99,7 +102,7 @@ func SettingsPage(c *gin.Context) {
 	statusBlock := ""
 	switch c.Query("ok") {
 	case "backup":
-		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Резервная копия создана</strong><p>Файлы users, workers, objects и timesheets сохранены в локальный backup.</p></div>`
+		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Резервная копия создана</strong><p>Пользователи, работники, объекты, табель и транспорт сохранены в локальный backup.</p></div>`
 	case "telegram_saved":
 		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Настройки Telegram сохранены</strong><p>Токен, username бота и адрес сайта обновлены.</p></div>`
 	case "telegram_synced":
@@ -142,7 +145,7 @@ func SettingsPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Настройки</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=6">
+    <link rel="stylesheet" href="/static/css/style.css?v=9">
 </head>
 <body>
 {{SIDEBAR_HTML}}

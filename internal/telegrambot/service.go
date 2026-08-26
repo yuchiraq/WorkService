@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -352,4 +353,97 @@ func SendScheduleEntryNotification(entry models.TimesheetEntry, title string) er
 		return errors.New(strings.Join(failures, "; "))
 	}
 	return nil
+}
+
+// SendMonthlyMileageReminders sends one reminder per assigned vehicle during
+// the first three days of a month. A successful delivery is persisted so a
+// server restart cannot duplicate it.
+func SendMonthlyMileageReminders(now time.Time) (int, error) {
+	if now.Day() > 3 {
+		return 0, nil
+	}
+	settings, err := loadSettings()
+	if err != nil {
+		return 0, err
+	}
+	_, _ = SyncContacts()
+
+	vehicles, err := storage.GetVehicles()
+	if err != nil {
+		return 0, err
+	}
+	users, err := storage.GetUsers()
+	if err != nil {
+		return 0, err
+	}
+	usersByID := make(map[string]models.User, len(users))
+	for _, user := range users {
+		usersByID[user.ID] = user
+	}
+
+	month := now.Format("2006-01")
+	sent := 0
+	failures := make([]string, 0)
+	for _, vehicle := range vehicles {
+		if vehicle.AssignedUserID == "" || vehicle.LastMileageReminderMonth == month || storage.HasMileageRecordForMonth(vehicle.ID, month) {
+			continue
+		}
+		user, exists := usersByID[vehicle.AssignedUserID]
+		if !exists {
+			continue
+		}
+		phone := strings.TrimSpace(user.Phone)
+		if phone == "" {
+			if worker, workerErr := storage.GetWorkerByUserID(user.ID); workerErr == nil {
+				phone = strings.TrimSpace(worker.Phone)
+			}
+		}
+		contact, contactErr := storage.FindTelegramContactByPhone(phone)
+		if contactErr != nil {
+			continue
+		}
+		message := strings.Join([]string{
+			"Уточните пробег автомобиля за текущий месяц.",
+			"",
+			"ТС: " + strings.TrimSpace(vehicle.Name),
+			"Госномер: " + strings.TrimSpace(vehicle.RegistrationNumber),
+			"Добавьте на сайте запись типа «Пробег».",
+		}, "\n")
+		if siteURL := strings.TrimSpace(settings.TelegramSiteURL); siteURL != "" {
+			message += "\n\nСайт: " + strings.TrimRight(siteURL, "/") + "/vehicles/" + vehicle.ID
+		}
+		if err := sendTelegramMessage(settings, contact.ChatID, message, nil); err != nil {
+			failures = append(failures, vehicle.RegistrationNumber+": "+err.Error())
+			continue
+		}
+		if err := storage.MarkVehicleMileageReminder(vehicle.ID, month); err != nil {
+			failures = append(failures, vehicle.RegistrationNumber+": "+err.Error())
+			continue
+		}
+		sent++
+	}
+	if len(failures) > 0 {
+		return sent, errors.New(strings.Join(failures, "; "))
+	}
+	return sent, nil
+}
+
+func StartMileageReminderScheduler() {
+	go func() {
+		run := func() {
+			sent, err := SendMonthlyMileageReminders(time.Now())
+			if err != nil && !errors.Is(err, ErrBotNotConfigured) {
+				log.Printf("mileage reminder check failed: %v", err)
+			}
+			if sent > 0 {
+				log.Printf("sent %d monthly mileage reminders", sent)
+			}
+		}
+		run()
+		ticker := time.NewTicker(6 * time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			run()
+		}
+	}()
 }

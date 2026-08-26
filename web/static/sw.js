@@ -1,8 +1,8 @@
-const CACHE_VERSION = 'avayusstroy-v6';
+const CACHE_VERSION = 'avayusstroy-v9';
 const APP_SHELL = [
   '/',
   '/login',
-  '/static/css/style.css?v=6',
+  '/static/css/style.css?v=9',
   '/static/img/logo.svg',
   '/static/img/logo-192.png',
   '/manifest.webmanifest'
@@ -62,7 +62,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
           return response;
         })
-        .catch(() => caches.match('/static/css/style.css?v=6'));
+        .catch(() => caches.match('/static/css/style.css?v=9'));
     })
   );
 });

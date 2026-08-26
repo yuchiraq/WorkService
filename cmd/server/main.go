@@ -5,6 +5,7 @@ import (
 
 	"project/internal/router"
 	"project/internal/storage"
+	"project/internal/telegrambot"
 
 	"github.com/gin-gonic/gin"
 )
@@ -32,6 +33,10 @@ func main() {
 	if err := storage.LoadTelegramContacts(); err != nil {
 		log.Fatalf("Failed to load telegram contacts: %v", err)
 	}
+	if err := storage.LoadVehicles(); err != nil {
+		log.Fatalf("Failed to load vehicles: %v", err)
+	}
+	telegrambot.StartMileageReminderScheduler()
 
 	r := gin.Default()
 

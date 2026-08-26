@@ -79,9 +79,19 @@ func SetupRouter(r *gin.Engine) {
 
 		authRequired.GET("/profile", api.ProfilePage)
 		authRequired.POST("/profile", api.UpdateProfile)
+		authRequired.GET("/profile/menu", api.MenuPreferencesPage)
+		authRequired.POST("/profile/menu", api.UpdateMenuPreferences)
 		authRequired.GET("/improvements", api.ImprovementsPage)
 		authRequired.POST("/improvements/new", api.CreateImprovement)
 		authRequired.POST("/improvements/complete/:id", api.CompleteImprovement)
+
+		authRequired.GET("/vehicles", api.VehiclesPage)
+		authRequired.GET("/vehicles/:id", api.VehiclePage)
+		authRequired.POST("/vehicles/new", api.CreateVehicle)
+		authRequired.POST("/vehicles/:id/assign-self", api.AssignVehicleToSelf)
+		authRequired.POST("/vehicles/:id/assign", api.AssignVehicle)
+		authRequired.POST("/vehicles/:id/unassign", api.UnassignVehicle)
+		authRequired.POST("/vehicles/:id/records", api.CreateVehicleRecord)
 	}
 
 	adminRequired := r.Group("/")

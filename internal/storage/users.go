@@ -239,3 +239,33 @@ func UpdateUserLastLogin(userID string, when time.Time) error {
 	}
 	return errors.New("user not found")
 }
+
+// UpdateUserHiddenMenuItems stores personal navigation preferences without
+// touching credentials or profile fields.
+func UpdateUserHiddenMenuItems(userID string, hiddenItems []string) error {
+	usersMutex.Lock()
+	defer usersMutex.Unlock()
+
+	cleaned := make([]string, 0, len(hiddenItems))
+	seen := make(map[string]struct{}, len(hiddenItems))
+	for _, item := range hiddenItems {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		if _, exists := seen[item]; exists {
+			continue
+		}
+		seen[item] = struct{}{}
+		cleaned = append(cleaned, item)
+	}
+	sort.Strings(cleaned)
+
+	for i := range users {
+		if users[i].ID == userID {
+			users[i].HiddenMenuItems = cleaned
+			return saveUsers()
+		}
+	}
+	return errors.New("user not found")
+}

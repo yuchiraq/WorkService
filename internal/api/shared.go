@@ -5,6 +5,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"project/internal/storage"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,6 +17,27 @@ type navItem struct {
 }
 
 const topNavActionsContextKey = "topNavActions"
+
+func navItemsForStatus(userStatus string) []navItem {
+	items := []navItem{
+		{PageID: "schedule", Path: "/schedule", Label: "Расписание"},
+		{PageID: "timesheets", Path: "/timesheets", Label: "Табель"},
+		{PageID: "vehicles", Path: "/vehicles", Label: "Авто"},
+		{PageID: "improvements", Path: "/improvements", Label: "Улучшения/ошибки"},
+	}
+	if userStatus == "admin" {
+		items = append([]navItem{
+			{PageID: "dashboard", Path: "/dashboard", Label: "Панель"},
+			{PageID: "workers", Path: "/workers", Label: "Работники"},
+			{PageID: "objects", Path: "/objects", Label: "Объекты"},
+		}, items...)
+		items = append(items,
+			navItem{PageID: "users", Path: "/users", Label: "Пользователи"},
+			navItem{PageID: "settings", Path: "/settings", Label: "Настройки"},
+		)
+	}
+	return items
+}
 
 func SetTopNavActions(c *gin.Context, html string) {
 	if c == nil {
@@ -39,35 +62,34 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 		}
 	}
 
-	navItems := []navItem{
-		{PageID: "schedule", Path: "/schedule", Label: "Расписание"},
-		{PageID: "timesheets", Path: "/timesheets", Label: "Табель"},
-		{PageID: "improvements", Path: "/improvements", Label: "Улучшения/ошибки"},
-	}
-	if userStatus == "admin" {
-		navItems = append([]navItem{
-			{PageID: "dashboard", Path: "/dashboard", Label: "Панель"},
-			{PageID: "workers", Path: "/workers", Label: "Работники"},
-			{PageID: "objects", Path: "/objects", Label: "Объекты"},
-		}, navItems...)
-		navItems = append(navItems,
-			navItem{PageID: "users", Path: "/users", Label: "Пользователи"},
-			navItem{PageID: "settings", Path: "/settings", Label: "Настройки"},
-		)
+	navItems := navItemsForStatus(userStatus)
+	hiddenItems := map[string]struct{}{}
+	if user, err := storage.GetUserByID(c.GetString("userID")); err == nil {
+		for _, pageID := range user.HiddenMenuItems {
+			hiddenItems[pageID] = struct{}{}
+		}
 	}
 
 	var nav strings.Builder
 	pageTitle := "Раздел"
 	for _, item := range navItems {
+		if item.PageID == activePage {
+			pageTitle = item.Label
+		}
+		if _, hidden := hiddenItems[item.PageID]; hidden {
+			continue
+		}
 		class := "nav-link"
 		if item.PageID == activePage {
 			class += " active"
-			pageTitle = item.Label
 		}
 		nav.WriteString(fmt.Sprintf(`<a class="%s" href="%s">%s</a>`, class, item.Path, item.Label))
 	}
 	if activePage == "my-profile" {
 		pageTitle = "Мой профиль"
+	}
+	if activePage == "menu-settings" {
+		pageTitle = "Настройка меню"
 	}
 
 	roleLabel := "Пользователь"
@@ -693,6 +715,7 @@ syncNavState();
   <div class="side-nav-brand"><img src="/static/img/logo.svg" alt="АВАЮССТРОЙ"><div class="side-nav-brand-copy"><strong>ЧСУП "АВАЮССТРОЙ"</strong><small>система управления работами</small></div></div>
   <a class="side-nav-user" href="/profile"><span class="user-avatar">%s</span><div><strong>%s</strong><small>%s</small></div></a>
   <nav class="side-nav-links">%s</nav>
+  <a class="btn btn-secondary side-nav-menu-settings" href="/profile/menu">Настроить меню</a>
   <button type="button" class="btn btn-secondary side-nav-notifications" data-enable-site-notifications>Уведомления</button>
   <a class="btn btn-secondary side-nav-logout" href="/logout">Выйти</a>
 </aside>
