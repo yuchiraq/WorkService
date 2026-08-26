@@ -92,6 +92,8 @@ func SetupRouter(r *gin.Engine) {
 		authRequired.POST("/vehicles/:id/assign", api.AssignVehicle)
 		authRequired.POST("/vehicles/:id/unassign", api.UnassignVehicle)
 		authRequired.POST("/vehicles/:id/records", api.CreateVehicleRecord)
+		authRequired.POST("/vehicles/:id/records/:recordID/delete", api.DeleteVehicleRecord)
+		authRequired.GET("/vehicles/:id/waybill", api.ExportVehicleWaybillPDF)
 	}
 
 	adminRequired := r.Group("/")

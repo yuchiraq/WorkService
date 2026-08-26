@@ -54,7 +54,7 @@ func ImprovementsPage(c *gin.Context) {
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Улучшения и ошибки</title><link rel="stylesheet" href="/static/css/style.css?v=11"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Улучшения и ошибки</title><link rel="stylesheet" href="/static/css/style.css?v=12"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
   <div class="page-header"><h1>Улучшения и ошибки</h1></div>

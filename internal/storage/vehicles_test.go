@@ -1,8 +1,10 @@
 package storage
 
 import (
+	"errors"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"project/internal/models"
 )
@@ -63,7 +65,19 @@ func TestVehicleLifecycleAndRecords(t *testing.T) {
 	if !HasMileageRecordForMonth(vehicle.ID, "2026-08") {
 		t.Fatal("HasMileageRecordForMonth() = false")
 	}
-
+	if _, err := GetVehicleRecord(vehicle.ID, mileageRecord.ID); err != nil {
+		t.Fatalf("GetVehicleRecord() error = %v", err)
+	}
+	if err := DeleteVehicleRecord(vehicle.ID, mileageRecord.ID, time.Now().Add(23*time.Hour)); err != nil {
+		t.Fatalf("DeleteVehicleRecord() within window error = %v", err)
+	}
+	if _, err := GetVehicleRecord(vehicle.ID, mileageRecord.ID); !errors.Is(err, ErrVehicleRecordNotFound) {
+		t.Fatalf("deleted GetVehicleRecord() error = %v", err)
+	}
+	vehicleRecords[0].CreatedAt = time.Now().Add(-25 * time.Hour).Format(time.RFC3339)
+	if err := DeleteVehicleRecord(vehicle.ID, maintenanceRecord.ID, time.Now()); !errors.Is(err, ErrVehicleRecordDeleteExpired) {
+		t.Fatalf("expired DeleteVehicleRecord() error = %v", err)
+	}
 	if err := MarkVehicleMileageReminder(vehicle.ID, "2026-08"); err != nil {
 		t.Fatalf("MarkVehicleMileageReminder() error = %v", err)
 	}

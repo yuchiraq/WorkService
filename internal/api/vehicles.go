@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"time"
 
 	"project/internal/models"
+	"project/internal/security"
 	"project/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -33,6 +35,21 @@ func vehicleDateLabel(value string) string {
 		return value
 	}
 	return date.Format("02.01.2006")
+}
+
+func vehicleRecordsLabel(count int) string {
+	lastTwo := count % 100
+	if lastTwo >= 11 && lastTwo <= 14 {
+		return strconv.Itoa(count) + " записей"
+	}
+	switch count % 10 {
+	case 1:
+		return strconv.Itoa(count) + " запись"
+	case 2, 3, 4:
+		return strconv.Itoa(count) + " записи"
+	default:
+		return strconv.Itoa(count) + " записей"
+	}
 }
 
 func vehicleUserNames() (map[string]string, []models.User, error) {
@@ -79,6 +96,14 @@ func vehicleRecordErrorMessage(err error) string {
 	default:
 		return "Не удалось сохранить запись. Попробуйте еще раз."
 	}
+}
+
+func canDeleteVehicleRecord(c *gin.Context, record models.VehicleRecord, now time.Time) bool {
+	if !isAdmin(c) && record.CreatedByID != c.GetString("userID") {
+		return false
+	}
+	createdAt, err := time.Parse(time.RFC3339, record.CreatedAt)
+	return err == nil && !now.After(createdAt.Add(24*time.Hour))
 }
 
 func VehiclesPage(c *gin.Context) {
@@ -161,7 +186,7 @@ func VehiclesPage(c *gin.Context) {
 	if needsMileage > 0 {
 		alert = `<div class="dashboard-alert-item is-warning vehicle-mileage-alert"><strong>Нужно уточнить пробег</strong><p>Для транспорта без показания за текущий месяц добавьте запись типа «Пробег».</p></div>`
 	}
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Авто</title><link rel="stylesheet" href="/static/css/style.css?v=11"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Авто</title><link rel="stylesheet" href="/static/css/style.css?v=12"></head><body>
 {{SIDEBAR_HTML}}{{TOAST}}<main class="main-content vehicles-page"><div class="page-header"><div><h1>Авто</h1><p class="text-muted">Учет заправок, пробега и технического обслуживания.</p></div></div>
 {{ALERT}}<div class="vehicle-summary"><div class="metric"><div class="label">Всего ТС</div><div class="value">{{TOTAL}}</div></div><div class="metric"><div class="label">Закреплено</div><div class="value">{{ASSIGNED}}</div></div><div class="metric"><div class="label">Свободно</div><div class="value">{{FREE}}</div></div></div>
 <section class="vehicle-section"><div class="section-heading"><div><h2>{{LIST_TITLE}}</h2><p>{{LIST_SUBTITLE}}</p></div></div><div class="vehicle-grid">{{ASSIGNED_CARDS}}</div></section>
@@ -292,6 +317,7 @@ func VehiclePage(c *gin.Context) {
 
 	lastMileage := 0
 	var recordsHTML strings.Builder
+	now := time.Now()
 	for _, record := range records {
 		if record.Mileage > lastMileage {
 			lastMileage = record.Mileage
@@ -310,7 +336,11 @@ func VehiclePage(c *gin.Context) {
 		if summary == "" {
 			summary = vehicleRecordTypeLabel(record.Type)
 		}
-		recordsHTML.WriteString(`<article class="vehicle-record"><div class="vehicle-record-date"><strong>` + template.HTMLEscapeString(vehicleDateLabel(record.Date)) + `</strong><span class="status-badge">` + template.HTMLEscapeString(vehicleRecordTypeLabel(record.Type)) + `</span></div><div><strong>` + template.HTMLEscapeString(summary) + `</strong><p>` + template.HTMLEscapeString(record.Notes) + `</p><small>` + template.HTMLEscapeString(record.CreatedByName) + `</small></div></article>`)
+		deleteAction := ""
+		if canDeleteVehicleRecord(c, record, now) {
+			deleteAction = `<form method="POST" action="/vehicles/` + template.HTMLEscapeString(vehicle.ID) + `/records/` + template.HTMLEscapeString(record.ID) + `/delete" onsubmit="return confirm('Удалить ошибочную запись?')">` + CSRFHiddenInput(c) + `<button class="btn btn-danger btn-compact" type="submit">Удалить</button></form>`
+		}
+		recordsHTML.WriteString(`<article class="vehicle-record"><div class="vehicle-record-date"><strong>` + template.HTMLEscapeString(vehicleDateLabel(record.Date)) + `</strong><span class="status-badge">` + template.HTMLEscapeString(vehicleRecordTypeLabel(record.Type)) + `</span></div><div class="vehicle-record-content"><strong>` + template.HTMLEscapeString(summary) + `</strong><p>` + template.HTMLEscapeString(record.Notes) + `</p><div class="vehicle-record-meta"><small>` + template.HTMLEscapeString(record.CreatedByName) + `</small>` + deleteAction + `</div></div></article>`)
 	}
 	if recordsHTML.Len() == 0 {
 		recordsHTML.WriteString(`<div class="empty-state-inline"><strong>Записей пока нет</strong><p>Добавьте первый пробег, заправку или техническое обслуживание.</p></div>`)
@@ -338,14 +368,14 @@ func VehiclePage(c *gin.Context) {
 		alert = `<div class="dashboard-alert-item is-warning vehicle-mileage-alert"><strong>Нет пробега за текущий месяц</strong><p>Добавьте показание одометра. В начале месяца напоминание также приходит в Telegram.</p></div>`
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{NAME}}</title><link rel="stylesheet" href="/static/css/style.css?v=11"></head><body>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{NAME}}</title><link rel="stylesheet" href="/static/css/style.css?v=12"></head><body>
 {{SIDEBAR_HTML}}{{TOAST}}<main class="main-content vehicle-detail-page"><a class="back-link" href="/vehicles">← Все авто</a><header class="vehicle-detail-hero"><div><span class="vehicle-card-kicker">Транспортное средство</span><h1>{{NAME}}</h1><div class="vehicle-registration">{{REGISTRATION}}</div></div><div class="vehicle-owner-summary"><span>Владелец</span><strong>{{OWNER}}</strong>{{UNASSIGN}}</div></header>
-{{ALERT}}{{ADMIN_PANEL}}<div class="vehicle-detail-grid"><section class="card vehicle-record-form-panel"><div class="section-heading"><div><h2>Новая запись</h2><p>Пробег, заправка или техническое обслуживание.</p></div></div><form method="POST" action="/vehicles/{{ID}}/records" class="vehicle-record-form">{{CSRF_FIELD}}<div class="form-group-edit"><label for="record_type">Тип</label><select id="record_type" name="type" required><option value="mileage">Пробег</option><option value="fuel">Заправка</option><option value="maintenance">Техническое обслуживание</option></select></div><div class="form-group-edit"><label for="record_date">Дата</label><input id="record_date" name="date" type="date" value="{{TODAY}}" required></div><div class="form-group-edit" data-record-field="mileage"><label for="mileage">Пробег, км</label><input id="mileage" name="mileage" type="number" min="0" value="{{LAST_MILEAGE}}"></div><div class="form-group-edit" data-record-field="fuel"><label for="liters">Топливо, л</label><input id="liters" name="liters" type="number" min="0" step="0.01"></div><div class="form-group-edit" data-record-field="amount"><label for="amount">Сумма, руб.</label><input id="amount" name="amount" type="number" min="0" step="0.01"></div><div class="form-group-edit vehicle-record-notes" data-record-field="notes"><label for="notes">Описание / комментарий</label><textarea id="notes" name="notes" rows="3" placeholder="Что сделано, где заправились или другое уточнение"></textarea></div><button class="btn btn-primary" type="submit">Добавить запись</button></form></section><section class="card vehicle-history-panel"><div class="section-heading"><div><h2>История</h2><p>{{RECORD_COUNT}} записей</p></div></div><div class="vehicle-record-list">{{RECORDS}}</div></section></div>
+{{ALERT}}{{ADMIN_PANEL}}<div class="vehicle-detail-grid"><section class="card vehicle-record-form-panel"><div class="section-heading"><div><h2>Новая запись</h2><p>Пробег, заправка или техническое обслуживание.</p></div></div><form method="POST" action="/vehicles/{{ID}}/records" class="vehicle-record-form">{{CSRF_FIELD}}<div class="form-group-edit"><label for="record_type">Тип</label><select id="record_type" name="type" required><option value="mileage">Пробег</option><option value="fuel">Заправка</option><option value="maintenance">Техническое обслуживание</option></select></div><div class="form-group-edit"><label for="record_date">Дата</label><input id="record_date" name="date" type="date" value="{{TODAY}}" required></div><div class="form-group-edit" data-record-field="mileage"><label for="mileage">Пробег, км</label><input id="mileage" name="mileage" type="number" min="0" value="{{LAST_MILEAGE}}"></div><div class="form-group-edit" data-record-field="fuel"><label for="liters">Топливо, л</label><input id="liters" name="liters" type="number" min="0" step="0.01"></div><div class="form-group-edit" data-record-field="amount"><label for="amount">Сумма, руб.</label><input id="amount" name="amount" type="number" min="0" step="0.01"></div><div class="form-group-edit vehicle-record-notes" data-record-field="notes"><label for="notes">Описание / комментарий</label><textarea id="notes" name="notes" rows="3" placeholder="Что сделано, где заправились или другое уточнение"></textarea></div><button class="btn btn-primary" type="submit">Добавить запись</button></form></section><section class="card vehicle-history-panel"><div class="section-heading vehicle-history-heading"><div><h2>История</h2><p>{{RECORD_COUNT}}</p></div><form class="vehicle-waybill-form" method="GET" action="/vehicles/{{ID}}/waybill"><label for="waybill_month">Месяц путевки</label><div><input id="waybill_month" name="month" type="month" value="{{CURRENT_MONTH}}" required><button class="btn btn-secondary btn-compact" type="submit">Экспорт PDF</button></div></form></div><div class="vehicle-record-list">{{RECORDS}}</div></section></div>
 </main><script>(function(){const type=document.getElementById('record_type');if(!type)return;const mileage=document.getElementById('mileage');const liters=document.getElementById('liters');const amount=document.getElementById('amount');const notes=document.getElementById('notes');function field(name){return document.querySelector('[data-record-field="'+name+'"]');}function toggle(name,visible){const el=field(name);if(el)el.hidden=!visible;}function sync(){const value=type.value;toggle('mileage',true);toggle('fuel',value==='fuel');toggle('amount',value==='fuel');toggle('notes',true);mileage.required=value==='mileage';liters.required=value==='fuel';notes.required=value==='maintenance';if(value!=='fuel'){liters.value='';amount.value='';}}type.addEventListener('change',sync);sync();})();</script></body></html>`
 	replacements := map[string]string{
 		"{{SIDEBAR_HTML}}": RenderSidebar(c, "vehicles"), "{{TOAST}}": RenderPageToast(c), "{{NAME}}": template.HTMLEscapeString(vehicle.Name), "{{REGISTRATION}}": template.HTMLEscapeString(vehicle.RegistrationNumber), "{{OWNER}}": template.HTMLEscapeString(owner),
 		"{{UNASSIGN}}": unassignButton, "{{ALERT}}": alert, "{{ADMIN_PANEL}}": adminPanel, "{{ID}}": template.HTMLEscapeString(vehicle.ID), "{{CSRF_FIELD}}": CSRFHiddenInput(c),
-		"{{TODAY}}": time.Now().Format("2006-01-02"), "{{LAST_MILEAGE}}": strconv.Itoa(lastMileage), "{{RECORD_COUNT}}": strconv.Itoa(len(records)), "{{RECORDS}}": recordsHTML.String(),
+		"{{TODAY}}": time.Now().Format("2006-01-02"), "{{CURRENT_MONTH}}": time.Now().Format("2006-01"), "{{LAST_MILEAGE}}": strconv.Itoa(lastMileage), "{{RECORD_COUNT}}": vehicleRecordsLabel(len(records)), "{{RECORDS}}": recordsHTML.String(),
 	}
 	for token, value := range replacements {
 		page = strings.ReplaceAll(page, token, value)
@@ -375,4 +405,35 @@ func CreateVehicleRecord(c *gin.Context) {
 		return
 	}
 	redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "success", "Запись добавлена.")
+}
+
+func DeleteVehicleRecord(c *gin.Context) {
+	vehicle, err := storage.GetVehicleByID(c.Param("id"))
+	if err != nil {
+		redirectVehicleMessage(c, "/vehicles", "error", "Транспорт не найден.")
+		return
+	}
+	if !canAccessVehicle(c, vehicle) {
+		redirectVehicleMessage(c, "/vehicles", "error", "У вас нет доступа к этому транспорту.")
+		return
+	}
+	record, err := storage.GetVehicleRecord(vehicle.ID, c.Param("recordID"))
+	if err != nil {
+		redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "error", "Запись не найдена.")
+		return
+	}
+	if !isAdmin(c) && record.CreatedByID != c.GetString("userID") {
+		redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "error", "Удалить запись может только её автор или администратор.")
+		return
+	}
+	if err := storage.DeleteVehicleRecord(vehicle.ID, record.ID, time.Now()); err != nil {
+		message := "Не удалось удалить запись."
+		if errors.Is(err, storage.ErrVehicleRecordDeleteExpired) {
+			message = "Запись можно удалить только в течение 24 часов после добавления."
+		}
+		redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "error", message)
+		return
+	}
+	security.LogEvent("vehicle_record_deleted", fmt.Sprintf("user=%s vehicle=%s record=%s", c.GetString("userName"), vehicle.ID, record.ID))
+	redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "success", "Ошибочная запись удалена.")
 }

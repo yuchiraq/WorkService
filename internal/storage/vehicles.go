@@ -20,6 +20,11 @@ type fleetFileData struct {
 }
 
 var (
+	ErrVehicleRecordNotFound      = errors.New("vehicle record not found")
+	ErrVehicleRecordDeleteExpired = errors.New("vehicle record delete window expired")
+)
+
+var (
 	vehicles       []models.Vehicle
 	vehicleRecords []models.VehicleRecord
 	vehiclesMutex  sync.RWMutex
@@ -141,6 +146,17 @@ func GetVehicleRecords(vehicleID string) ([]models.VehicleRecord, error) {
 	return result, nil
 }
 
+func GetVehicleRecord(vehicleID, recordID string) (models.VehicleRecord, error) {
+	vehiclesMutex.RLock()
+	defer vehiclesMutex.RUnlock()
+	for _, record := range vehicleRecords {
+		if record.VehicleID == vehicleID && record.ID == recordID {
+			return record, nil
+		}
+	}
+	return models.VehicleRecord{}, ErrVehicleRecordNotFound
+}
+
 func CreateVehicleRecord(record models.VehicleRecord) (models.VehicleRecord, error) {
 	vehiclesMutex.Lock()
 	defer vehiclesMutex.Unlock()
@@ -187,6 +203,32 @@ func CreateVehicleRecord(record models.VehicleRecord) (models.VehicleRecord, err
 		return models.VehicleRecord{}, err
 	}
 	return record, nil
+}
+
+func DeleteVehicleRecord(vehicleID, recordID string, now time.Time) error {
+	vehiclesMutex.Lock()
+	defer vehiclesMutex.Unlock()
+
+	for index, record := range vehicleRecords {
+		if record.VehicleID != vehicleID || record.ID != recordID {
+			continue
+		}
+		createdAt, err := time.Parse(time.RFC3339, record.CreatedAt)
+		if err != nil || now.After(createdAt.Add(24*time.Hour)) {
+			return ErrVehicleRecordDeleteExpired
+		}
+
+		removed := record
+		vehicleRecords = append(vehicleRecords[:index], vehicleRecords[index+1:]...)
+		if err := saveVehicles(); err != nil {
+			vehicleRecords = append(vehicleRecords, models.VehicleRecord{})
+			copy(vehicleRecords[index+1:], vehicleRecords[index:])
+			vehicleRecords[index] = removed
+			return err
+		}
+		return nil
+	}
+	return ErrVehicleRecordNotFound
 }
 
 func HasMileageRecordForMonth(vehicleID, month string) bool {

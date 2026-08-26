@@ -1846,6 +1846,20 @@ textarea:focus-visible,
 .vehicle-record:last-child { border-bottom: 0; }
 .vehicle-record-date { display: grid; align-content: start; justify-items: start; gap: 7px; }
 .vehicle-record p { margin: 5px 0; color: var(--muted); overflow-wrap: anywhere; }
+.vehicle-record-content { min-width: 0; }
+.vehicle-record-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+.vehicle-record-meta form { margin: 0; }
+.vehicle-history-heading { align-items: end; }
+.vehicle-waybill-form { display: grid; gap: 6px; min-width: min(100%, 310px); }
+.vehicle-waybill-form > label { color: var(--muted); font-size: 0.76rem; font-weight: 700; }
+.vehicle-waybill-form > div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.vehicle-waybill-form input { min-width: 0; }
 
 .gallery-page { width: 100%; min-width: 0; max-width: 100%; display: grid; gap: var(--s5); }
 .gallery-settings-panel { width: 100%; min-width: 0; max-width: 100%; display: grid; gap: 18px; }
@@ -1994,6 +2008,12 @@ textarea:focus-visible,
   .vehicle-owner-summary { width: 100%; justify-items: start; text-align: left; }
   .vehicle-owner-panel form { grid-template-columns: 1fr; }
   .vehicle-record { grid-template-columns: 1fr; gap: 8px; }
+  .vehicle-record-meta { align-items: stretch; flex-direction: column; }
+  .vehicle-record-meta form,
+  .vehicle-record-meta .btn { width: 100%; }
+  .vehicle-waybill-form { width: 100%; min-width: 0; }
+  .vehicle-waybill-form > div { grid-template-columns: 1fr; }
+  .vehicle-waybill-form .btn { width: 100%; }
   .vehicle-record-form > .btn,
   .vehicle-record-notes { grid-column: 1; }
   .vehicle-grid { grid-template-columns: minmax(0, 1fr); }
