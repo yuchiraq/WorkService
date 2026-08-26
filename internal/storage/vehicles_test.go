@@ -46,8 +46,19 @@ func TestVehicleLifecycleAndRecords(t *testing.T) {
 	if _, err := CreateVehicleRecord(models.VehicleRecord{VehicleID: vehicle.ID, Type: "fuel", Date: "2026-08-01"}); err == nil {
 		t.Fatal("CreateVehicleRecord() accepted fuel without liters")
 	}
-	if _, err := CreateVehicleRecord(models.VehicleRecord{VehicleID: vehicle.ID, Type: "mileage", Date: "2026-08-01", Mileage: 125400}); err != nil {
+	mileageRecord, err := CreateVehicleRecord(models.VehicleRecord{VehicleID: vehicle.ID, Type: "mileage", Date: "2026-08-01", Mileage: 125400, Liters: 50, Amount: 120})
+	if err != nil {
 		t.Fatalf("CreateVehicleRecord() error = %v", err)
+	}
+	if mileageRecord.Liters != 0 || mileageRecord.Amount != 0 {
+		t.Fatalf("mileage record kept fuel values: %#v", mileageRecord)
+	}
+	maintenanceRecord, err := CreateVehicleRecord(models.VehicleRecord{VehicleID: vehicle.ID, Type: "maintenance", Date: "2026-08-02", Mileage: 125500, Liters: 10, Amount: 90, Notes: "Замена масла"})
+	if err != nil {
+		t.Fatalf("maintenance CreateVehicleRecord() error = %v", err)
+	}
+	if maintenanceRecord.Liters != 0 || maintenanceRecord.Amount != 0 {
+		t.Fatalf("maintenance record kept fuel values: %#v", maintenanceRecord)
 	}
 	if !HasMileageRecordForMonth(vehicle.ID, "2026-08") {
 		t.Fatal("HasMileageRecordForMonth() = false")

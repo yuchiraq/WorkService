@@ -145,7 +145,7 @@ func SettingsPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Настройки</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=10">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
 </head>
 <body>
 {{SIDEBAR_HTML}}

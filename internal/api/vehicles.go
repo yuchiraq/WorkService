@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -51,6 +52,33 @@ func vehicleUserNames() (map[string]string, []models.User, error) {
 
 func canAccessVehicle(c *gin.Context, vehicle models.Vehicle) bool {
 	return isAdmin(c) || vehicle.AssignedUserID == c.GetString("userID")
+}
+
+func redirectVehicleMessage(c *gin.Context, path, kind, message string) {
+	separator := "?"
+	if strings.Contains(path, "?") {
+		separator = "&"
+	}
+	c.Redirect(http.StatusFound, path+separator+kind+"="+url.QueryEscape(message))
+}
+
+func vehicleRecordErrorMessage(err error) string {
+	switch err.Error() {
+	case "invalid vehicle record type":
+		return "Выберите корректный тип записи."
+	case "invalid record date":
+		return "Укажите корректную дату."
+	case "record values cannot be negative":
+		return "Пробег, количество топлива и сумма не могут быть отрицательными."
+	case "mileage is required":
+		return "Укажите текущий пробег."
+	case "fuel liters are required":
+		return "Укажите количество заправленного топлива."
+	case "maintenance description is required":
+		return "Укажите, какие работы были выполнены."
+	default:
+		return "Не удалось сохранить запись. Попробуйте еще раз."
+	}
 }
 
 func VehiclesPage(c *gin.Context) {
@@ -133,8 +161,8 @@ func VehiclesPage(c *gin.Context) {
 	if needsMileage > 0 {
 		alert = `<div class="dashboard-alert-item is-warning vehicle-mileage-alert"><strong>Нужно уточнить пробег</strong><p>Для транспорта без показания за текущий месяц добавьте запись типа «Пробег».</p></div>`
 	}
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Авто</title><link rel="stylesheet" href="/static/css/style.css?v=10"></head><body>
-{{SIDEBAR_HTML}}<main class="main-content vehicles-page"><div class="page-header"><div><h1>Авто</h1><p class="text-muted">Учет заправок, пробега и технического обслуживания.</p></div></div>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Авто</title><link rel="stylesheet" href="/static/css/style.css?v=11"></head><body>
+{{SIDEBAR_HTML}}{{TOAST}}<main class="main-content vehicles-page"><div class="page-header"><div><h1>Авто</h1><p class="text-muted">Учет заправок, пробега и технического обслуживания.</p></div></div>
 {{ALERT}}<div class="vehicle-summary"><div class="metric"><div class="label">Всего ТС</div><div class="value">{{TOTAL}}</div></div><div class="metric"><div class="label">Закреплено</div><div class="value">{{ASSIGNED}}</div></div><div class="metric"><div class="label">Свободно</div><div class="value">{{FREE}}</div></div></div>
 <section class="vehicle-section"><div class="section-heading"><div><h2>{{LIST_TITLE}}</h2><p>{{LIST_SUBTITLE}}</p></div></div><div class="vehicle-grid">{{ASSIGNED_CARDS}}</div></section>
 {{AVAILABLE_SECTION}}
@@ -147,7 +175,7 @@ func VehiclesPage(c *gin.Context) {
 		listSubtitle = "Здесь отображаются только закрепленные за вами ТС."
 	}
 	replacements := map[string]string{
-		"{{SIDEBAR_HTML}}": RenderSidebar(c, "vehicles"), "{{ALERT}}": alert,
+		"{{SIDEBAR_HTML}}": RenderSidebar(c, "vehicles"), "{{TOAST}}": RenderPageToast(c), "{{ALERT}}": alert,
 		"{{TOTAL}}": strconv.Itoa(visibleTotal), "{{ASSIGNED}}": strconv.Itoa(assignedCount), "{{FREE}}": strconv.Itoa(unassignedCount),
 		"{{LIST_TITLE}}": listTitle, "{{LIST_SUBTITLE}}": listSubtitle, "{{ASSIGNED_CARDS}}": assignedCards.String(), "{{AVAILABLE_SECTION}}": availableSection,
 		"{{CSRF_FIELD}}": CSRFHiddenInput(c), "{{ASSIGNMENT_FIELD}}": assignmentField, "{{SUBMIT_LABEL}}": submitLabel,
@@ -172,7 +200,7 @@ func CreateVehicle(c *gin.Context) {
 		assignedUserID = strings.TrimSpace(c.PostForm("assigned_user_id"))
 		if assignedUserID != "" {
 			if _, err := storage.GetUserByID(assignedUserID); err != nil {
-				c.String(http.StatusBadRequest, "Выбранный пользователь не найден")
+				redirectVehicleMessage(c, "/vehicles", "error", "Выбранный пользователь не найден.")
 				return
 			}
 		}
@@ -182,74 +210,74 @@ func CreateVehicle(c *gin.Context) {
 		CreatedByUserID: userID, CreatedByName: c.GetString("userName"),
 	})
 	if err != nil {
-		c.String(http.StatusBadRequest, "Не удалось добавить транспорт: %v", err)
+		redirectVehicleMessage(c, "/vehicles", "error", "Не удалось добавить транспорт. Проверьте название и госномер.")
 		return
 	}
-	c.Redirect(http.StatusFound, "/vehicles")
+	redirectVehicleMessage(c, "/vehicles", "success", "Транспорт добавлен.")
 }
 
 func AssignVehicleToSelf(c *gin.Context) {
 	vehicle, err := storage.GetVehicleByID(c.Param("id"))
 	if err != nil {
-		c.String(http.StatusNotFound, "Транспорт не найден")
+		redirectVehicleMessage(c, "/vehicles", "error", "Транспорт не найден.")
 		return
 	}
 	userID := c.GetString("userID")
 	if vehicle.AssignedUserID != "" && vehicle.AssignedUserID != userID {
-		c.String(http.StatusConflict, "Транспорт уже закреплен за другим пользователем")
+		redirectVehicleMessage(c, "/vehicles", "error", "Транспорт уже закреплен за другим пользователем.")
 		return
 	}
 	if err := storage.AssignVehicle(vehicle.ID, userID); err != nil {
-		c.String(http.StatusInternalServerError, "Не удалось привязать транспорт: %v", err)
+		redirectVehicleMessage(c, "/vehicles", "error", "Не удалось привязать транспорт.")
 		return
 	}
-	c.Redirect(http.StatusFound, "/vehicles/"+vehicle.ID)
+	redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "success", "Транспорт привязан к вашему аккаунту.")
 }
 
 func AssignVehicle(c *gin.Context) {
 	if !isAdmin(c) {
-		c.String(http.StatusForbidden, "Доступ запрещен")
+		redirectVehicleMessage(c, "/vehicles", "error", "У вас нет прав для изменения владельца.")
 		return
 	}
 	userID := strings.TrimSpace(c.PostForm("assigned_user_id"))
 	if userID != "" {
 		if _, err := storage.GetUserByID(userID); err != nil {
-			c.String(http.StatusBadRequest, "Пользователь не найден")
+			redirectVehicleMessage(c, "/vehicles/"+c.Param("id"), "error", "Пользователь не найден.")
 			return
 		}
 	}
 	if err := storage.AssignVehicle(c.Param("id"), userID); err != nil {
-		c.String(http.StatusBadRequest, "Не удалось изменить владельца: %v", err)
+		redirectVehicleMessage(c, "/vehicles", "error", "Не удалось изменить владельца транспорта.")
 		return
 	}
-	c.Redirect(http.StatusFound, "/vehicles/"+c.Param("id"))
+	redirectVehicleMessage(c, "/vehicles/"+c.Param("id"), "success", "Владелец транспорта изменен.")
 }
 
 func UnassignVehicle(c *gin.Context) {
 	vehicle, err := storage.GetVehicleByID(c.Param("id"))
 	if err != nil {
-		c.String(http.StatusNotFound, "Транспорт не найден")
+		redirectVehicleMessage(c, "/vehicles", "error", "Транспорт не найден.")
 		return
 	}
 	if !isAdmin(c) && vehicle.AssignedUserID != c.GetString("userID") {
-		c.String(http.StatusForbidden, "Доступ запрещен")
+		redirectVehicleMessage(c, "/vehicles", "error", "У вас нет доступа к этому транспорту.")
 		return
 	}
 	if err := storage.AssignVehicle(vehicle.ID, ""); err != nil {
-		c.String(http.StatusInternalServerError, "Не удалось снять привязку: %v", err)
+		redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "error", "Не удалось снять привязку.")
 		return
 	}
-	c.Redirect(http.StatusFound, "/vehicles")
+	redirectVehicleMessage(c, "/vehicles", "success", "Привязка транспорта снята.")
 }
 
 func VehiclePage(c *gin.Context) {
 	vehicle, err := storage.GetVehicleByID(c.Param("id"))
 	if err != nil {
-		c.String(http.StatusNotFound, "Транспорт не найден")
+		redirectVehicleMessage(c, "/vehicles", "error", "Транспорт не найден.")
 		return
 	}
 	if !canAccessVehicle(c, vehicle) {
-		c.String(http.StatusForbidden, "Доступ запрещен")
+		redirectVehicleMessage(c, "/vehicles", "error", "У вас нет доступа к этому транспорту.")
 		return
 	}
 	records, _ := storage.GetVehicleRecords(vehicle.ID)
@@ -310,12 +338,12 @@ func VehiclePage(c *gin.Context) {
 		alert = `<div class="dashboard-alert-item is-warning vehicle-mileage-alert"><strong>Нет пробега за текущий месяц</strong><p>Добавьте показание одометра. В начале месяца напоминание также приходит в Telegram.</p></div>`
 	}
 
-	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{NAME}}</title><link rel="stylesheet" href="/static/css/style.css?v=10"></head><body>
-{{SIDEBAR_HTML}}<main class="main-content vehicle-detail-page"><a class="back-link" href="/vehicles">← Все авто</a><header class="vehicle-detail-hero"><div><span class="vehicle-card-kicker">Транспортное средство</span><h1>{{NAME}}</h1><div class="vehicle-registration">{{REGISTRATION}}</div></div><div class="vehicle-owner-summary"><span>Владелец</span><strong>{{OWNER}}</strong>{{UNASSIGN}}</div></header>
+	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{NAME}}</title><link rel="stylesheet" href="/static/css/style.css?v=11"></head><body>
+{{SIDEBAR_HTML}}{{TOAST}}<main class="main-content vehicle-detail-page"><a class="back-link" href="/vehicles">← Все авто</a><header class="vehicle-detail-hero"><div><span class="vehicle-card-kicker">Транспортное средство</span><h1>{{NAME}}</h1><div class="vehicle-registration">{{REGISTRATION}}</div></div><div class="vehicle-owner-summary"><span>Владелец</span><strong>{{OWNER}}</strong>{{UNASSIGN}}</div></header>
 {{ALERT}}{{ADMIN_PANEL}}<div class="vehicle-detail-grid"><section class="card vehicle-record-form-panel"><div class="section-heading"><div><h2>Новая запись</h2><p>Пробег, заправка или техническое обслуживание.</p></div></div><form method="POST" action="/vehicles/{{ID}}/records" class="vehicle-record-form">{{CSRF_FIELD}}<div class="form-group-edit"><label for="record_type">Тип</label><select id="record_type" name="type" required><option value="mileage">Пробег</option><option value="fuel">Заправка</option><option value="maintenance">Техническое обслуживание</option></select></div><div class="form-group-edit"><label for="record_date">Дата</label><input id="record_date" name="date" type="date" value="{{TODAY}}" required></div><div class="form-group-edit" data-record-field="mileage"><label for="mileage">Пробег, км</label><input id="mileage" name="mileage" type="number" min="0" value="{{LAST_MILEAGE}}"></div><div class="form-group-edit" data-record-field="fuel"><label for="liters">Топливо, л</label><input id="liters" name="liters" type="number" min="0" step="0.01"></div><div class="form-group-edit" data-record-field="amount"><label for="amount">Сумма, руб.</label><input id="amount" name="amount" type="number" min="0" step="0.01"></div><div class="form-group-edit vehicle-record-notes" data-record-field="notes"><label for="notes">Описание / комментарий</label><textarea id="notes" name="notes" rows="3" placeholder="Что сделано, где заправились или другое уточнение"></textarea></div><button class="btn btn-primary" type="submit">Добавить запись</button></form></section><section class="card vehicle-history-panel"><div class="section-heading"><div><h2>История</h2><p>{{RECORD_COUNT}} записей</p></div></div><div class="vehicle-record-list">{{RECORDS}}</div></section></div>
-</main><script>(function(){const type=document.getElementById('record_type');if(!type)return;const mileage=document.getElementById('mileage');const liters=document.getElementById('liters');const amount=document.getElementById('amount');const notes=document.getElementById('notes');function field(name){return document.querySelector('[data-record-field="'+name+'"]');}function toggle(name,visible){const el=field(name);if(el)el.hidden=!visible;}function sync(){const value=type.value;toggle('mileage',true);toggle('fuel',value==='fuel');toggle('amount',value!=='mileage');toggle('notes',true);mileage.required=value==='mileage';liters.required=value==='fuel';notes.required=value==='maintenance';if(value!=='fuel')liters.value='';if(value==='mileage')amount.value='';}type.addEventListener('change',sync);sync();})();</script></body></html>`
+</main><script>(function(){const type=document.getElementById('record_type');if(!type)return;const mileage=document.getElementById('mileage');const liters=document.getElementById('liters');const amount=document.getElementById('amount');const notes=document.getElementById('notes');function field(name){return document.querySelector('[data-record-field="'+name+'"]');}function toggle(name,visible){const el=field(name);if(el)el.hidden=!visible;}function sync(){const value=type.value;toggle('mileage',true);toggle('fuel',value==='fuel');toggle('amount',value==='fuel');toggle('notes',true);mileage.required=value==='mileage';liters.required=value==='fuel';notes.required=value==='maintenance';if(value!=='fuel'){liters.value='';amount.value='';}}type.addEventListener('change',sync);sync();})();</script></body></html>`
 	replacements := map[string]string{
-		"{{SIDEBAR_HTML}}": RenderSidebar(c, "vehicles"), "{{NAME}}": template.HTMLEscapeString(vehicle.Name), "{{REGISTRATION}}": template.HTMLEscapeString(vehicle.RegistrationNumber), "{{OWNER}}": template.HTMLEscapeString(owner),
+		"{{SIDEBAR_HTML}}": RenderSidebar(c, "vehicles"), "{{TOAST}}": RenderPageToast(c), "{{NAME}}": template.HTMLEscapeString(vehicle.Name), "{{REGISTRATION}}": template.HTMLEscapeString(vehicle.RegistrationNumber), "{{OWNER}}": template.HTMLEscapeString(owner),
 		"{{UNASSIGN}}": unassignButton, "{{ALERT}}": alert, "{{ADMIN_PANEL}}": adminPanel, "{{ID}}": template.HTMLEscapeString(vehicle.ID), "{{CSRF_FIELD}}": CSRFHiddenInput(c),
 		"{{TODAY}}": time.Now().Format("2006-01-02"), "{{LAST_MILEAGE}}": strconv.Itoa(lastMileage), "{{RECORD_COUNT}}": strconv.Itoa(len(records)), "{{RECORDS}}": recordsHTML.String(),
 	}
@@ -328,11 +356,11 @@ func VehiclePage(c *gin.Context) {
 func CreateVehicleRecord(c *gin.Context) {
 	vehicle, err := storage.GetVehicleByID(c.Param("id"))
 	if err != nil {
-		c.String(http.StatusNotFound, "Транспорт не найден")
+		redirectVehicleMessage(c, "/vehicles", "error", "Транспорт не найден.")
 		return
 	}
 	if !canAccessVehicle(c, vehicle) {
-		c.String(http.StatusForbidden, "Доступ запрещен")
+		redirectVehicleMessage(c, "/vehicles", "error", "У вас нет доступа к этому транспорту.")
 		return
 	}
 	mileage, _ := strconv.Atoi(strings.TrimSpace(c.PostForm("mileage")))
@@ -343,8 +371,8 @@ func CreateVehicleRecord(c *gin.Context) {
 		CreatedByID: c.GetString("userID"), CreatedByName: c.GetString("userName"),
 	}
 	if _, err := storage.CreateVehicleRecord(record); err != nil {
-		c.String(http.StatusBadRequest, "Не удалось добавить запись: %v", err)
+		redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "error", vehicleRecordErrorMessage(err))
 		return
 	}
-	c.Redirect(http.StatusFound, "/vehicles/"+vehicle.ID)
+	redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "success", "Запись добавлена.")
 }

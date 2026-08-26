@@ -2,6 +2,7 @@ package api
 
 import (
 	"fmt"
+	"html/template"
 	"strings"
 	"unicode/utf8"
 
@@ -45,6 +46,25 @@ func SetTopNavActions(c *gin.Context, html string) {
 		return
 	}
 	c.Set(topNavActionsContextKey, strings.TrimSpace(html))
+}
+
+func RenderPageToast(c *gin.Context) string {
+	message := strings.TrimSpace(c.Query("error"))
+	title := "Не удалось выполнить действие"
+	className := "is-error"
+	role := "alert"
+	if message == "" {
+		message = strings.TrimSpace(c.Query("success"))
+		title = "Готово"
+		className = "is-success"
+		role = "status"
+	}
+	if message == "" {
+		return ""
+	}
+
+	return fmt.Sprintf(`<div class="site-toast %s" role="%s" data-page-toast><div><strong>%s</strong><p>%s</p></div><button type="button" aria-label="Закрыть уведомление" onclick="this.parentElement.remove()">&times;</button></div><script>window.setTimeout(function(){var toast=document.querySelector('[data-page-toast]');if(toast)toast.remove();},7000);</script>`,
+		className, role, title, template.HTMLEscapeString(message))
 }
 
 // RenderSidebar keeps historical name, but renders topbar with off-canvas navigation.
@@ -717,7 +737,6 @@ syncNavState();
   <a class="side-nav-user" href="/profile"><span class="user-avatar">%s</span><div><strong>%s</strong><small>%s</small></div></a>
   <nav class="side-nav-links">%s</nav>
   <a class="btn btn-secondary side-nav-menu-settings" href="/profile/menu">Настроить меню</a>
-  <button type="button" class="btn btn-secondary side-nav-notifications" data-enable-site-notifications>Уведомления</button>
   <a class="btn btn-secondary side-nav-logout" href="/logout">Выйти</a>
 </aside>
 <div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение">+</a></div>

@@ -171,6 +171,10 @@ func CreateVehicleRecord(record models.VehicleRecord) (models.VehicleRecord, err
 	if record.Type == "fuel" && record.Liters == 0 {
 		return models.VehicleRecord{}, errors.New("fuel liters are required")
 	}
+	if record.Type != "fuel" {
+		record.Liters = 0
+		record.Amount = 0
+	}
 	record.Notes = strings.TrimSpace(record.Notes)
 	if record.Type == "maintenance" && record.Notes == "" {
 		return models.VehicleRecord{}, errors.New("maintenance description is required")

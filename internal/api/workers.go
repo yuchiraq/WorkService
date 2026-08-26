@@ -139,7 +139,7 @@ func WorkersPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Работники</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=10">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -351,7 +351,7 @@ func WorkerProfilePage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Профиль: {{WORKER_NAME}}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=10">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -439,7 +439,7 @@ func AddWorkerPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Добавить работника</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=10">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -556,7 +556,7 @@ func EditWorkerPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Редактировать профиль</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=10">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
 </head>
 <body>
     {{SIDEBAR_HTML}}

@@ -93,7 +93,7 @@ func ObjectsPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Объекты</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=10">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -157,7 +157,7 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{{TITLE}}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=10">
+    <link rel="stylesheet" href="/static/css/style.css?v=11">
 </head>
 <body>
     {{LAYOUT_START}}
@@ -317,7 +317,7 @@ func ObjectProfilePage(c *gin.Context) {
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Объект: {{OBJECT_NAME}}</title><link rel="stylesheet" href="/static/css/style.css?v=10"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Объект: {{OBJECT_NAME}}</title><link rel="stylesheet" href="/static/css/style.css?v=11"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
   <a href="/objects" class="back-link">← К списку объектов</a>
