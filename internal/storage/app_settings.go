@@ -41,9 +41,18 @@ func normalizeAppSettings(settings *models.AppSettings) {
 	settings.TelegramBotToken = strings.TrimSpace(settings.TelegramBotToken)
 	settings.TelegramBotUsername = strings.TrimSpace(strings.TrimPrefix(settings.TelegramBotUsername, "@"))
 	settings.TelegramSiteURL = strings.TrimSpace(settings.TelegramSiteURL)
+	settings.GalleryDirectory = strings.TrimSpace(settings.GalleryDirectory)
 	if settings.TelegramUpdateOffset < 0 {
 		settings.TelegramUpdateOffset = 0
 	}
+}
+
+func UpdateGalleryDirectory(directory string) error {
+	appSettingsMutex.Lock()
+	defer appSettingsMutex.Unlock()
+
+	appSettings.GalleryDirectory = strings.TrimSpace(directory)
+	return saveAppSettings()
 }
 
 func saveAppSettings() error {

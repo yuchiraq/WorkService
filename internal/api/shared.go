@@ -33,6 +33,7 @@ func navItemsForStatus(userStatus string) []navItem {
 		}, items...)
 		items = append(items,
 			navItem{PageID: "users", Path: "/users", Label: "Пользователи"},
+			navItem{PageID: "gallery", Path: "/gallery", Label: "Галерея"},
 			navItem{PageID: "settings", Path: "/settings", Label: "Настройки"},
 		)
 	}

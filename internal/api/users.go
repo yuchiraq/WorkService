@@ -68,7 +68,7 @@ func UsersPage(c *gin.Context) {
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Пользователи</title><link rel="stylesheet" href="/static/css/style.css?v=9"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Пользователи</title><link rel="stylesheet" href="/static/css/style.css?v=10"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Пользователи</h1><a href="/users/new" class="btn btn-primary" data-modal-url="/users/new" data-modal-title="Новый пользователь" data-modal-return="/users">Добавить пользователя</a></div>
@@ -174,7 +174,7 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 
 	isModal := IsModalRequest(c)
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css?v=9"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css?v=10"></head><body>
 {{LAYOUT_START}}
 <div class="main-content{{MAIN_CONTENT_CLASS}}">
 {{BACK_LINK}}
@@ -386,7 +386,7 @@ func ProfilePage(c *gin.Context) {
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Мой профиль</title><link rel="stylesheet" href="/static/css/style.css?v=9"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Мой профиль</title><link rel="stylesheet" href="/static/css/style.css?v=10"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content"><div class="page-header"><h1>Мой профиль</h1></div>
 <div class="card"><form action="/profile" method="POST" class="form-grid-edit">

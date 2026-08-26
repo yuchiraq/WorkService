@@ -6,4 +6,5 @@ type AppSettings struct {
 	TelegramBotUsername  string `json:"telegramBotUsername,omitempty"`
 	TelegramSiteURL      string `json:"telegramSiteUrl,omitempty"`
 	TelegramUpdateOffset int    `json:"telegramUpdateOffset,omitempty"`
+	GalleryDirectory     string `json:"galleryDirectory,omitempty"`
 }

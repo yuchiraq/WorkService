@@ -110,6 +110,16 @@ func SetupRouter(r *gin.Engine) {
 		adminRequired.POST("/settings/telegram/delete", api.DeleteTelegramContact)
 	}
 
+	galleryRequired := r.Group("/")
+	galleryRequired.Use(api.AuthRequired(), api.AdminRequired(), api.CSRFMiddleware())
+	{
+		galleryRequired.GET("/gallery", api.GalleryPage)
+		galleryRequired.GET("/gallery/image/:name", api.GalleryImage)
+		galleryRequired.POST("/gallery/settings", api.SaveGallerySettings)
+		galleryRequired.POST("/gallery/upload", api.UploadGalleryImages)
+		galleryRequired.POST("/gallery/delete", api.DeleteGalleryImage)
+	}
+
 	r.GET("/", func(c *gin.Context) {
 		api.HomePage(c)
 	})

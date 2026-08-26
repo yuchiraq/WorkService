@@ -447,3 +447,57 @@ func StartMileageReminderScheduler() {
 		}
 	}()
 }
+
+// SendAdminGalleryChangeNotification tells every linked administrator that
+// the external site must be restarted after gallery files change.
+func SendAdminGalleryChangeNotification(actorName, action string, filenames []string) error {
+	settings, err := loadSettings()
+	if err != nil {
+		return err
+	}
+	_, _ = SyncContacts()
+	users, err := storage.GetUsers()
+	if err != nil {
+		return err
+	}
+
+	fileList := strings.Join(filenames, ", ")
+	if len([]rune(fileList)) > 600 {
+		fileList = string([]rune(fileList)[:600]) + "..."
+	}
+	message := strings.Join([]string{
+		"Галерея внешнего сайта изменена.",
+		"",
+		"Действие: " + strings.TrimSpace(action),
+		"Файлы: " + fileList,
+		"Администратор: " + strings.TrimSpace(actorName),
+		"",
+		"Перезапустите внешний сайт, чтобы применить изменения.",
+	}, "\n")
+	if siteURL := strings.TrimSpace(settings.TelegramSiteURL); siteURL != "" {
+		message += "\n\nСервис: " + strings.TrimRight(siteURL, "/") + "/gallery"
+	}
+
+	sentChats := map[int64]struct{}{}
+	failures := make([]string, 0)
+	for _, user := range users {
+		if user.Status != "admin" || strings.TrimSpace(user.Phone) == "" {
+			continue
+		}
+		contact, err := storage.FindTelegramContactByPhone(user.Phone)
+		if err != nil {
+			continue
+		}
+		if _, duplicate := sentChats[contact.ChatID]; duplicate {
+			continue
+		}
+		sentChats[contact.ChatID] = struct{}{}
+		if err := sendTelegramMessage(settings, contact.ChatID, message, nil); err != nil {
+			failures = append(failures, err.Error())
+		}
+	}
+	if len(failures) > 0 {
+		return errors.New(strings.Join(failures, "; "))
+	}
+	return nil
+}
