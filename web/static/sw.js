@@ -1,8 +1,8 @@
-const CACHE_VERSION = 'avayusstroy-v12';
+const CACHE_VERSION = 'avayusstroy-v17';
 const APP_SHELL = [
-  '/',
   '/login',
-  '/static/css/style.css?v=12',
+  '/static/css/style.css?v=17',
+  '/static/js/ui.js?v=17',
   '/static/img/logo.svg',
   '/static/img/logo-192.png',
   '/manifest.webmanifest'
@@ -28,14 +28,8 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
-          return response;
-        })
         .catch(async () => {
-          const cached = await caches.match(request);
-          return cached || caches.match('/login');
+          return caches.match('/login');
         })
     );
     return;
@@ -62,7 +56,7 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
           return response;
         })
-        .catch(() => caches.match('/static/css/style.css?v=12'));
+        .catch(() => Response.error());
     })
   );
 });

@@ -25,6 +25,9 @@ func objectStatusLabel(status string) string {
 }
 
 func ObjectsPage(c *gin.Context) {
+	if !requireAdmin(c) {
+		return
+	}
 	objects, err := storage.GetObjects()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load objects: %v", err)
@@ -93,7 +96,7 @@ func ObjectsPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Объекты</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -157,7 +160,7 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{{TITLE}}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body>
     {{LAYOUT_START}}
@@ -201,24 +204,24 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
     </div>
 {{LAYOUT_END}}
 
-    <div id="deleteModal" class="modal" style="display:none;">
+    <dialog id="deleteModal" class="confirmation-dialog" aria-labelledby="delete-object-title">
         <div class="modal-content">
-            <span class="close-button" onclick="closeDeleteModal()">&times;</span>
-            <h2>Подтверждение удаления</h2>
+            <button type="button" class="close-button" aria-label="Закрыть" onclick="closeDeleteModal()">&times;</button>
+            <h2 id="delete-object-title">Удалить объект?</h2>
             <p>Вы уверены, что хотите удалить объект?</p>
             <form action="/objects/delete/{{OBJECT_ID}}" method="POST">
                 {{CSRF_FIELD}}
                 <div class="form-actions">
                     <button type="submit" class="btn btn-danger">Да, удалить</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Отмена</button>
+                    <button type="button" class="btn btn-secondary" autofocus onclick="closeDeleteModal()">Отмена</button>
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <script>
-        function showDeleteModal(){document.getElementById('deleteModal').style.display='grid';}
-        function closeDeleteModal(){document.getElementById('deleteModal').style.display='none';}
+        function showDeleteModal(){const dialog=document.querySelector('#app-action-modal.visible #deleteModal') || document.getElementById('deleteModal');dialog.uiReturnFocus=document.activeElement;dialog.showModal();}
+        function closeDeleteModal(){(document.querySelector('#app-action-modal.visible #deleteModal') || document.getElementById('deleteModal')).close();}
     </script>
 </body>
 </html>`
@@ -282,6 +285,7 @@ func ObjectProfilePage(c *gin.Context) {
 	}
 
 	entries, _ := storage.GetTimesheets()
+	entries, _ = getScopedEntries(c, entries)
 	workersMap, _ := buildWorkersMap()
 	related := make([]models.TimesheetEntry, 0)
 	for _, entry := range entries {
@@ -291,6 +295,10 @@ func ObjectProfilePage(c *gin.Context) {
 				break
 			}
 		}
+	}
+	if !isAdmin(c) && len(related) == 0 {
+		accessDenied(c)
+		return
 	}
 	sort.Slice(related, func(i, j int) bool {
 		if related[i].Date == related[j].Date {
@@ -317,22 +325,30 @@ func ObjectProfilePage(c *gin.Context) {
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Объект: {{OBJECT_NAME}}</title><link rel="stylesheet" href="/static/css/style.css?v=12"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Объект: {{OBJECT_NAME}}</title><link rel="stylesheet" href="/static/css/style.css?v=17"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
-  <a href="/objects" class="back-link">← К списку объектов</a>
+  {{OBJECT_BACK}}
   <div class="profile-header-container">
     <div class="profile-header">
       <div class="worker-avatar">🏗</div>
       <div class="profile-header-info"><h1>{{OBJECT_NAME}}</h1><p>{{OBJECT_STATUS}}</p></div>
     </div>
-    <div class="profile-actions"><a class="btn btn-secondary" href="/objects/edit/{{OBJECT_ID}}" data-modal-url="/objects/edit/{{OBJECT_ID}}" data-modal-title="Редактировать объект" data-modal-return="/object/{{OBJECT_ID}}">Редактировать</a></div>
+    {{OBJECT_ACTIONS}}
   </div>
   <ul class="profile-details"><li><strong>Адрес:</strong> {{OBJECT_ADDRESS}}</li><li><strong>Ответственный:</strong> {{RESPONSIBLE}}</li></ul>
   <div class="card"><div class="history-header"><h2>Назначения по объекту</h2></div><div class="schedule-vertical">{{ASSIGNMENTS}}</div></div>
 </div></body></html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "objects"), 1)
+	objectActions := ""
+	objectBack := `<a href="/schedule" class="back-link">К расписанию</a>`
+	if isAdmin(c) {
+		objectBack = `<a href="/objects" class="back-link">К объектам</a>`
+		objectActions = `<a class="btn btn-secondary" href="/objects/edit/{{OBJECT_ID}}" data-modal-url="/objects/edit/{{OBJECT_ID}}" data-modal-title="Объект">Изменить</a>`
+	}
+	final = strings.ReplaceAll(final, "{{OBJECT_ACTIONS}}", objectActions)
+	final = strings.ReplaceAll(final, "{{OBJECT_BACK}}", objectBack)
 	final = strings.Replace(final, "{{OBJECT_NAME}}", template.HTMLEscapeString(object.Name), -1)
 	final = strings.Replace(final, "{{OBJECT_STATUS}}", template.HTMLEscapeString(objectStatusLabel(object.Status)), 1)
 	final = strings.Replace(final, "{{OBJECT_ADDRESS}}", template.HTMLEscapeString(object.Address), 1)

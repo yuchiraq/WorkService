@@ -191,23 +191,23 @@ func LoginPage(c *gin.Context) {
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/static/img/logo-192.png">
     <title>Вход в систему</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body class="login-screen">
     <div class="center-page">
         <div class="card center-card login-card">
             <div class="login-card-head">
-                <h2>Вход в систему</h2>
-                <p style="margin-bottom: 25px;">Пожалуйста, введите свои учетные данные для входа.</p>
+                <img class="login-logo" src="/static/img/logo.svg" alt="АВАЮССТРОЙ">
+                <h2>АВАЮССТРОЙ</h2>
                 {{ERROR_BLOCK}}
                 <form action="/login" method="POST">
                     <div class="form-group">
                         <label for="username">Имя пользователя</label>
-                        <input type="text" id="username" name="username" required autofocus>
+                        <input type="text" id="username" name="username" autocomplete="username" required autofocus>
                     </div>
                     <div class="form-group">
                         <label for="password">Пароль</label>
-                        <input type="password" id="password" name="password" required>
+                        <input type="password" id="password" name="password" autocomplete="current-password" required>
                     </div>
                     <button type="submit" class="btn btn-primary" style="width: 100%;">Войти</button>
                 </form>
@@ -293,6 +293,7 @@ func Logout(c *gin.Context) {
 // AuthRequired is a middleware to ensure the user is authenticated.
 func AuthRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		c.Header("Cache-Control", "no-store")
 		cleanExpiredSessions()
 		token, err := c.Cookie(sessionCookie)
 		if err != nil || token == "" {
@@ -362,7 +363,7 @@ func AdminRequired() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		statusValue, ok := c.Get("userStatus")
 		if !ok || statusValue.(string) != "admin" {
-			c.String(http.StatusForbidden, "Доступ запрещен")
+			accessDenied(c)
 			c.Abort()
 			return
 		}

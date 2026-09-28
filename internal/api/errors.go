@@ -6,6 +6,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+func accessDenied(c *gin.Context) {
+	c.Data(http.StatusForbidden, "text/html; charset=utf-8", []byte(`<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Нет доступа</title><link rel="stylesheet" href="/static/css/style.css?v=17"></head><body><main class="center-page"><section class="center-card"><h1>Нет доступа</h1><p>Эта страница доступна владельцу или администратору.</p><a class="btn btn-secondary" href="/schedule">К расписанию</a></section></main></body></html>`))
+}
+
 // NotFoundPage renders a user-friendly 404 error page.
 func NotFoundPage(c *gin.Context) {
 	pageHTML := `
@@ -15,7 +19,7 @@ func NotFoundPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Ошибка 404 - Страница не найдена</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body>
     <div class="center-page">

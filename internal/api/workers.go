@@ -99,13 +99,7 @@ func WorkersPage(c *gin.Context) {
 
 	var workersGridHTML strings.Builder
 	for _, worker := range filteredWorkers {
-		runes := []rune(worker.Name)
-		initials := ""
-		if len(runes) > 1 {
-			initials = string(runes[0:2])
-		} else if len(runes) > 0 {
-			initials = string(runes[0])
-		}
+		initials := profileInitials(worker.Name)
 
 		cardHTML := fmt.Sprintf(`
             <a href="/worker/%s" class="worker-card-link-wrapper">
@@ -139,7 +133,7 @@ func WorkersPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Работники</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -149,7 +143,7 @@ func WorkersPage(c *gin.Context) {
             <a href="/workers/new" class="btn btn-primary" data-modal-url="/workers/new" data-modal-title="Добавить работника" data-modal-return="{{WORKERS_RETURN}}">Добавить работника</a>
         </div>
         <div class="card">
-            <p>Просмотр, добавление, редактирование или увольнение работников.</p>
+
             <div class="tab-switcher">
                 <a class="btn btn-secondary{{TAB_ACTIVE_CLASS}}" href="/workers?tab=active">Текущие</a>
                 <a class="btn btn-secondary{{TAB_FIRED_CLASS}}" href="/workers?tab=fired">Уволенные</a>
@@ -232,19 +226,20 @@ func WorkersPage(c *gin.Context) {
 // WorkerProfilePage displays a single worker's profile.
 func WorkerProfilePage(c *gin.Context) {
 	workerID := c.Param("id")
+	if !isAdmin(c) {
+		own, err := storage.GetWorkerByUserID(c.GetString("userID"))
+		if err != nil || own.ID != workerID {
+			accessDenied(c)
+			return
+		}
+	}
 	worker, err := storage.GetWorkerByID(workerID)
 	if err != nil {
 		c.String(http.StatusNotFound, "Worker not found: %v", err)
 		return
 	}
 
-	runes := []rune(worker.Name)
-	initials := ""
-	if len(runes) > 1 {
-		initials = string(runes[0:2])
-	} else if len(runes) > 0 {
-		initials = string(runes[0])
-	}
+	initials := profileInitials(worker.Name)
 
 	selectedMonth := c.Query("month")
 	if selectedMonth == "" {
@@ -266,12 +261,10 @@ func WorkerProfilePage(c *gin.Context) {
 	var workerMarks strings.Builder
 	currentDate := ""
 	returnToWorker := "/worker/" + worker.ID + "?month=" + selectedMonth
-	returnToWorkerEsc := template.HTMLEscapeString(returnToWorker)
 	returnToWorkerQuery := url.QueryEscape(returnToWorker)
-	csrfField := CSRFHiddenInput(c)
 
 	for _, entry := range entries {
-		if !strings.HasPrefix(entry.Date, selectedMonth+"-") {
+		if !entryInMonth(entry, selectedMonth) {
 			continue
 		}
 		matched := false
@@ -285,11 +278,17 @@ func WorkerProfilePage(c *gin.Context) {
 			continue
 		}
 		if isSpecialMark(entry.UserMark) {
-			commentHTML := "—"
+			commentHTML := ""
 			if strings.TrimSpace(entry.Notes) != "" {
 				commentHTML = template.HTMLEscapeString(entry.Notes)
 			}
-			workerMarks.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical structured-assignment"><div class="assignment-head"><strong>%s</strong><span>%s</span></div><div class="assignment-body"><div class="assignment-note"><span>Комментарий</span><p>%s</p></div><div class="info-card-actions"><a href="/schedule/edit/%s" class="btn btn-secondary" data-modal-url="/schedule/edit/%s" data-modal-title="Редактирование отметки" data-modal-return="%s">Редактировать</a><form action="/schedule/delete/%s" method="POST"><input type="hidden" name="return_to" value="%s">%s<button type="submit" class="btn btn-danger">Удалить</button></form></div></div></article>`, template.HTMLEscapeString(formatScheduleDateLabel(entry.Date)), template.HTMLEscapeString(specialMarkLabel(entry.UserMark)), commentHTML, template.HTMLEscapeString(entry.ID), template.HTMLEscapeString(entry.ID), returnToWorkerEsc, template.HTMLEscapeString(entry.ID), returnToWorkerEsc, csrfField))
+			dateLabel := formatScheduleDateLabel(entry.Date)
+			if entry.PeriodEnd > entry.Date {
+				start, _ := time.Parse("2006-01-02", entry.Date)
+				end, _ := time.Parse("2006-01-02", entry.PeriodEnd)
+				dateLabel = start.Format("02.01.2006") + " – " + end.Format("02.01.2006")
+			}
+			workerMarks.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical structured-assignment"><div class="assignment-head"><strong>%s</strong><span>%s</span></div><p>%s</p>%s</article>`, template.HTMLEscapeString(specialMarkTitle(entry.UserMark)), template.HTMLEscapeString(dateLabel), commentHTML, scheduleEditAction(c, entry, returnToWorker)))
 			continue
 		}
 		hoursVal, _ := strconv.ParseFloat(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes), 64)
@@ -351,32 +350,31 @@ func WorkerProfilePage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Профиль: {{WORKER_NAME}}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body>
     {{SIDEBAR_HTML}}
     <div class="main-content worker-profile-page"> 
-        <a href="/workers" class="back-link">К списку работников</a>
+        {{PROFILE_BACK}}
 
         <div class="profile-header-container worker-profile-header-container">
             <div class="profile-header">
                 <div class="worker-avatar worker-profile-avatar">{{INITIALS}}</div>
                 <div class="profile-header-info">
                     <h1>{{WORKER_NAME}}</h1>
-                    <p>Должность: {{POSITION}}</p>
+                    <div class="profile-status-line"><p>{{POSITION}}</p>{{STATUS_BADGE}}</div>
                 </div>
             </div>
 			<div class="profile-actions worker-profile-actions">
-				{{STATUS_BADGE}}
-				<a href="/schedule/new?worker_id={{WORKER_ID}}&return={{WORKER_RETURN_QUERY}}&special_mark=vacation" class="btn btn-primary" data-modal-url="/schedule/new?worker_id={{WORKER_ID}}&return={{WORKER_RETURN_QUERY}}&special_mark=vacation" data-modal-title="Добавить отметку" data-modal-return="/worker/{{WORKER_ID}}">Добавить отпуск/больничный/выходной</a>
-				<a href="/workers/edit/{{WORKER_ID}}" class="btn btn-secondary" data-modal-url="/workers/edit/{{WORKER_ID}}" data-modal-title="Редактировать работника" data-modal-return="/worker/{{WORKER_ID}}">Редактировать</a>
+				<a href="/schedule/new?worker_id={{WORKER_ID}}&return={{WORKER_RETURN_QUERY}}&special_mark=vacation" class="btn btn-primary" data-modal-url="/schedule/new?worker_id={{WORKER_ID}}&return={{WORKER_RETURN_QUERY}}&special_mark=vacation" data-modal-title="Добавить отметку" data-modal-return="/worker/{{WORKER_ID}}">Добавить отсутствие</a>
+				{{PROFILE_EDIT}}
 			</div>
 		</div>
 
         <ul class="profile-details worker-profile-details">
-            <li><span class="profile-detail-icon" aria-hidden="true"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M6 8V7a4 4 0 118 0v1h2V7a6 6 0 10-12 0v1h2zm6 2H8v6h4v-6z"/></svg></span><div><small>Дата рождения</small><strong>{{BIRTH_DATE}}</strong></div></li>
-            <li><span class="profile-detail-icon" aria-hidden="true"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M2 3a1 1 0 011-1h2.153a1 1 0 01.986.836l.74 4.435a1 1 0 01-.54 1.06l-1.548.773a11.037 11.037 0 006.105 6.105l.774-1.548a1 1 0 011.059-.54l4.435.74a1 1 0 01.836.986V17a1 1 0 01-1 1h-2C7.82 18 2 12.18 2 5V3z"/></svg></span><div><small>Телефон</small><strong>{{PHONE}}</strong></div></li>
-            <li><span class="profile-detail-icon" aria-hidden="true"><svg fill="currentColor" viewBox="0 0 20 20"><path d="M10 2a8 8 0 100 16 8 8 0 000-16zm1 11a1 1 0 11-2 0v-2a1 1 0 112 0v2zm-1-4a1 1 0 01-1-1V7a1 1 0 112 0v1a1 1 0 01-1 1z"/></svg></span><div><small>Ставка</small><strong>{{RATE}} руб/час</strong></div></li>
+            <li><div><small>Дата рождения</small><strong>{{BIRTH_DATE}}</strong></div></li>
+            <li><div><small>Телефон</small><strong>{{PHONE}}</strong></div></li>
+            <li><div><small>Ставка</small><strong>{{RATE}} руб/час</strong></div></li>
         </ul>
 
 
@@ -398,6 +396,14 @@ func WorkerProfilePage(c *gin.Context) {
 	// Build the final HTML by replacing placeholders
 	sidebar := RenderSidebar(c, "workers")
 	finalHTML := pageTemplate
+	profileBack := `<a href="/timesheets" class="back-link">К табелю</a>`
+	profileEdit := `<a href="/profile" class="btn btn-secondary">Личные данные</a>`
+	if isAdmin(c) {
+		profileBack = `<a href="/workers" class="back-link">К работникам</a>`
+		profileEdit = `<a href="/workers/edit/` + template.HTMLEscapeString(worker.ID) + `" class="btn btn-secondary" data-modal-url="/workers/edit/` + template.HTMLEscapeString(worker.ID) + `" data-modal-title="Работник">Изменить</a>`
+	}
+	finalHTML = strings.ReplaceAll(finalHTML, "{{PROFILE_BACK}}", profileBack)
+	finalHTML = strings.ReplaceAll(finalHTML, "{{PROFILE_EDIT}}", profileEdit)
 	finalHTML = strings.Replace(finalHTML, "{{SIDEBAR_HTML}}", sidebar, -1)
 	finalHTML = strings.Replace(finalHTML, "{{WORKER_NAME}}", template.HTMLEscapeString(worker.Name), -1)
 	finalHTML = strings.Replace(finalHTML, "{{INITIALS}}", template.HTMLEscapeString(strings.ToUpper(initials)), -1)
@@ -439,7 +445,7 @@ func AddWorkerPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Добавить работника</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -449,12 +455,11 @@ func AddWorkerPage(c *gin.Context) {
             <h1>Новый работник</h1>
         </div>
         <div class="card">
-            <p>Заполните все поля для регистрации нового работника в системе.</p>
             <form action="/workers/new" method="POST">
                 {{CSRF_FIELD}}
                 <div class="form-grid">
                     <div class="form-group">
-                        <label for="name">Ф.И.О.</label>
+                        <label for="name">ФИО</label>
                         <input type="text" id="name" name="name" required>
                     </div>
                     <div class="form-group">
@@ -556,7 +561,7 @@ func EditWorkerPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Редактировать профиль</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -604,35 +609,30 @@ func EditWorkerPage(c *gin.Context) {
         </div>
     </div>
 
-    <!-- Modal for delete confirmation -->
-    <div id="deleteModal" class="modal">
+    <dialog id="deleteModal" class="confirmation-dialog" aria-labelledby="delete-worker-title">
         <div class="modal-content">
-            <span class="close-button" onclick="closeDeleteModal()">&times;</span>
-            <h2>Подтверждение увольнения</h2>
-            <p>Вы уверены, что хотите уволить этого работника? Это действие нельзя будет отменить.</p>
+            <button type="button" class="close-button" aria-label="Закрыть" onclick="closeDeleteModal()">&times;</button>
+            <h2 id="delete-worker-title">Уволить работника?</h2>
+            <p>Работник перейдёт в список уволенных. История назначений останется в табеле.</p>
             <form action="/workers/delete/{{WORKER_ID}}" method="POST">
                 {{CSRF_FIELD}}
                 <div class="form-actions">
                     <button type="submit" class="btn btn-danger">Да, уволить</button>
-                    <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">Отмена</button>
+                    <button type="button" class="btn btn-secondary" autofocus onclick="closeDeleteModal()">Отмена</button>
                 </div>
             </form>
         </div>
-    </div>
+    </dialog>
 
     <script>
         function showDeleteModal() {
-            document.getElementById('deleteModal').style.display = 'grid';
+            const dialog=document.querySelector('#app-action-modal.visible #deleteModal') || document.getElementById('deleteModal');
+            dialog.uiReturnFocus=document.activeElement;
+            dialog.showModal();
         }
         function closeDeleteModal() {
-            document.getElementById('deleteModal').style.display = 'none';
+            (document.querySelector('#app-action-modal.visible #deleteModal') || document.getElementById('deleteModal')).close();
         }
-        // Close modal if user clicks outside of it
-        window.addEventListener('click', function(event) {
-            if (event.target == document.getElementById('deleteModal')) {
-                closeDeleteModal();
-            }
-        });
     </script>
 
 </body>

@@ -57,6 +57,7 @@ func saveTimesheets() error {
 
 func normalizeTimesheet(entry *models.TimesheetEntry) {
 	entry.Date = strings.TrimSpace(entry.Date)
+	entry.PeriodEnd = strings.TrimSpace(entry.PeriodEnd)
 	entry.StartTime = strings.TrimSpace(entry.StartTime)
 	entry.EndTime = strings.TrimSpace(entry.EndTime)
 	entry.Notes = strings.TrimSpace(entry.Notes)
@@ -110,6 +111,16 @@ func validateTimesheet(entry models.TimesheetEntry) error {
 	}
 	if len(entry.WorkerIDs) == 0 {
 		return errors.New("at least one worker is required")
+	}
+	if entry.PeriodEnd != "" {
+		end, err := time.Parse("2006-01-02", entry.PeriodEnd)
+		start, _ := time.Parse("2006-01-02", entry.Date)
+		if err != nil || end.Before(start) || end.After(start.AddDate(1, 0, 0)) {
+			return errors.New("invalid absence period")
+		}
+		if entry.UserMark != "ОТ" && entry.UserMark != "Б" && entry.UserMark != "ПР" {
+			return errors.New("period requires absence mark")
+		}
 	}
 
 	if isSpecialMark(entry.UserMark) {
@@ -208,8 +219,13 @@ func UpdateTimesheet(entry models.TimesheetEntry) error {
 
 	for i := range timesheets {
 		if timesheets[i].ID == entry.ID {
+			previous := timesheets[i]
 			timesheets[i] = entry
-			return saveTimesheets()
+			if err := saveTimesheets(); err != nil {
+				timesheets[i] = previous
+				return err
+			}
+			return nil
 		}
 	}
 
@@ -222,8 +238,13 @@ func DeleteTimesheet(id string) error {
 
 	for i := range timesheets {
 		if timesheets[i].ID == id {
-			timesheets = append(timesheets[:i], timesheets[i+1:]...)
-			return saveTimesheets()
+			previous := timesheets
+			timesheets = append(append([]models.TimesheetEntry{}, previous[:i]...), previous[i+1:]...)
+			if err := saveTimesheets(); err != nil {
+				timesheets = previous
+				return err
+			}
+			return nil
 		}
 	}
 	return errors.New("timesheet entry not found")

@@ -4,6 +4,7 @@ package models
 type TimesheetEntry struct {
 	ID                string   `json:"id"`
 	Date              string   `json:"date"` // YYYY-MM-DD
+	PeriodEnd         string   `json:"periodEnd,omitempty"`
 	StartTime         string   `json:"startTime"`
 	EndTime           string   `json:"endTime"`
 	LunchBreakMinutes int      `json:"lunchBreakMinutes"` // 30 | 60 | 90

@@ -19,6 +19,18 @@ type navItem struct {
 
 const topNavActionsContextKey = "topNavActions"
 
+func profileInitials(name string) string {
+	var initials []rune
+	for _, part := range strings.Fields(name) {
+		r, _ := utf8.DecodeRuneInString(part)
+		initials = append(initials, r)
+		if len(initials) == 2 {
+			break
+		}
+	}
+	return strings.ToUpper(string(initials))
+}
+
 func navItemsForStatus(userStatus string) []navItem {
 	items := []navItem{
 		{PageID: "schedule", Path: "/schedule", Label: "Расписание"},
@@ -63,7 +75,7 @@ func RenderPageToast(c *gin.Context) string {
 		return ""
 	}
 
-	return fmt.Sprintf(`<div class="site-toast %s" role="%s" data-page-toast><div><strong>%s</strong><p>%s</p></div><button type="button" aria-label="Закрыть уведомление" onclick="this.parentElement.remove()">&times;</button></div><script>window.setTimeout(function(){var toast=document.querySelector('[data-page-toast]');if(toast)toast.remove();},7000);</script>`,
+	return fmt.Sprintf(`<div class="site-toast %s" role="%s" aria-atomic="true" data-page-toast><div><strong>%s</strong><p>%s</p></div><button type="button" aria-label="Закрыть уведомление" onclick="this.parentElement.remove()">&times;</button></div>`,
 		className, role, title, template.HTMLEscapeString(message))
 }
 
@@ -101,10 +113,12 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 			continue
 		}
 		class := "nav-link"
+		current := ""
 		if item.PageID == activePage {
 			class += " active"
+			current = ` aria-current="page"`
 		}
-		nav.WriteString(fmt.Sprintf(`<a class="%s" href="%s">%s</a>`, class, item.Path, item.Label))
+		nav.WriteString(fmt.Sprintf(`<a class="%s" href="%s"%s>%s</a>`, class, item.Path, current, item.Label))
 	}
 	if activePage == "my-profile" {
 		pageTitle = "Мой профиль"
@@ -127,7 +141,7 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 	csrfToken, _ := c.Get("csrfToken")
 	csrfScript := ""
 	if token, ok := csrfToken.(string); ok && token != "" {
-		csrfScript = fmt.Sprintf(`<script>(function(){const t=%q;document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(f){if(f.querySelector('input[name="_csrf_token"]')) return; var i=document.createElement('input'); i.type='hidden'; i.name='_csrf_token'; i.value=t; f.appendChild(i);});})();</script>`, token)
+		csrfScript = fmt.Sprintf(`<script>document.addEventListener('DOMContentLoaded',function(){const t=%q;document.querySelectorAll('form[method="POST"], form[method="post"]').forEach(function(f){if(f.querySelector('input[name="_csrf_token"]')) return; var i=document.createElement('input'); i.type='hidden'; i.name='_csrf_token'; i.value=t; f.appendChild(i);});});</script>`, token)
 	}
 
 	topNavActions := ""
@@ -140,6 +154,7 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 	if topNavActions != "" {
 		navInnerClass += " has-actions"
 	}
+	floatingAction := `<div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение" title="Создать назначение">+</a></div>`
 
 	uiScript := `<script>(function(){
 const body=document.body;
@@ -286,6 +301,8 @@ function bindHoursTooltipListeners(root){
   (root || document).querySelectorAll('.hours-cell').forEach(function(cell){
     if(!cell.querySelector('.hours-tooltip') || cell.hasAttribute('data-hours-tooltip-bound')) return;
     cell.setAttribute('data-hours-tooltip-bound', 'true');
+    cell.tabIndex=0;
+    cell.setAttribute('aria-label','Подробности: '+cell.querySelector('span').textContent.trim());
     cell.addEventListener('mouseenter', function(){ showHoursTooltip(cell); });
     cell.addEventListener('mouseleave', function(){
       if(!tooltipPortal || !tooltipPortal.matches(':hover')) scheduleHideHoursTooltip();
@@ -305,8 +322,11 @@ function closeTimesheetMenus(){
 }
 
 function closeNav(){
+  const wasOpen=body.classList.contains('nav-open');
   body.classList.remove('nav-open');
   syncNavState();
+  if(window.WorkServiceUI) window.WorkServiceUI.syncLayers();
+  if(wasOpen && burger && window.innerWidth < 1024) burger.focus({preventScroll:true});
 }
 
 function ensureBrandAssets(){
@@ -366,7 +386,8 @@ function initThemeMeta(){
 function showModalLoading(title){
   if(modalTitle) modalTitle.textContent=title || defaultModalTitle;
   if(!modalContent) return;
-  modalContent.innerHTML='<div class="action-modal-loading"><div class="action-modal-loading-bar"></div><p>Загрузка...</p></div>';
+  if(modalBody) modalBody.querySelectorAll('[data-page-toast]').forEach(function(toast){ toast.remove(); });
+  modalContent.innerHTML='<div class="action-modal-loading" role="status"><div class="action-modal-loading-bar"></div><p>Загрузка...</p></div>';
   if(modalBody) modalBody.scrollTop=0;
 }
 
@@ -394,6 +415,10 @@ function executeModalScripts(scope){
 
 function focusFirstModalField(){
   if(!modalContent) return;
+  if(window.matchMedia('(pointer: coarse)').matches){
+    if(closeBtn) closeBtn.focus({preventScroll:true});
+    return;
+  }
   const field=modalContent.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
   if(field && typeof field.focus === 'function'){
     window.requestAnimationFrame(function(){
@@ -413,6 +438,7 @@ function renderModalHTML(html, fallbackTitle, returnPath){
   if(modalBody) modalBody.scrollTop=0;
   bindHoursTooltipListeners(modalContent);
   executeModalScripts(modalContent);
+  if(window.WorkServiceUI) window.WorkServiceUI.prepare(modalContent);
   focusFirstModalField();
 }
 
@@ -435,7 +461,9 @@ function closeModal(){
   modal.setAttribute('aria-hidden', 'true');
   modal.removeAttribute('data-return-path');
   body.classList.remove('modal-open');
+  if(window.WorkServiceUI) window.WorkServiceUI.syncLayers();
   if(modalContent) modalContent.innerHTML='';
+  if(modalBody) modalBody.querySelectorAll('[data-page-toast]').forEach(function(toast){ toast.remove(); });
   if(lastModalTrigger && document.contains(lastModalTrigger)){
     try{ lastModalTrigger.focus({ preventScroll: true }); }catch(_){ lastModalTrigger.focus(); }
   }
@@ -451,13 +479,17 @@ function openModal(url, title, ret, trigger){
   const requestURL=buildModalURL(url, effectiveRet);
   const seq=++modalRequestSeq;
   lastModalTrigger=trigger || document.activeElement;
+  closeNav();
+  closeTimesheetMenus();
   hideHoursTooltip();
   clearModalCleanup();
   modal.classList.add('visible');
   modal.setAttribute('aria-hidden', 'false');
   modal.setAttribute('data-return-path', effectiveRet);
   body.classList.add('modal-open');
+  if(window.WorkServiceUI) window.WorkServiceUI.syncLayers();
   showModalLoading(title);
+  if(closeBtn) closeBtn.focus({preventScroll:true});
   fetch(requestURL, {
     cache: 'no-store',
     credentials: 'same-origin',
@@ -475,11 +507,13 @@ function openModal(url, title, ret, trigger){
     renderModalHTML(payload.text, title, effectiveRet);
   }).catch(function(){
     if(seq !== modalRequestSeq) return;
-    window.location.assign(stripModalParams(requestURL));
+    modalContent.innerHTML='';
+    if(window.WorkServiceUI) window.WorkServiceUI.feedback('Не удалось загрузить форму. Проверьте соединение и откройте её снова.');
   });
 }
 
 function submitModalForm(form, submitter){
+  if(form.getAttribute('aria-busy') === 'true') return;
   const method=(form.getAttribute('method') || 'GET').toUpperCase();
   const action=form.getAttribute('action') || window.location.href;
   const returnPath=getModalReturnPath();
@@ -511,9 +545,7 @@ function submitModalForm(form, submitter){
   }
 
   const seq=++modalRequestSeq;
-  if(submitter && typeof submitter.disabled !== 'undefined'){
-    submitter.disabled=true;
-  }
+  if(window.WorkServiceUI) window.WorkServiceUI.beginSubmission(form, submitter);
 
   fetch(action, {
     method: method,
@@ -527,6 +559,11 @@ function submitModalForm(form, submitter){
     });
   }).then(function(payload){
     if(seq !== modalRequestSeq) return;
+    if(window.WorkServiceUI){
+      const error=window.WorkServiceUI.responseError(payload.response,payload.text);
+      if(error){ window.WorkServiceUI.feedback(error); return; }
+      if(payload.response.redirected) window.WorkServiceUI.rememberSuccess(payload.response.url);
+    }
     if(payload.response.redirected){
       navigateAfterModal(payload.response.url);
       return;
@@ -534,11 +571,9 @@ function submitModalForm(form, submitter){
     renderModalHTML(payload.text, modalTitle ? modalTitle.textContent : defaultModalTitle, returnPath);
   }).catch(function(){
     if(seq !== modalRequestSeq) return;
-    window.location.assign(stripModalParams(action));
+    if(window.WorkServiceUI) window.WorkServiceUI.feedback('Нет ответа от сервера. Данные остались в форме. Проверьте, сохранилась ли запись, прежде чем отправлять её повторно.');
   }).finally(function(){
-    if(submitter && typeof submitter.disabled !== 'undefined'){
-      submitter.disabled=false;
-    }
+    if(window.WorkServiceUI) window.WorkServiceUI.endSubmission(form);
   });
 }
 
@@ -592,12 +627,13 @@ function updateSiteNotificationControls(){
       btn.disabled=true;
       return;
     }
-    btn.textContent=siteNotificationsEnabled() ? 'Уведомления включены' : 'Включить уведомления сайта';
+    btn.textContent=siteNotificationsEnabled() ? 'Включены' : 'Включить';
     btn.disabled=Notification.permission === 'denied';
   });
 }
 window.appSiteNotify=showSiteNotification;
 updateSiteNotificationControls();
+document.addEventListener('DOMContentLoaded',updateSiteNotificationControls);
 
 document.addEventListener('click', function(e){
   const notificationBtn=e.target.closest('[data-enable-site-notifications]');
@@ -632,14 +668,17 @@ document.addEventListener('click', function(e){
     menu.classList.add('open');
     menu.classList.remove('open-up');
     btn.setAttribute('aria-expanded', 'true');
+    menu.style.position='fixed';
+    menu.style.transform='none';
+    menu.style.bottom='auto';
     const rect=menu.getBoundingClientRect();
     const needDown=rect.height + 12;
     const triggerRect=btn.getBoundingClientRect();
     const freeDown=window.innerHeight - triggerRect.bottom;
     const freeUp=triggerRect.top;
-    if(freeDown < needDown && freeUp > freeDown){
-      menu.classList.add('open-up');
-    }
+    const top=freeDown < needDown && freeUp > freeDown ? triggerRect.top-rect.height-6 : triggerRect.bottom+6;
+    menu.style.left=Math.max(8,Math.min(triggerRect.left,window.innerWidth-rect.width-8))+'px';
+    menu.style.top=Math.max(8,Math.min(top,window.innerHeight-rect.height-8))+'px';
     return;
   }
 
@@ -680,9 +719,15 @@ if(modal) modal.addEventListener('click', function(e){
   if(e.target === modal) closeModal();
 });
 if(burger) burger.addEventListener('click', function(){
-  body.classList.toggle('nav-open');
+  if(body.classList.contains('nav-open')){ closeNav(); return; }
+  body.classList.add('nav-open');
   syncNavState();
+  if(window.WorkServiceUI) window.WorkServiceUI.syncLayers();
+  const current=document.querySelector('.side-nav .nav-link.active') || document.querySelector('.side-nav-user');
+  if(current) current.focus({preventScroll:true});
 });
+const navClose=document.querySelector('[data-nav-close]');
+if(navClose) navClose.addEventListener('click',closeNav);
 if(navOverlay) navOverlay.addEventListener('click', closeNav);
 document.querySelectorAll('.side-nav-links a').forEach(function(a){
   a.addEventListener('click', closeNav);
@@ -702,6 +747,7 @@ window.addEventListener('scroll', function(){
 }, true);
 document.addEventListener('keydown', function(e){
   if(e.key === 'Escape'){
+    if(document.querySelector('dialog[open]')) return;
     hideHoursTooltip();
     closeTimesheetMenus();
     closeModal();
@@ -713,9 +759,10 @@ syncNavState();
 })();</script>`
 
 	return fmt.Sprintf(`
+<a class="skip-link" href="#main-content">К содержимому</a>
 <header class="top-nav">
   <div class="%s">
-    <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню" aria-expanded="false">
+    <button class="mobile-nav-toggle" type="button" data-mobile-nav-toggle aria-label="Меню" aria-controls="site-navigation" aria-expanded="false">
       <svg viewBox="0 0 24 24" aria-hidden="true">
         <rect x="3.5" y="4.5" width="17" height="15" rx="4"></rect>
         <path d="M8.5 8h8"></path>
@@ -732,20 +779,20 @@ syncNavState();
   </div>
 </header>
 <div class="side-nav-overlay" data-nav-overlay></div>
-<aside class="side-nav" aria-label="Навигация">
-  <div class="side-nav-brand"><img src="/static/img/logo.svg" alt="АВАЮССТРОЙ"><div class="side-nav-brand-copy"><strong>ЧСУП "АВАЮССТРОЙ"</strong><small>система управления работами</small></div></div>
+<aside class="side-nav" id="site-navigation" aria-label="Навигация">
+  <div class="side-nav-brand"><img src="/static/img/logo.svg" alt="АВАЮССТРОЙ"><div class="side-nav-brand-copy"><strong>ЧСУП "АВАЮССТРОЙ"</strong><small>система управления работами</small></div><button class="nav-dismiss" type="button" data-nav-close aria-label="Закрыть меню" title="Закрыть меню">&times;</button></div>
   <a class="side-nav-user" href="/profile"><span class="user-avatar">%s</span><div><strong>%s</strong><small>%s</small></div></a>
   <nav class="side-nav-links">%s</nav>
   <a class="btn btn-secondary side-nav-menu-settings" href="/profile/menu">Настроить меню</a>
   <a class="btn btn-secondary side-nav-logout" href="/logout">Выйти</a>
 </aside>
-<div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение">+</a></div>
-<div class="action-modal" id="app-action-modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="app-action-modal-title">
+%s
+<div class="action-modal" id="app-action-modal" tabindex="-1" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="app-action-modal-title">
   <div class="action-modal-sheet">
     <div class="action-modal-header"><strong id="app-action-modal-title">Форма</strong><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">&times;</button></div>
     <div class="action-modal-body"><div id="app-action-modal-content" class="action-modal-content"></div></div>
   </div>
-</div>%s%s`, navInnerClass, pageTitle, topNavActions, userInitial, userName, roleLabel, nav.String(), csrfScript, uiScript)
+</div>%s%s<script src="/static/js/ui.js?v=17" defer></script>`, navInnerClass, pageTitle, topNavActions, template.HTMLEscapeString(userInitial), template.HTMLEscapeString(userName), roleLabel, nav.String(), floatingAction, csrfScript, uiScript)
 }
 
 func IsModalRequest(c *gin.Context) bool {

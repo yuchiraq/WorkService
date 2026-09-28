@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"project/internal/models"
 	"project/internal/storage"
 
 	"github.com/gin-gonic/gin"
@@ -44,14 +45,15 @@ func DashboardPage(c *gin.Context) {
 
 	SetTopNavActions(c, `<div class="top-nav-toolbar"><span class="status-badge">`+template.HTMLEscapeString(todayDate.Format("02.01.2006"))+`</span><a class="btn btn-primary" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" data-modal-return="/dashboard">Новая смена</a><a class="btn btn-secondary" href="/workers/new" data-modal-url="/workers/new" data-modal-title="Добавить работника" data-modal-return="/dashboard">Работник</a><a class="btn btn-secondary" href="/objects/new" data-modal-url="/objects/new" data-modal-title="Новый объект" data-modal-return="/dashboard">Объект</a></div>`)
 
-	userName := strings.TrimSpace(c.GetString("userName"))
-	if userName == "" {
-		userName = "команда"
-	}
-
 	workers, _ := storage.GetWorkers()
 	objects, _ := storage.GetObjects()
 	entries, _ := storage.GetTimesheets()
+	monthStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
+	calendarEntries := make([]models.TimesheetEntry, 0, len(entries))
+	for offset := -1; offset <= 1; offset++ {
+		calendarEntries = append(calendarEntries, monthEntries(entries, monthStart.AddDate(0, offset, 0).Format("2006-01"))...)
+	}
+	entries = calendarEntries
 	improvements, _ := storage.GetImprovements()
 	workersMap, _ := buildWorkersMap()
 	objectsMap, _ := buildObjectsMap()
@@ -289,16 +291,6 @@ func DashboardPage(c *gin.Context) {
 		weekPulseHTML.WriteString(renderDashboardDayChip(rollup.Date, rollup.Assignments, len(rollup.Workers), rollup.SpecialMarks, dayKey == today))
 	}
 
-	heroDescription := fmt.Sprintf(
-		"Сегодня в сменах %d из %d работников, свободно %d. На паузе %d объектов, открыто %d обращений, а в плане на неделю уже %d назначений.",
-		len(todayWorkersSet),
-		activeWorkers,
-		freeWorkersToday,
-		pausedObjects,
-		openImprovements,
-		weekAssignments,
-	)
-
 	pageTemplate := `
 <!DOCTYPE html>
 <html lang="ru">
@@ -306,7 +298,7 @@ func DashboardPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Панель управления</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -314,9 +306,7 @@ func DashboardPage(c *gin.Context) {
         <div class="page-header">
             <div class="dashboard-hero">
                 <div class="dashboard-copy">
-                    <span class="text-muted">оперативная сводка</span>
-                    <h1>Добро пожаловать, {{USER_NAME}}</h1>
-                    <p>{{HERO_DESCRIPTION}}</p>
+                    <h1>Сегодня</h1>
                 </div>
                 <div class="dashboard-cta dashboard-quick-actions">
                     <span class="status-badge">сегодня · {{TODAY_LABEL}}</span>
@@ -327,14 +317,14 @@ func DashboardPage(c *gin.Context) {
             </div>
         </div>
 
-        <div class="workers-grid dashboard-stats">
-            <a class="metric metric-link" href="/schedule"><div class="label">Назначений сегодня</div><div class="value">{{TODAY_ASSIGNMENTS}}</div><p>Сводка по текущему дню</p></a>
+        <div class="dashboard-stats">
+            <a class="metric metric-link" href="/schedule"><div class="label">Назначений сегодня</div><div class="value">{{TODAY_ASSIGNMENTS}}</div></a>
             <a class="metric metric-link" href="/schedule"><div class="label">Людей в сменах</div><div class="value">{{TODAY_WORKERS}}</div><p>Из {{ACTIVE_WORKERS}} работников в штате</p></a>
-            <a class="metric metric-link" href="/workers"><div class="label">Свободный резерв</div><div class="value">{{FREE_WORKERS}}</div><p>Людей можно быстро подключить к задачам</p></a>
-            <a class="metric metric-link" href="/timesheets"><div class="label">Часов на сегодня</div><div class="value">{{TODAY_HOURS}}</div><p>Плановая загрузка на день</p></a>
+            <a class="metric metric-link" href="/workers"><div class="label">Свободный резерв</div><div class="value">{{FREE_WORKERS}}</div></a>
+            <a class="metric metric-link" href="/timesheets"><div class="label">Часов на сегодня</div><div class="value">{{TODAY_HOURS}}</div></a>
             <a class="metric metric-link" href="/schedule"><div class="label">Назначений за неделю</div><div class="value">{{WEEK_ASSIGNMENTS}}</div><p>{{WEEK_RANGE}}</p></a>
             <a class="metric metric-link" href="/objects"><div class="label">Объектов в работе</div><div class="value">{{ACTIVE_OBJECTS}}</div><p>{{PAUSED_OBJECTS}} на паузе</p></a>
-            <a class="metric metric-link" href="/objects?tab=completed"><div class="label">Завершено объектов</div><div class="value">{{COMPLETED_OBJECTS}}</div><p>Архив выполненных площадок</p></a>
+            <a class="metric metric-link" href="/objects?tab=completed"><div class="label">Завершено объектов</div><div class="value">{{COMPLETED_OBJECTS}}</div></a>
             <a class="metric metric-link" href="/improvements"><div class="label">Открытых замечаний</div><div class="value">{{OPEN_IMPROVEMENTS}}</div><p>Закрыто сегодня: {{DONE_TODAY}}</p></a>
         </div>
 
@@ -349,7 +339,6 @@ func DashboardPage(c *gin.Context) {
             <div class="placeholder-card dashboard-panel">
                 <div class="history-header">
                     <h2>Требует внимания</h2>
-                    <span class="status-badge">оперативный контроль</span>
                 </div>
                 <div class="dashboard-alerts">{{ATTENTION_ITEMS}}</div>
             </div>
@@ -358,10 +347,9 @@ func DashboardPage(c *gin.Context) {
         <div class="compact-grid dashboard-panels">
             <div class="info-card">
                 <div class="info-card-header">
-                    <h2>Пульс на 7 дней</h2>
-                    <span class="status-badge">неделя вперед</span>
+                    <h2>На этой неделе</h2>
                 </div>
-                <div class="dashboard-day-strip">{{DAY_PULSE}}</div>
+                <div class="dashboard-day-strip" tabindex="0" role="region" aria-label="Назначения на неделю">{{DAY_PULSE}}</div>
             </div>
             <div class="info-card">
                 <div class="info-card-header">
@@ -401,8 +389,6 @@ func DashboardPage(c *gin.Context) {
 
 	sidebar := RenderSidebar(c, "dashboard")
 	finalHTML := strings.Replace(pageTemplate, "{{SIDEBAR_HTML}}", sidebar, 1)
-	finalHTML = strings.Replace(finalHTML, "{{USER_NAME}}", template.HTMLEscapeString(userName), 1)
-	finalHTML = strings.Replace(finalHTML, "{{HERO_DESCRIPTION}}", template.HTMLEscapeString(heroDescription), 1)
 	finalHTML = strings.Replace(finalHTML, "{{TODAY_LABEL}}", template.HTMLEscapeString(todayDate.Format("02.01.2006")), 1)
 	finalHTML = strings.Replace(finalHTML, "{{TODAY_ASSIGNMENTS}}", fmt.Sprintf("%d", todayAssignments), 1)
 	finalHTML = strings.Replace(finalHTML, "{{TODAY_WORKERS}}", fmt.Sprintf("%d", len(todayWorkersSet)), 1)

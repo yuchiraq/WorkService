@@ -291,6 +291,9 @@ func assignmentMessage(settings models.AppSettings, worker models.Worker, entry 
 	}
 
 	if strings.TrimSpace(entry.UserMark) != "" {
+		if entry.PeriodEnd != "" {
+			lines = append(lines, "По: "+entry.PeriodEnd)
+		}
 		lines = append(lines, "Отметка: "+strings.TrimSpace(entry.UserMark))
 	} else {
 		hours := formatAssignmentHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)

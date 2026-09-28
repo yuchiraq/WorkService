@@ -145,14 +145,14 @@ func SettingsPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Настройки</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=12">
+    <link rel="stylesheet" href="/static/css/style.css?v=17">
 </head>
 <body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
     <div class="page-header">
         <h1>Настройки</h1>
-        <p>Резервирование данных, установка приложения на телефон, Telegram-бот и контроль безопасности.</p>
+
     </div>
 
     {{STATUS_BLOCK}}
@@ -161,9 +161,8 @@ func SettingsPage(c *gin.Context) {
         <div class="info-card">
             <div class="info-card-header">
                 <h2>Резервное копирование</h2>
-                <span class="status-badge">backup</span>
+
             </div>
-            <p>Создайте локальную копию файлов данных перед крупными изменениями или обновлениями.</p>
             <form method="POST" action="/settings/backup">
                 <button type="submit" class="btn btn-primary">Создать резервную копию</button>
             </form>
@@ -174,18 +173,16 @@ func SettingsPage(c *gin.Context) {
                 <h2>Установка на телефон</h2>
                 <span class="status-badge">PWA</span>
             </div>
-            <p>Сервис «АВАЮССТРОЙ» можно поставить как обычное приложение: иконка появится на главном экране, а система будет открываться без лишних вкладок браузера.</p>
-            <div class="pwa-steps">
+            <details class="settings-disclosure"><summary>Установка приложения</summary><div class="pwa-steps">
                 <div class="pwa-step">
                     <strong>iPhone / Safari</strong>
-                    <p>Откройте сайт в Safari, нажмите «Поделиться», выберите «На экран Домой», при наличии включите «Открывать как веб-приложение», затем нажмите «Добавить».</p>
+                    <p>Safari → «Поделиться» → «На экран Домой».</p>
                 </div>
                 <div class="pwa-step">
                     <strong>Android / Chrome</strong>
-                    <p>Откройте сайт в Chrome, откройте меню браузера и выберите «Добавить на главный экран» или «Установить приложение», затем подтвердите установку.</p>
+                    <p>Меню Chrome → «Установить приложение».</p>
                 </div>
-            </div>
-            <p class="pwa-meta">Если кнопка не появилась, откройте сайт именно в Safari или Chrome, дождитесь полной загрузки страницы и попробуйте снова.</p>
+            </div></details>
             <div class="site-notifications-panel"><button type="button" class="btn btn-secondary" data-enable-site-notifications>Включить уведомления сайта</button><span class="status-badge" data-site-notification-status>Проверка...</span></div>
         </div>
     </div>
@@ -196,9 +193,8 @@ func SettingsPage(c *gin.Context) {
                 <h2>Telegram-бот</h2>
                 <span class="status-badge">` + template.HTMLEscapeString(strconv.Itoa(len(telegramContacts))) + ` контактов</span>
             </div>
-            <p>Telegram не позволяет боту написать человеку первым только по номеру телефона. Рабочая схема такая: сотрудник сам открывает бота, нажимает Start, отправляет свой контакт, после этого система сможет сопоставить его телефон и отправлять сообщение о создании учётки.</p>
             <form method="POST" action="/settings/telegram" class="form-grid-edit">
-                <div class="form-group-edit form-group-name"><label for="telegram_bot_token">Токен бота</label><input type="text" id="telegram_bot_token" name="telegram_bot_token" value="` + template.HTMLEscapeString(settings.TelegramBotToken) + `" placeholder="123456:ABC..."></div>
+                <div class="form-group-edit form-group-name"><label for="telegram_bot_token">Токен бота</label><input type="password" autocomplete="off" id="telegram_bot_token" name="telegram_bot_token" value="` + template.HTMLEscapeString(settings.TelegramBotToken) + `" placeholder="123456:ABC..."></div>
                 <div class="form-group-edit form-group-position"><label for="telegram_bot_username">Username бота</label><input type="text" id="telegram_bot_username" name="telegram_bot_username" value="` + template.HTMLEscapeString(settings.TelegramBotUsername) + `" placeholder="my_company_bot"></div>
                 <div class="form-group-edit timesheet-span-2"><label for="telegram_site_url">Адрес сайта</label><input type="url" id="telegram_site_url" name="telegram_site_url" value="` + template.HTMLEscapeString(settings.TelegramSiteURL) + `" placeholder="https://example.com"></div>
                 <div class="form-actions-edit"><button type="submit" class="btn btn-primary">Сохранить настройки бота</button></div>
@@ -210,11 +206,7 @@ func SettingsPage(c *gin.Context) {
             <div class="dashboard-list">` + contactsHTML.String() + `</div>
         </div>
 
-        <div class="info-card">
-            <div class="info-card-header">
-                <h2>Как подключить сотрудника</h2>
-                <span class="status-badge">bot flow</span>
-            </div>
+        <details class="settings-disclosure"><summary>Подключение Telegram</summary>
             <div class="pwa-steps">
                 <div class="pwa-step">
                     <strong>1. Открыть бота</strong>
@@ -226,18 +218,17 @@ func SettingsPage(c *gin.Context) {
                 </div>
                 <div class="pwa-step">
                     <strong>3. Синхронизировать</strong>
-                    <p>В настройках нажмите «Синхронизировать контакты из бота». После этого при создании учётки система сможет отправить логин, сайт, PWA-инструкцию и пароль в этот Telegram-чат.</p>
+                    <p>Нажмите «Синхронизировать контакты из бота».</p>
                 </div>
             </div>
-        </div>
+        </details>
     </div>
 
     <div class="card">
         <h2>Мониторинг безопасности</h2>
         <p><strong>Активные сессии:</strong> {{ACTIVE}}</p>
         <p><strong>Заблокированные попытки входа:</strong> {{LOCKED}}</p>
-        <h3 style="margin-top:12px;">Последние события security.log</h3>
-        <ul>{{LOGS}}</ul>
+        <details class="settings-disclosure"><summary>Последние события</summary><ul>{{LOGS}}</ul></details>
     </div>
 </div>
 </body>

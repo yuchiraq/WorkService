@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -68,16 +67,16 @@ func UsersPage(c *gin.Context) {
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Пользователи</title><link rel="stylesheet" href="/static/css/style.css?v=12"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Пользователи</title><link rel="stylesheet" href="/static/css/style.css?v=17"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
 <div class="page-header"><h1>Пользователи</h1><a href="/users/new" class="btn btn-primary" data-modal-url="/users/new" data-modal-title="Новый пользователь" data-modal-return="/users">Добавить пользователя</a></div>
-<div class="card"><table class="table responsive-table users-table"><thead><tr><th>ФИО</th><th>Логин</th><th>Телефон</th><th>Статус</th><th>Последний вход</th><th>Действия</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
+<div class="card table-scroll"><table class="table responsive-table users-table"><thead><tr><th>ФИО</th><th>Логин</th><th>Телефон</th><th>Статус</th><th>Последний вход</th><th>Действия</th></tr></thead><tbody>{{ROWS}}</tbody></table></div>
 </div></body></html>`
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "users"), 1)
 	final = strings.Replace(final, "{{ROWS}}", rows.String(), 1)
 	if noticeBlock != "" {
-		final = strings.Replace(final, `<div class="card"><table class="table responsive-table users-table">`, noticeBlock+`<div class="card"><table class="table responsive-table users-table">`, 1)
+		final = strings.Replace(final, `<div class="card table-scroll"><table class="table responsive-table users-table">`, noticeBlock+`<div class="card table-scroll"><table class="table responsive-table users-table">`, 1)
 	}
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
@@ -174,7 +173,7 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 
 	isModal := IsModalRequest(c)
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css?v=12"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>{{TITLE}}</title><link rel="stylesheet" href="/static/css/style.css?v=17"></head><body>
 {{LAYOUT_START}}
 <div class="main-content{{MAIN_CONTENT_CLASS}}">
 {{BACK_LINK}}
@@ -184,7 +183,7 @@ func renderUserForm(c *gin.Context, user models.User, actionURL, title, submitLa
 {{CSRF_FIELD}}
 <div class="form-group-edit form-group-name"><label for="name">ФИО</label><input type="text" id="name" name="name" value="{{NAME}}" required></div>
 <div class="form-group-edit form-group-position"><label for="username">Логин</label><input type="text" id="username" name="username" value="{{USERNAME}}" required></div>
-<div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="password" id="password" name="password" value="" placeholder="Оставьте пустым, чтобы не менять"></div>
+<div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="password" id="password" name="password" value="" placeholder="Без изменений"></div>
 <div class="form-group-edit form-group-rate"><label for="phone">Контактный номер</label><input type="tel" id="phone" name="phone" value="{{PHONE}}"></div>
 <div class="form-group-edit form-group-rate">{{STATUS_FIELD}}</div>
 <div class="form-group-edit form-group-rate">{{WORKER_FIELD}}</div>
@@ -369,52 +368,42 @@ func ProfilePage(c *gin.Context) {
 		return
 	}
 
-	workerBlock := `
-<div class="form-group-edit form-group-name"><label for="name">ФИО</label><input type="text" id="name" name="name" value="{{NAME}}" required></div>
-<div class="form-group-edit form-group-position"><label for="username">Логин</label><input type="text" id="username" name="username" value="{{USERNAME}}" required></div>
-<div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="password" id="password" name="password" value="" placeholder="Оставьте пустым, чтобы не менять"></div>
-<div class="form-group-edit form-group-rate"><label for="phone">Телефон</label><input type="tel" id="phone" name="phone" value="{{PHONE}}"></div>
-<div class="form-group-edit form-group-position"><label for="position">Должность</label><input type="text" id="position" name="position" value="{{POSITION}}"></div>
-<div class="form-group-edit form-group-rate"><label for="birth_date">Дата рождения</label><input type="date" id="birth_date" name="birth_date" value="{{BIRTH_DATE}}"></div>
-<div class="form-group-edit form-group-rate"><label for="hourly_rate">Ставка, руб/час</label><input type="number" step="0.01" min="0" id="hourly_rate" name="hourly_rate" value="{{RATE}}"></div>`
-	if isAdmin(c) {
-		workerBlock = `
-<div class="form-group-edit form-group-name"><label for="name">ФИО</label><input type="text" id="name" name="name" value="{{NAME}}" required></div>
-<div class="form-group-edit form-group-position"><label for="username">Логин</label><input type="text" id="username" name="username" value="{{USERNAME}}" required></div>
-<div class="form-group-edit form-group-phone"><label for="password">Пароль</label><input type="password" id="password" name="password" value="" placeholder="Оставьте пустым, чтобы не менять"></div>
-<div class="form-group-edit form-group-rate"><label for="phone">Контактный номер</label><input type="tel" id="phone" name="phone" value="{{PHONE}}"></div>`
+	workerBlock := `<section><h2 class="settings-section-title">Личные данные</h2><div class="settings-group">
+<div class="form-group-edit"><label for="name">Имя</label><input type="text" id="name" name="name" autocomplete="name" value="{{NAME}}" required></div>
+<div class="form-group-edit"><label for="phone">Телефон</label><input type="tel" id="phone" name="phone" autocomplete="tel" value="{{PHONE}}" placeholder="Не указан"></div>`
+	if !isAdmin(c) {
+		workerBlock += `<div class="form-group-edit"><label for="birth_date">Дата рождения</label><input type="date" id="birth_date" name="birth_date" value="{{BIRTH_DATE}}"></div>`
+	}
+	workerBlock += `</div></section><section><h2 class="settings-section-title">Аккаунт</h2><div class="settings-group">
+<div class="form-group-edit"><label for="username">Логин</label><input type="text" id="username" name="username" autocomplete="username" value="{{USERNAME}}" required></div>
+<div class="form-group-edit"><label for="password">Пароль</label><input type="password" id="password" name="password" autocomplete="new-password" placeholder="Без изменений"></div></div></section>`
+	if !isAdmin(c) {
+		workerBlock += `<section><h2 class="settings-section-title">Работа</h2><div class="settings-group">
+<div class="form-group-edit"><label for="position">Должность</label><input type="text" id="position" name="position" value="{{POSITION}}" readonly></div>
+<div class="form-group-edit"><label for="hourly_rate">Ставка, руб/ч</label><input type="number" id="hourly_rate" name="hourly_rate" value="{{RATE}}" readonly></div></div></section>`
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Мой профиль</title><link rel="stylesheet" href="/static/css/style.css?v=12"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Мой профиль</title><link rel="stylesheet" href="/static/css/style.css?v=17"></head><body>
 {{SIDEBAR_HTML}}
-<div class="main-content"><div class="page-header"><h1>Мой профиль</h1></div>
-<div class="card"><form action="/profile" method="POST" class="form-grid-edit">
+<div class="main-content settings-profile"><div class="profile-identity"><div class="user-avatar">{{INITIAL}}</div><h1>{{DISPLAY_NAME}}</h1><p>{{ROLE}}</p></div>
+<form action="/profile" method="POST" class="form-grid-edit settings-form">
 {{CSRF_FIELD}}
 {{PROFILE_FIELDS}}
 <div class="form-actions-edit"><button type="submit" class="btn btn-primary">Сохранить</button></div>
-</form></div></div>
+</form><section><h2 class="settings-section-title">Настройки</h2><div class="settings-links"><a href="/profile/menu">Боковое меню <span aria-hidden="true">›</span></a><div class="settings-link-row"><span>Уведомления</span><button type="button" class="btn btn-secondary btn-compact" data-enable-site-notifications>Включить</button></div></div></section></div>
 </body></html>`
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "my-profile"), 1)
+	initial := profileInitials(user.Name)
+	final = strings.ReplaceAll(final, "{{INITIAL}}", template.HTMLEscapeString(initial))
+	final = strings.ReplaceAll(final, "{{DISPLAY_NAME}}", template.HTMLEscapeString(user.Name))
+	final = strings.ReplaceAll(final, "{{ROLE}}", userStatusLabel(user.Status))
 	final = strings.Replace(final, "{{PROFILE_FIELDS}}", workerBlock, 1)
 	final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(user.Name), 1)
 	final = strings.Replace(final, "{{USERNAME}}", template.HTMLEscapeString(user.Username), 1)
 	final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(user.Phone), 1)
-	final = strings.Replace(final, "{{POSITION}}", "", 1)
-	final = strings.Replace(final, "{{BIRTH_DATE}}", "", 1)
-	final = strings.Replace(final, "{{RATE}}", "0", 1)
 	if !isAdmin(c) {
-		worker, err := storage.GetWorkerByUserID(userID)
-		if err != nil {
-			worker, _ = storage.CreateWorker(models.Worker{
-				Name:          user.Name,
-				Position:      "Сотрудник",
-				Phone:         user.Phone,
-				CreatedBy:     userID,
-				CreatedByName: user.Name,
-				UserID:        userID,
-			})
-		}
+		worker, _ := storage.GetWorkerByUserID(userID)
 		final = strings.Replace(final, "{{NAME}}", template.HTMLEscapeString(worker.Name), 1)
 		final = strings.Replace(final, "{{PHONE}}", template.HTMLEscapeString(worker.Phone), 1)
 		final = strings.Replace(final, "{{POSITION}}", template.HTMLEscapeString(worker.Position), 1)
@@ -461,11 +450,8 @@ func UpdateProfile(c *gin.Context) {
 			return
 		}
 		worker.Name = c.PostForm("name")
-		worker.Position = c.PostForm("position")
 		worker.Phone = c.PostForm("phone")
 		worker.BirthDate = c.PostForm("birth_date")
-		rate, _ := strconv.ParseFloat(strings.TrimSpace(c.PostForm("hourly_rate")), 64)
-		worker.HourlyRate = rate
 		if err := storage.UpdateWorker(worker); err != nil {
 			c.String(http.StatusBadRequest, "Failed to update profile: %v", err)
 			return

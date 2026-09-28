@@ -97,7 +97,7 @@ func SetupRouter(r *gin.Engine) {
 	}
 
 	adminRequired := r.Group("/")
-	adminRequired.Use(api.AuthRequired(), api.AdminRequired())
+	adminRequired.Use(api.AuthRequired(), api.AdminRequired(), api.CSRFMiddleware())
 	{
 		adminRequired.GET("/users", api.UsersPage)
 		adminRequired.GET("/users/new", api.AddUserPage)
