@@ -3,7 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"errors"
-	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -27,7 +26,7 @@ func LoadUsers() error {
 	usersMutex.Lock()
 	defer usersMutex.Unlock()
 
-	file, err := os.ReadFile(usersFile)
+	file, err := readData(usersFile)
 	if err != nil {
 		return err
 	}
@@ -87,10 +86,7 @@ func saveUsers() error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("storage", 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(usersFile, data, 0o644)
+	return writeData(usersFile, data)
 }
 
 func GetUsers() ([]models.User, error) {
@@ -206,7 +202,11 @@ func UpdateUser(updatedUser models.User) error {
 	for i, user := range users {
 		if user.ID == updatedUser.ID {
 			users[i] = updatedUser
-			return saveUsers()
+			if err := saveUsers(); err != nil {
+				users[i] = user
+				return err
+			}
+			return nil
 		}
 	}
 
@@ -219,8 +219,13 @@ func DeleteUser(id string) error {
 
 	for i, user := range users {
 		if user.ID == id {
-			users = append(users[:i], users[i+1:]...)
-			return saveUsers()
+			previous := users
+			users = append(append([]models.User{}, users[:i]...), users[i+1:]...)
+			if err := saveUsers(); err != nil {
+				users = previous
+				return err
+			}
+			return nil
 		}
 	}
 
@@ -233,8 +238,13 @@ func UpdateUserLastLogin(userID string, when time.Time) error {
 
 	for i := range users {
 		if users[i].ID == userID {
+			previous := users[i]
 			users[i].LastLoginAt = when.Format(time.RFC3339)
-			return saveUsers()
+			if err := saveUsers(); err != nil {
+				users[i] = previous
+				return err
+			}
+			return nil
 		}
 	}
 	return errors.New("user not found")
@@ -263,8 +273,13 @@ func UpdateUserHiddenMenuItems(userID string, hiddenItems []string) error {
 
 	for i := range users {
 		if users[i].ID == userID {
+			previous := users[i]
 			users[i].HiddenMenuItems = cleaned
-			return saveUsers()
+			if err := saveUsers(); err != nil {
+				users[i] = previous
+				return err
+			}
+			return nil
 		}
 	}
 	return errors.New("user not found")

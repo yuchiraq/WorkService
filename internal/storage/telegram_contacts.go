@@ -43,7 +43,7 @@ func LoadTelegramContacts() error {
 	defer telegramContactsMutex.Unlock()
 
 	telegramContacts = []models.TelegramContactLink{}
-	file, err := os.ReadFile(telegramContactsFile)
+	file, err := readData(telegramContactsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -68,10 +68,7 @@ func saveTelegramContacts() error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("storage", 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(telegramContactsFile, data, 0o644)
+	return writeData(telegramContactsFile, data)
 }
 
 func GetTelegramContacts() ([]models.TelegramContactLink, error) {
@@ -103,13 +100,22 @@ func UpsertTelegramContact(contact models.TelegramContactLink) error {
 
 	for i := range telegramContacts {
 		if telegramContacts[i].Phone == contact.Phone || telegramContacts[i].ChatID == contact.ChatID {
+			previous := telegramContacts[i]
 			telegramContacts[i] = contact
-			return saveTelegramContacts()
+			if err := saveTelegramContacts(); err != nil {
+				telegramContacts[i] = previous
+				return err
+			}
+			return nil
 		}
 	}
 
 	telegramContacts = append(telegramContacts, contact)
-	return saveTelegramContacts()
+	if err := saveTelegramContacts(); err != nil {
+		telegramContacts = telegramContacts[:len(telegramContacts)-1]
+		return err
+	}
+	return nil
 }
 
 func FindTelegramContactByPhone(phone string) (models.TelegramContactLink, error) {
@@ -132,8 +138,13 @@ func DeleteTelegramContactByPhone(phone string) error {
 	normalized := NormalizePhoneNumber(phone)
 	for i, contact := range telegramContacts {
 		if contact.Phone == normalized {
-			telegramContacts = append(telegramContacts[:i], telegramContacts[i+1:]...)
-			return saveTelegramContacts()
+			previous := telegramContacts
+			telegramContacts = append(append([]models.TelegramContactLink{}, telegramContacts[:i]...), telegramContacts[i+1:]...)
+			if err := saveTelegramContacts(); err != nil {
+				telegramContacts = previous
+				return err
+			}
+			return nil
 		}
 	}
 	return errors.New("telegram contact not found")

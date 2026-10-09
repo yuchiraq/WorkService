@@ -24,7 +24,7 @@ func LoadTimesheets() error {
 	timesheetsMutex.Lock()
 	defer timesheetsMutex.Unlock()
 
-	file, err := os.ReadFile(timesheetsFile)
+	file, err := readData(timesheetsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			timesheets = []models.TimesheetEntry{}
@@ -49,10 +49,7 @@ func saveTimesheets() error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("storage", 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(timesheetsFile, data, 0o644)
+	return writeData(timesheetsFile, data)
 }
 
 func normalizeTimesheet(entry *models.TimesheetEntry) {

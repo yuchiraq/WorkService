@@ -11,6 +11,11 @@ import (
 )
 
 func main() {
+	closeStorage, err := storage.ConfigureFromEnv()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer closeStorage()
 	// Load initial data
 	if err := storage.LoadUsers(); err != nil {
 		log.Fatalf("Failed to load users: %v", err)
@@ -35,6 +40,12 @@ func main() {
 	}
 	if err := storage.LoadVehicles(); err != nil {
 		log.Fatalf("Failed to load vehicles: %v", err)
+	}
+	if err := storage.LoadInventory(); err != nil {
+		log.Fatalf("Failed to load inventory: %v", err)
+	}
+	if err := storage.LoadObjectPhotos(); err != nil {
+		log.Fatalf("Failed to load object photos: %v", err)
 	}
 	telegrambot.StartMileageReminderScheduler()
 

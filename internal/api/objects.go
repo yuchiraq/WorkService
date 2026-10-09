@@ -25,9 +25,6 @@ func objectStatusLabel(status string) string {
 }
 
 func ObjectsPage(c *gin.Context) {
-	if !requireAdmin(c) {
-		return
-	}
 	objects, err := storage.GetObjects()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load objects: %v", err)
@@ -49,6 +46,9 @@ func ObjectsPage(c *gin.Context) {
 
 	visibleObjects := make([]models.Object, 0, len(objects))
 	for _, object := range objects {
+		if !canManageInventory(c, object) {
+			continue
+		}
 		if selectedTab == "completed" {
 			if object.Status == "completed" {
 				visibleObjects = append(visibleObjects, object)
@@ -70,7 +70,11 @@ func ObjectsPage(c *gin.Context) {
 		if object.Status == "completed" {
 			statusClass = "warning"
 		}
-		cards.WriteString(fmt.Sprintf(`<article class="info-card object-card"><div class="info-card-header"><h3><a class="entity-link" href="/object/%s">%s</a></h3><span class="status-badge %s">%s</span></div><div class="details-list"><div class="detail-row"><span>Адрес</span><strong>%s</strong></div><div class="detail-row"><span>Ответственный</span><strong>%s</strong></div></div><div class="info-card-actions"><a class="btn btn-secondary" href="/object/%s">Открыть</a><a class="btn btn-secondary" href="/objects/edit/%s" data-modal-url="/objects/edit/%s" data-modal-title="Редактировать объект" data-modal-return="/objects?tab=%s">Редактировать</a></div></article>`,
+		editAction := ""
+		if isAdmin(c) {
+			editAction = fmt.Sprintf(`<a class="btn btn-secondary" href="/objects/edit/%s" data-modal-url="/objects/edit/%s" data-modal-title="Редактировать объект" data-modal-return="/objects?tab=%s">Редактировать</a>`, template.HTMLEscapeString(object.ID), template.HTMLEscapeString(object.ID), template.HTMLEscapeString(selectedTab))
+		}
+		cards.WriteString(fmt.Sprintf(`<article class="info-card object-card"><div class="info-card-header"><h3><a class="entity-link" href="/object/%s">%s</a></h3><span class="status-badge %s">%s</span></div><div class="details-list"><div class="detail-row"><span>Адрес</span><strong>%s</strong></div><div class="detail-row"><span>Ответственный</span><strong>%s</strong></div></div><div class="info-card-actions"><a class="btn btn-secondary" href="/object/%s">Открыть</a><a class="btn btn-secondary" href="/object/%s#object-inventory">Инвентарь</a>%s</div></article>`,
 			template.HTMLEscapeString(object.ID),
 			template.HTMLEscapeString(object.Name),
 			template.HTMLEscapeString(statusClass),
@@ -79,15 +83,18 @@ func ObjectsPage(c *gin.Context) {
 			template.HTMLEscapeString(responsible),
 			template.HTMLEscapeString(object.ID),
 			template.HTMLEscapeString(object.ID),
-			template.HTMLEscapeString(object.ID),
-			template.HTMLEscapeString(selectedTab),
+			editAction,
 		))
 	}
 	if cards.Len() == 0 {
-		cards.WriteString(`<div class="info-card"><p>Объекты пока не добавлены.</p></div>`)
+		cards.WriteString(`<div class="info-card"><p>Нет доступных объектов в этом разделе.</p></div>`)
 	}
 	currentObjectsPath := "/objects?tab=" + template.URLQueryEscaper(selectedTab)
-	SetTopNavActions(c, `<div class="top-nav-toolbar"><a href="/objects/new" class="btn btn-primary" data-modal-url="/objects/new" data-modal-title="Новый объект" data-modal-return="`+currentObjectsPath+`">Новый объект</a></div>`)
+	newAction := ""
+	if isAdmin(c) {
+		newAction = `<a href="/objects/new" class="btn btn-primary" data-modal-url="/objects/new" data-modal-title="Новый объект" data-modal-return="` + currentObjectsPath + `">Новый объект</a>`
+		SetTopNavActions(c, `<div class="top-nav-toolbar">`+newAction+`</div>`)
+	}
 
 	page := `
 <!DOCTYPE html>
@@ -103,7 +110,7 @@ func ObjectsPage(c *gin.Context) {
     <div class="main-content">
         <div class="page-header page-header-desktop-hidden">
             <h1>Объекты</h1>
-            <a href="/objects/new" class="btn btn-primary" data-modal-url="/objects/new" data-modal-title="Новый объект" data-modal-return="/objects?tab={{TAB}}">Добавить объект</a>
+            {{NEW_OBJECT}}
         </div>
         <div class="card"><div class="tab-switcher" style="margin-bottom:10px;display:flex;gap:8px;"><a class="btn btn-secondary{{TAB_ACTIVE_CLASS}}" href="/objects?tab=active">В работе</a><a class="btn btn-secondary{{TAB_COMPLETED_CLASS}}" href="/objects?tab=completed">Оконченные</a></div><div class="compact-grid">{{CARDS}}</div></div>
     </div>
@@ -111,6 +118,7 @@ func ObjectsPage(c *gin.Context) {
 </html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "objects"), 1)
+	final = strings.Replace(final, "{{NEW_OBJECT}}", newAction, 1)
 	final = strings.Replace(final, "{{TAB}}", template.HTMLEscapeString(selectedTab), -1)
 	tabActiveClass := ""
 	tabCompletedClass := ""
@@ -168,7 +176,7 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
         {{BACK_LINK}}
         <div class="page-header"><h1>{{TITLE}}</h1></div>
         <div class="card{{CARD_CLASS}}">
-            <form action="{{ACTION_URL}}" method="POST" class="form-grid-edit">
+            <form action="{{ACTION_URL}}" method="POST" class="form-grid-edit" data-object-status-form data-object-id="{{OBJECT_ID}}" data-original-status="{{ORIGINAL_STATUS}}">
 {{CSRF_FIELD}}
                 <input type="hidden" name="return_to" value="{{RETURN_TO}}">
                 <div class="form-group-edit form-group-name">
@@ -223,6 +231,8 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
         function showDeleteModal(){const dialog=document.querySelector('#app-action-modal.visible #deleteModal') || document.getElementById('deleteModal');dialog.uiReturnFocus=document.activeElement;dialog.showModal();}
         function closeDeleteModal(){(document.querySelector('#app-action-modal.visible #deleteModal') || document.getElementById('deleteModal')).close();}
     </script>
+    <link rel="stylesheet" href="/static/css/operation-controls.css?v=1">
+    <script src="/static/js/object-status.js?v=1" defer></script>
 </body>
 </html>`
 
@@ -263,6 +273,7 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
 	final = strings.Replace(final, "{{SUBMIT_LABEL}}", template.HTMLEscapeString(submitLabel), 1)
 	final = strings.Replace(final, "{{DELETE_SECTION}}", deleteSection, 1)
 	final = strings.Replace(final, "{{OBJECT_ID}}", template.HTMLEscapeString(object.ID), -1)
+	final = strings.Replace(final, "{{ORIGINAL_STATUS}}", template.HTMLEscapeString(object.Status), -1)
 
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
@@ -296,7 +307,7 @@ func ObjectProfilePage(c *gin.Context) {
 			}
 		}
 	}
-	if !isAdmin(c) && len(related) == 0 {
+	if !isAdmin(c) && len(related) == 0 && !canManageInventory(c, object) {
 		accessDenied(c)
 		return
 	}
@@ -337,12 +348,15 @@ func ObjectProfilePage(c *gin.Context) {
     {{OBJECT_ACTIONS}}
   </div>
   <ul class="profile-details"><li><strong>Адрес:</strong> {{OBJECT_ADDRESS}}</li><li><strong>Ответственный:</strong> {{RESPONSIBLE}}</li></ul>
-  <div class="card"><div class="history-header"><h2>Назначения по объекту</h2></div><div class="schedule-vertical">{{ASSIGNMENTS}}</div></div>
+  {{OBJECT_SECTIONS}}
+  {{INVENTORY}}
+  {{PHOTOS}}
+  <div class="card" id="object-assignments"><div class="history-header"><h2>Назначения по объекту</h2></div><div class="schedule-vertical">{{ASSIGNMENTS}}</div></div>
 </div></body></html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "objects"), 1)
 	objectActions := ""
-	objectBack := `<a href="/schedule" class="back-link">К расписанию</a>`
+	objectBack := `<a href="/objects" class="back-link">К объектам</a>`
 	if isAdmin(c) {
 		objectBack = `<a href="/objects" class="back-link">К объектам</a>`
 		objectActions = `<a class="btn btn-secondary" href="/objects/edit/{{OBJECT_ID}}" data-modal-url="/objects/edit/{{OBJECT_ID}}" data-modal-title="Объект">Изменить</a>`
@@ -355,6 +369,13 @@ func ObjectProfilePage(c *gin.Context) {
 	final = strings.Replace(final, "{{RESPONSIBLE}}", template.HTMLEscapeString(responsible), 1)
 	final = strings.Replace(final, "{{OBJECT_ID}}", template.HTMLEscapeString(object.ID), -1)
 	final = strings.Replace(final, "{{ASSIGNMENTS}}", assignments.String(), 1)
+	final = strings.Replace(final, "{{INVENTORY}}", renderObjectInventory(c, object), 1)
+	final = strings.Replace(final, "{{PHOTOS}}", renderObjectPhotos(c, object), 1)
+	sections := ""
+	if canManageInventory(c, object) {
+		sections = `<nav class="object-section-links" aria-label="Разделы объекта"><a href="#object-inventory">Инвентарь</a><a href="#object-photos">Фото</a><a href="#object-assignments">Назначения</a></nav>`
+	}
+	final = strings.Replace(final, "{{OBJECT_SECTIONS}}", sections, 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
 }
 
@@ -412,6 +433,7 @@ func UpdateObject(c *gin.Context) {
 		return
 	}
 
+	previousStatus := object.Status
 	object.Name = c.PostForm("name")
 	object.Status = c.PostForm("status")
 	object.Address = c.PostForm("address")
@@ -420,6 +442,18 @@ func UpdateObject(c *gin.Context) {
 	if _, err := storage.GetUserByID(object.ResponsibleUserID); err != nil {
 		c.String(http.StatusBadRequest, "Invalid responsible user")
 		return
+	}
+	if object.Status != previousStatus && (object.Status == "paused" || object.Status == "completed") && c.PostForm("inventory_confirmed_status") != object.Status {
+		remaining := 0
+		for _, item := range storage.GetInventory(object.ID).Items {
+			if item.Quantity > 0 {
+				remaining++
+			}
+		}
+		if remaining > 0 {
+			c.String(http.StatusConflict, "На объекте остался инвентарь: %d позиций. Подтвердите смену статуса. Инвентарь не будет списан автоматически.", remaining)
+			return
+		}
 	}
 	if err := storage.UpdateObject(object); err != nil {
 		c.String(http.StatusBadRequest, "Failed to update object: %v", err)

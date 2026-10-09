@@ -25,7 +25,7 @@ func LoadWorkers() error {
 	workersMutex.Lock()
 	defer workersMutex.Unlock()
 
-	file, err := os.ReadFile(workersFile)
+	file, err := readData(workersFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			workers = []models.Worker{} // If file doesn't exist, start with an empty slice
@@ -43,11 +43,7 @@ func saveWorkers() error {
 	if err != nil {
 		return err
 	}
-	// Ensure the directory exists
-	if err := os.MkdirAll("storage", 0755); err != nil {
-		return err
-	}
-	return os.WriteFile(workersFile, data, 0644)
+	return writeData(workersFile, data)
 }
 
 // GetWorkers returns all workers.
@@ -117,7 +113,11 @@ func UpdateWorker(updatedWorker models.Worker) error {
 	for i, worker := range workers {
 		if worker.ID == updatedWorker.ID {
 			workers[i] = updatedWorker
-			return saveWorkers()
+			if err := saveWorkers(); err != nil {
+				workers[i] = worker
+				return err
+			}
+			return nil
 		}
 	}
 
@@ -137,7 +137,11 @@ func DeleteWorker(id string) error {
 			workers[i].IsFired = true
 			workers[i].FiredAt = time.Now().Format(time.RFC3339)
 			workers[i].UserID = ""
-			return saveWorkers()
+			if err := saveWorkers(); err != nil {
+				workers[i] = worker
+				return err
+			}
+			return nil
 		}
 	}
 
@@ -163,13 +167,18 @@ func LinkWorkerToUser(workerID, userID string) error {
 		return errors.New("cannot link dismissed worker")
 	}
 
+	previous := append([]models.Worker{}, workers...)
 	for i := range workers {
 		if workers[i].UserID == userID {
 			workers[i].UserID = ""
 		}
 	}
 	workers[workerIndex].UserID = userID
-	return saveWorkers()
+	if err := saveWorkers(); err != nil {
+		workers = previous
+		return err
+	}
+	return nil
 }
 
 // ClearWorkerLinkByUserID clears the worker-user link without deleting worker data.
@@ -178,6 +187,7 @@ func ClearWorkerLinkByUserID(userID string) error {
 	defer workersMutex.Unlock()
 
 	changed := false
+	previous := append([]models.Worker{}, workers...)
 	for i := range workers {
 		if workers[i].UserID == userID {
 			workers[i].UserID = ""
@@ -187,7 +197,11 @@ func ClearWorkerLinkByUserID(userID string) error {
 	if !changed {
 		return nil
 	}
-	return saveWorkers()
+	if err := saveWorkers(); err != nil {
+		workers = previous
+		return err
+	}
+	return nil
 }
 
 // DeleteWorkerByUserID unlinks user account without deleting worker history.

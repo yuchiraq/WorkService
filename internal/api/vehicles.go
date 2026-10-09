@@ -252,8 +252,8 @@ func AssignVehicleToSelf(c *gin.Context) {
 		redirectVehicleMessage(c, "/vehicles", "error", "Транспорт уже закреплен за другим пользователем.")
 		return
 	}
-	if err := storage.AssignVehicle(vehicle.ID, userID); err != nil {
-		redirectVehicleMessage(c, "/vehicles", "error", "Не удалось привязать транспорт.")
+	if err := storage.AssignVehicle(vehicle.ID, "", userID, userID, c.GetString("userName")); err != nil {
+		redirectVehicleMessage(c, "/vehicles", "error", vehicleOwnerError(err))
 		return
 	}
 	redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "success", "Транспорт привязан к вашему аккаунту.")
@@ -265,14 +265,18 @@ func AssignVehicle(c *gin.Context) {
 		return
 	}
 	userID := strings.TrimSpace(c.PostForm("assigned_user_id"))
+	if userID == "" {
+		redirectVehicleMessage(c, "/vehicles/"+c.Param("id"), "error", "Выберите владельца транспорта.")
+		return
+	}
 	if userID != "" {
 		if _, err := storage.GetUserByID(userID); err != nil {
 			redirectVehicleMessage(c, "/vehicles/"+c.Param("id"), "error", "Пользователь не найден.")
 			return
 		}
 	}
-	if err := storage.AssignVehicle(c.Param("id"), userID); err != nil {
-		redirectVehicleMessage(c, "/vehicles", "error", "Не удалось изменить владельца транспорта.")
+	if err := storage.AssignVehicle(c.Param("id"), "", userID, c.GetString("userID"), c.GetString("userName")); err != nil {
+		redirectVehicleMessage(c, "/vehicles/"+c.Param("id"), "error", vehicleOwnerError(err))
 		return
 	}
 	redirectVehicleMessage(c, "/vehicles/"+c.Param("id"), "success", "Владелец транспорта изменен.")
@@ -288,11 +292,22 @@ func UnassignVehicle(c *gin.Context) {
 		redirectVehicleMessage(c, "/vehicles", "error", "У вас нет доступа к этому транспорту.")
 		return
 	}
-	if err := storage.AssignVehicle(vehicle.ID, ""); err != nil {
-		redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "error", "Не удалось снять привязку.")
+	if err := storage.AssignVehicle(vehicle.ID, c.PostForm("expected_owner_id"), "", c.GetString("userID"), c.GetString("userName")); err != nil {
+		redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "error", vehicleOwnerError(err))
 		return
 	}
-	redirectVehicleMessage(c, "/vehicles", "success", "Привязка транспорта снята.")
+	destination := "/vehicles"
+	if isAdmin(c) {
+		destination += "/" + vehicle.ID
+	}
+	redirectVehicleMessage(c, destination, "success", "Привязка транспорта снята.")
+}
+
+func vehicleOwnerError(err error) string {
+	if errors.Is(err, storage.ErrVehicleOwnerConflict) || errors.Is(err, storage.ErrVehicleAlreadyAssigned) {
+		return err.Error()
+	}
+	return "Не удалось изменить привязку транспорта. Повторите попытку."
 }
 
 func VehiclePage(c *gin.Context) {
@@ -347,9 +362,9 @@ func VehiclePage(c *gin.Context) {
 	}
 
 	adminPanel := ""
-	if isAdmin(c) {
+	if isAdmin(c) && vehicle.AssignedUserID == "" {
 		var options strings.Builder
-		options.WriteString(`<option value="">Без владельца</option>`)
+		options.WriteString(`<option value="">Выберите владельца</option>`)
 		for _, user := range users {
 			selected := ""
 			if user.ID == vehicle.AssignedUserID {
@@ -357,11 +372,11 @@ func VehiclePage(c *gin.Context) {
 			}
 			options.WriteString(`<option value="` + template.HTMLEscapeString(user.ID) + `"` + selected + `>` + template.HTMLEscapeString(user.Name) + `</option>`)
 		}
-		adminPanel = `<section class="card vehicle-owner-panel"><div><h2>Владелец ТС</h2></div><form method="POST" action="/vehicles/` + template.HTMLEscapeString(vehicle.ID) + `/assign">` + CSRFHiddenInput(c) + `<select name="assigned_user_id" aria-label="Владелец ТС">` + options.String() + `</select><button class="btn btn-secondary" type="submit">Сохранить владельца</button></form></section>`
+		adminPanel = `<section class="card vehicle-owner-panel"><div><h2>Владелец ТС</h2></div><form method="POST" action="/vehicles/` + template.HTMLEscapeString(vehicle.ID) + `/assign">` + CSRFHiddenInput(c) + `<select name="assigned_user_id" aria-label="Владелец ТС" required>` + options.String() + `</select><button class="btn btn-secondary" type="submit">Привязать</button></form></section>`
 	}
 	unassignButton := ""
 	if vehicle.AssignedUserID != "" {
-		unassignButton = `<form method="POST" action="/vehicles/` + template.HTMLEscapeString(vehicle.ID) + `/unassign">` + CSRFHiddenInput(c) + `<button class="btn btn-secondary btn-compact" type="submit">Снять привязку</button></form>`
+		unassignButton = `<form method="POST" action="/vehicles/` + template.HTMLEscapeString(vehicle.ID) + `/unassign">` + CSRFHiddenInput(c) + `<input type="hidden" name="expected_owner_id" value="` + template.HTMLEscapeString(vehicle.AssignedUserID) + `"><button class="btn btn-secondary btn-compact" type="submit">Снять привязку</button></form>`
 	}
 	alert := ""
 	if vehicle.AssignedUserID != "" && !storage.HasMileageRecordForMonth(vehicle.ID, time.Now().Format("2006-01")) {

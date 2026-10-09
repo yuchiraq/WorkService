@@ -23,7 +23,7 @@ func LoadObjects() error {
 	objectsMutex.Lock()
 	defer objectsMutex.Unlock()
 
-	file, err := os.ReadFile(objectsFile)
+	file, err := readData(objectsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			objects = []models.Object{}
@@ -50,10 +50,7 @@ func saveObjects() error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("storage", 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(objectsFile, data, 0o644)
+	return writeData(objectsFile, data)
 }
 
 func NormalizeObjectStatus(status string) string {
@@ -132,7 +129,11 @@ func UpdateObject(updatedObject models.Object) error {
 	for i, object := range objects {
 		if object.ID == updatedObject.ID {
 			objects[i] = updatedObject
-			return saveObjects()
+			if err := saveObjects(); err != nil {
+				objects[i] = object
+				return err
+			}
+			return nil
 		}
 	}
 
@@ -142,11 +143,23 @@ func UpdateObject(updatedObject models.Object) error {
 func DeleteObject(id string) error {
 	objectsMutex.Lock()
 	defer objectsMutex.Unlock()
+	photosMutex.RLock()
+	defer photosMutex.RUnlock()
+	for _, photo := range objectPhotos {
+		if photo.ObjectID == id {
+			return errors.New("На объекте есть фото. Сначала удалите их или переведите объект в оконченные")
+		}
+	}
 
 	for i, object := range objects {
 		if object.ID == id {
-			objects = append(objects[:i], objects[i+1:]...)
-			return saveObjects()
+			previous := objects
+			objects = append(append([]models.Object{}, objects[:i]...), objects[i+1:]...)
+			if err := saveObjects(); err != nil {
+				objects = previous
+				return err
+			}
+			return nil
 		}
 	}
 

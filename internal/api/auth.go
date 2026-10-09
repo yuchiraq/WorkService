@@ -344,9 +344,19 @@ func CSRFMiddleware() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		token := c.PostForm("_csrf_token")
+		limit := int64(64 << 20)
+		if c.FullPath() == "/object/:id/photos" {
+			limit = 25 << 20
+		}
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
+		defer func() {
+			if c.Request.MultipartForm != nil {
+				_ = c.Request.MultipartForm.RemoveAll()
+			}
+		}()
+		token := c.GetHeader("X-CSRF-Token")
 		if token == "" {
-			token = c.GetHeader("X-CSRF-Token")
+			token = c.PostForm("_csrf_token")
 		}
 		expected := csrfValue.(string)
 		if token == "" || subtle.ConstantTimeCompare([]byte(token), []byte(expected)) != 1 {

@@ -20,7 +20,7 @@ func LoadAppSettings() error {
 	defer appSettingsMutex.Unlock()
 
 	appSettings = models.AppSettings{}
-	file, err := os.ReadFile(appSettingsFile)
+	file, err := readData(appSettingsFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -51,8 +51,13 @@ func UpdateGalleryDirectory(directory string) error {
 	appSettingsMutex.Lock()
 	defer appSettingsMutex.Unlock()
 
+	previous := appSettings
 	appSettings.GalleryDirectory = strings.TrimSpace(directory)
-	return saveAppSettings()
+	if err := saveAppSettings(); err != nil {
+		appSettings = previous
+		return err
+	}
+	return nil
 }
 
 func saveAppSettings() error {
@@ -60,10 +65,7 @@ func saveAppSettings() error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("storage", 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(appSettingsFile, data, 0o644)
+	return writeData(appSettingsFile, data)
 }
 
 func GetAppSettings() (models.AppSettings, error) {
@@ -77,6 +79,11 @@ func UpdateAppSettings(settings models.AppSettings) error {
 	defer appSettingsMutex.Unlock()
 
 	normalizeAppSettings(&settings)
+	previous := appSettings
 	appSettings = settings
-	return saveAppSettings()
+	if err := saveAppSettings(); err != nil {
+		appSettings = previous
+		return err
+	}
+	return nil
 }

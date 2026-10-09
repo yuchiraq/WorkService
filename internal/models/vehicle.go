@@ -2,14 +2,26 @@ package models
 
 // Vehicle represents a vehicle that can be assigned to a user account.
 type Vehicle struct {
-	ID                       string `json:"id"`
-	Name                     string `json:"name"`
-	RegistrationNumber       string `json:"registrationNumber"`
-	AssignedUserID           string `json:"assignedUserId,omitempty"`
-	CreatedByUserID          string `json:"createdByUserId"`
-	CreatedByName            string `json:"createdByName"`
-	CreatedAt                string `json:"createdAt"`
-	LastMileageReminderMonth string `json:"lastMileageReminderMonth,omitempty"`
+	ID                       string               `json:"id"`
+	Name                     string               `json:"name"`
+	RegistrationNumber       string               `json:"registrationNumber"`
+	AssignedUserID           string               `json:"assignedUserId,omitempty"`
+	CreatedByUserID          string               `json:"createdByUserId"`
+	CreatedByName            string               `json:"createdByName"`
+	CreatedAt                string               `json:"createdAt"`
+	LastMileageReminderMonth string               `json:"lastMileageReminderMonth,omitempty"`
+	OwnerHistory             []VehicleOwnerChange `json:"ownerHistory,omitempty"`
+}
+
+type VehicleOwnerChange struct {
+	At             string `json:"at"`
+	PreviousUserID string `json:"previousUserId,omitempty"`
+	PreviousName   string `json:"previousName,omitempty"`
+	UserID         string `json:"userId,omitempty"`
+	UserName       string `json:"userName,omitempty"`
+	ActorID        string `json:"actorId"`
+	ActorName      string `json:"actorName"`
+	Initial        bool   `json:"initial,omitempty"`
 }
 
 // VehicleRecord stores fuel, odometer and maintenance events for a vehicle.

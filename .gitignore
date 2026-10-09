@@ -1,4 +1,10 @@
 # Compiled executables
+storage/*.db*
+storage/*.lock
+storage/.workservice.lock
+storage/object_photos/
+storage/object_photos.json
+storage/backups/
 *.exe
 *.out
 *.test

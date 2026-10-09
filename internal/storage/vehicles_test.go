@@ -37,7 +37,7 @@ func TestVehicleLifecycleAndRecords(t *testing.T) {
 		t.Fatal("CreateVehicle() accepted a duplicate registration number")
 	}
 
-	if err := AssignVehicle(vehicle.ID, "user-1"); err != nil {
+	if err := AssignVehicle(vehicle.ID, "", "user-1", "admin", "Admin"); err != nil {
 		t.Fatalf("AssignVehicle() error = %v", err)
 	}
 	assigned, err := GetVehicleByID(vehicle.ID)

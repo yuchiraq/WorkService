@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"html/template"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -17,35 +16,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func copyFile(src, dst string) error {
-	content, err := os.ReadFile(src)
-	if err != nil {
-		return err
-	}
-	if err := os.WriteFile(dst, content, 0o644); err != nil {
-		return err
-	}
-	return nil
-}
-
 func CreateBackup(c *gin.Context) {
-	backupDir := filepath.Join("storage", "backups")
-	if err := os.MkdirAll(backupDir, 0o755); err != nil {
-		c.String(http.StatusInternalServerError, "backup dir error: %v", err)
+	ts := time.Now().UTC().Format("20060102-150405.000000000")
+	if err := storage.CreateDataBackup(filepath.Join("storage", "backups", ts)); err != nil {
+		c.String(http.StatusInternalServerError, "Не удалось создать резервную копию: %v", err)
 		return
-	}
-	ts := time.Now().Format("20060102-150405")
-	files := []string{"users.json", "workers.json", "objects.json", "timesheets.json", "vehicles.json"}
-	for _, f := range files {
-		src := filepath.Join("storage", f)
-		dst := filepath.Join(backupDir, strings.TrimSuffix(f, ".json")+"-"+ts+".json")
-		if err := copyFile(src, dst); err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			c.String(http.StatusInternalServerError, "backup failed for %s: %v", f, err)
-			return
-		}
 	}
 	security.LogEvent("backup_created", fmt.Sprintf("user=%s time=%s", c.GetString("userName"), ts))
 	c.Redirect(http.StatusFound, "/settings?ok=backup")
@@ -102,7 +77,7 @@ func SettingsPage(c *gin.Context) {
 	statusBlock := ""
 	switch c.Query("ok") {
 	case "backup":
-		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Резервная копия создана</strong><p>Пользователи, работники, объекты, табель и транспорт сохранены в локальный backup.</p></div>`
+		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Резервная копия создана</strong><p>Данные сервиса, настройки и фото объектов сохранены в storage/backups.</p></div>`
 	case "telegram_saved":
 		statusBlock = `<div class="dashboard-alert-item is-success"><strong>Настройки Telegram сохранены</strong><p>Токен, username бота и адрес сайта обновлены.</p></div>`
 	case "telegram_synced":
@@ -161,6 +136,7 @@ func SettingsPage(c *gin.Context) {
         <div class="info-card">
             <div class="info-card-header">
                 <h2>Резервное копирование</h2>
+                <span class="status-badge">{{STORAGE_MODE}}</span>
 
             </div>
             <form method="POST" action="/settings/backup">
@@ -235,6 +211,7 @@ func SettingsPage(c *gin.Context) {
 </html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "settings"), 1)
+	final = strings.Replace(final, "{{STORAGE_MODE}}", storage.BackendName(), 1)
 	final = strings.Replace(final, "{{STATUS_BLOCK}}", statusBlock, 1)
 	final = strings.Replace(final, "{{ACTIVE}}", fmt.Sprintf("%d", stats.ActiveSessions), 1)
 	final = strings.Replace(final, "{{LOCKED}}", fmt.Sprintf("%d", stats.LockedAttempts), 1)

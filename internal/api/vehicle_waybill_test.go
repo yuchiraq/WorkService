@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -32,6 +33,40 @@ func TestCanDeleteVehicleRecord(t *testing.T) {
 	record.CreatedAt = now.Add(-25 * time.Hour).Format(time.RFC3339)
 	if canDeleteVehicleRecord(context, record, now) {
 		t.Fatal("expired record remained deletable")
+	}
+}
+
+func TestWaybillOwnershipByMonth(t *testing.T) {
+	vehicle := models.Vehicle{AssignedUserID: "future", OwnerHistory: []models.VehicleOwnerChange{
+		{At: "2026-08-01T08:00:00+03:00", UserID: "one", UserName: "Первый водитель", Initial: true},
+		{At: "2026-09-12T08:00:00+03:00", PreviousUserID: "one", PreviousName: "Первый водитель", ActorName: "Администратор"},
+		{At: "2026-09-12T09:00:00+03:00", UserID: "two", UserName: "Второй водитель", ActorName: "Администратор"},
+		{At: "2026-09-30T21:00:00Z", PreviousUserID: "two", PreviousName: "Второй водитель"},
+		{At: "2026-10-01T08:00:00+03:00", UserID: "future", UserName: "Будущий водитель"},
+	}}
+	month, _ := parseVehicleWaybillMonth("2026-09")
+	data := buildVehicleWaybillData(vehicle, "Будущий водитель", nil, month)
+	if len(data.OwnerRows) != 3 || !strings.Contains(data.DriverName, "Несколько") {
+		t.Fatalf("wrong monthly history: %+v", data)
+	}
+	for _, row := range data.OwnerRows {
+		if strings.Contains(row.Owner, "Будущий") {
+			t.Fatal("current owner leaked into past month")
+		}
+	}
+	if data.OwnerRows[0].Owner != "Первый водитель" || data.OwnerRows[1].Owner != "Без привязки" || data.OwnerRows[2].Owner != "Второй водитель" {
+		t.Fatal(data.OwnerRows)
+	}
+	month, _ = parseVehicleWaybillMonth("2026-10")
+	data = buildVehicleWaybillData(vehicle, "Будущий водитель", nil, month)
+	if len(data.OwnerRows) != 3 || data.OwnerRows[1].At != "01.10.2026 00:00" {
+		t.Fatalf("Minsk month boundary: %+v", data.OwnerRows)
+	}
+	legacy := models.Vehicle{OwnerHistory: vehicle.OwnerHistory[1:]}
+	month, _ = parseVehicleWaybillMonth("2026-08")
+	data = buildVehicleWaybillData(legacy, "Будущий водитель", nil, month)
+	if data.DriverName != "Нет истории привязки" || data.OwnerNote == "" {
+		t.Fatal("invented legacy ownership", data)
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"image/color"
 	"image/jpeg"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -15,14 +16,22 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
 	"project/internal/models"
+	"project/internal/persistence"
 	"project/internal/storage"
 )
 
 func TestSiteIntegration(t *testing.T) {
+	for _, mode := range []string{"json", "sqlite"} {
+		t.Run(mode, func(t *testing.T) { testSiteIntegration(t, mode) })
+	}
+}
+
+func testSiteIntegration(t *testing.T, mode string) {
 	gin.SetMode(gin.TestMode)
 	old, err := os.Getwd()
 	if err != nil {
@@ -56,7 +65,35 @@ func TestSiteIntegration(t *testing.T) {
 		{ID: "fired-entry", Date: "2026-09-01", StartTime: "08:00", EndTime: "17:00", LunchBreakMinutes: 60, WorkerIDs: []string{"fired"}},
 		{ID: "absence", Date: "2026-09-02", PeriodEnd: "2026-09-06", UserMark: "Б", WorkerIDs: []string{"own"}, CreatedByID: "admin"},
 	})
-	for _, load := range []func() error{storage.LoadUsers, storage.LoadWorkers, storage.LoadObjects, storage.LoadTimesheets, storage.LoadImprovements, storage.LoadAppSettings, storage.LoadTelegramContacts, storage.LoadVehicles} {
+	t.Setenv("WORKSERVICE_STORAGE", mode)
+	t.Setenv("WORKSERVICE_SQLITE_PATH", filepath.Join(dir, "storage", "workservice.db"))
+	t.Setenv("WORKSERVICE_PHOTO_DIR", filepath.Join(dir, "storage", "object_photos"))
+	if mode == "sqlite" {
+		db, e := persistence.OpenSQLite(os.Getenv("WORKSERVICE_SQLITE_PATH"), true)
+		if e != nil {
+			t.Fatal(e)
+		}
+		documents, e := persistence.OpenJSON("storage").Snapshot()
+		if e != nil {
+			t.Fatal(e)
+		}
+		if e = db.Import(documents); e != nil {
+			t.Fatal(e)
+		}
+		if e = db.Close(); e != nil {
+			t.Fatal(e)
+		}
+	}
+	closeStorage, err := storage.ConfigureFromEnv()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := closeStorage(); err != nil {
+			t.Error(err)
+		}
+	})
+	for _, load := range []func() error{storage.LoadUsers, storage.LoadWorkers, storage.LoadObjects, storage.LoadTimesheets, storage.LoadImprovements, storage.LoadAppSettings, storage.LoadTelegramContacts, storage.LoadVehicles, storage.LoadInventory, storage.LoadObjectPhotos} {
 		if err = load(); err != nil {
 			t.Fatal(err)
 		}
@@ -122,13 +159,13 @@ func TestSiteIntegration(t *testing.T) {
 		return w.Result().Cookies()[0]
 	}
 	admin, user := login("admin"), login("worker")
-	for _, path := range []string{"/worker/other", "/workers", "/workers/new", "/workers/edit/own", "/users", "/settings", "/gallery", "/schedule/edit/private-entry", "/schedule/edit/absence"} {
+	for _, path := range []string{"/worker/other", "/workers", "/workers/new", "/workers/edit/own", "/objects/new", "/objects/edit/object", "/users", "/settings", "/gallery", "/schedule/edit/private-entry", "/schedule/edit/absence"} {
 		w := request("GET", path, nil, user)
 		if w.Code != 403 {
 			t.Errorf("%s: want 403 got %d", path, w.Code)
 		}
 	}
-	for _, path := range []string{"/worker/own", "/profile", "/schedule", "/timesheets", "/object/object"} {
+	for _, path := range []string{"/worker/own", "/profile", "/schedule", "/timesheets", "/objects", "/object/object"} {
 		w := request("GET", path, nil, user)
 		if w.Code != 200 {
 			t.Errorf("%s: %d", path, w.Code)
@@ -142,6 +179,190 @@ func TestSiteIntegration(t *testing.T) {
 		t.Fatal("profile values missing")
 	}
 	csrf := regexp.MustCompile(`name="_csrf_token" value="([^"]+)"`).FindStringSubmatch(profile)[1]
+	t.Run("object photos", func(t *testing.T) {
+		var source bytes.Buffer
+		_ = jpeg.Encode(&source, image.NewRGBA(image.Rect(0, 0, 80, 40)), nil)
+		upload := func(path, token string, data []byte) *httptest.ResponseRecorder {
+			var body bytes.Buffer
+			writer := multipart.NewWriter(&body)
+			part, e := writer.CreateFormFile("photo", "phone.jpg")
+			if e != nil {
+				t.Fatal(e)
+			}
+			_, _ = part.Write(data)
+			_ = writer.Close()
+			req := httptest.NewRequest("POST", path, &body)
+			req.Header.Set("Content-Type", writer.FormDataContentType())
+			req.Header.Set("X-CSRF-Token", token)
+			req.AddCookie(user)
+			response := httptest.NewRecorder()
+			r.ServeHTTP(response, req)
+			return response
+		}
+		if w := upload("/object/object/photos", "", source.Bytes()); w.Code != 403 {
+			t.Fatal("upload without CSRF", w.Code)
+		}
+		if w := upload("/object/object/photos", csrf, []byte("invalid")); w.Code != 400 {
+			t.Fatal("invalid image accepted", w.Code)
+		}
+		if w := upload("/object/object/photos", csrf, source.Bytes()); w.Code != 200 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+		photos := storage.GetObjectPhotos("object")
+		if len(photos) != 1 {
+			t.Fatal("photo missing")
+		}
+		photo := photos[0]
+		if w := upload("/object/object/photos", csrf, source.Bytes()); w.Code != 200 || !strings.Contains(w.Body.String(), `"duplicate":true`) {
+			t.Fatal("duplicate photo", w.Body.String())
+		}
+		private, e := storage.CreateObject(models.Object{Name: "Private photo object", Address: "Minsk", ResponsibleUserID: "admin"})
+		if e != nil {
+			t.Fatal(e)
+		}
+		for _, path := range []string{"/object/" + private.ID + "/photos", "/object/" + private.ID + "/photos/" + photo.ID + "/image"} {
+			if w := request("GET", path, nil, user); w.Code != 403 {
+				t.Fatal("private photo access", w.Code)
+			}
+		}
+		if w := upload("/object/"+private.ID+"/photos", csrf, source.Bytes()); w.Code != 403 {
+			t.Fatal("private upload", w.Code)
+		}
+		path := "/object/object/photos/" + photo.ID
+		for _, suffix := range []string{"/image", "/image?thumb=1", "/image?download=1"} {
+			w := request("GET", path+suffix, nil, user)
+			if w.Code != 200 || w.Header().Get("Cache-Control") != "private, no-store" {
+				t.Fatal(w.Code, w.Header())
+			}
+			if _, _, e = image.DecodeConfig(bytes.NewReader(w.Body.Bytes())); e != nil {
+				t.Fatal(e)
+			}
+		}
+		if w := request("GET", path+"/image", nil, nil); w.Code == 200 {
+			t.Fatal("anonymous photo access")
+		}
+		other := login("other")
+		token := regexp.MustCompile(`name="_csrf_token" value="([^"]+)"`).FindStringSubmatch(request("GET", "/profile", nil, other).Body.String())[1]
+		if w := request("POST", path+"/delete", url.Values{"_csrf_token": {token}, "version": {"1"}}, other); w.Code != 403 {
+			t.Fatal("another worker deleted photo", w.Code)
+		}
+		if w := request("POST", path+"/caption", url.Values{"_csrf_token": {csrf}, "version": {"1"}, "caption": {"</script><script>alert(1)</script>"}}, user); w.Code != 200 {
+			t.Fatal(w.Body.String())
+		}
+		if strings.Contains(request("GET", "/object/object", nil, user).Body.String(), "</script><script>alert(1)</script>") {
+			t.Fatal("unsafe photo caption")
+		}
+		if w := request("POST", path+"/delete", url.Values{"_csrf_token": {csrf}, "version": {"1"}}, user); w.Code != 409 {
+			t.Fatal("stale photo deletion", w.Code)
+		}
+		worker, _ := storage.GetWorkerByID("own")
+		worker.IsFired = true
+		_ = storage.UpdateWorker(worker)
+		if w := request("GET", path+"/image", nil, user); w.Code != 403 {
+			t.Fatal("fired worker retained photo access")
+		}
+		worker.IsFired = false
+		_ = storage.UpdateWorker(worker)
+		if e := storage.CreateDataBackup(filepath.Join(dir, "photo-backup")); e != nil {
+			t.Fatal(e)
+		}
+		if _, _, e := storage.ReadMigrationSource(filepath.Join(dir, "photo-backup"), filepath.Join(dir, "photo-backup/object_photos")); e != nil {
+			t.Fatal(e)
+		}
+		if w := request("POST", path+"/delete", url.Values{"_csrf_token": {csrf}, "version": {"2"}}, user); w.Code != 200 {
+			t.Fatal(w.Body.String())
+		}
+		if w := request("GET", path+"/image", nil, user); w.Code != 404 {
+			t.Fatal("deleted photo still available")
+		}
+	})
+	t.Run("object inventory", func(t *testing.T) {
+		privateObject, err := storage.CreateObject(models.Object{Name: "Чужой объект", Address: "Минск", ResponsibleUserID: "admin"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		responsibleObject, err := storage.CreateObject(models.Object{Name: "Ответственный", Address: "Минск", ResponsibleUserID: "user"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, path := range []string{"/object/" + privateObject.ID, "/object/" + privateObject.ID + "/inventory"} {
+			if w := request("GET", path, nil, user); w.Code != 403 {
+				t.Fatalf("private object leaked: %s %d", path, w.Code)
+			}
+		}
+		objectList := request("GET", "/objects", nil, user).Body.String()
+		if strings.Contains(objectList, privateObject.ID) || strings.Contains(objectList, `/objects/new`) || strings.Contains(objectList, `/objects/edit/`) || !strings.Contains(objectList, responsibleObject.ID) || !strings.Contains(objectList, `/object/object#object-inventory`) {
+			t.Fatal("worker objects list is not correctly scoped")
+		}
+		for _, path := range []string{"/object/object/inventory", "/object/" + responsibleObject.ID, "/object/" + responsibleObject.ID + "/inventory"} {
+			if w := request("GET", path, nil, user); w.Code != 200 {
+				t.Fatalf("assigned/responsible access: %s %d", path, w.Code)
+			}
+		}
+		if w := request("POST", "/object/object/inventory", nil, user); w.Code != 403 {
+			t.Fatal("missing CSRF accepted")
+		}
+		values := url.Values{"_csrf_token": {csrf}, "name": {"Дрель </script><script>alert(1)</script>"}, "unit": {"pcs"}, "quantity": {"2,5"}, "note": {"<img src=x onerror=alert(1)>"}}
+		if w := request("POST", "/object/"+privateObject.ID+"/inventory", values, user); w.Code != 403 {
+			t.Fatal("private mutation accepted")
+		}
+		if w := request("POST", "/object/object/inventory", values, user); w.Code != 200 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+		state := storage.GetInventory("object")
+		if len(state.Items) != 1 || state.Items[0].Quantity != 2500 || state.History[0].ActorID != "user" {
+			t.Fatal("inventory not persisted", state)
+		}
+		item := state.Items[0]
+		page := request("GET", "/object/object", nil, user).Body.String()
+		if strings.Contains(page, "</script><script>alert(1)</script>") || strings.Contains(page, "<img src=x onerror=alert(1)>") || !strings.Contains(page, `id="inventory-data"`) {
+			t.Fatal("unsafe or missing inventory state")
+		}
+		itemPath := "/object/object/inventory/" + item.ID
+		badValues := url.Values{"_csrf_token": {csrf}, "quantity": {"-1"}, "version": {"1"}}
+		if w := request("POST", itemPath+"/quantity", badValues, user); w.Code != 400 || !strings.Contains(w.Header().Get("Content-Type"), "application/json") {
+			t.Fatal("invalid amount not rejected as JSON", w.Code)
+		}
+		badValues.Set("quantity", "3")
+		if w := request("POST", "/object/"+responsibleObject.ID+"/inventory/"+item.ID+"/quantity", badValues, user); w.Code != 404 {
+			t.Fatal("cross-object item accepted", w.Code)
+		}
+		if w := request("POST", itemPath+"/quantity", badValues, user); w.Code != 200 {
+			t.Fatal(w.Body.String())
+		}
+		if w := request("POST", itemPath+"/delete", badValues, user); w.Code != 409 {
+			t.Fatal("stale deletion accepted", w.Code)
+		}
+		worker, _ := storage.GetWorkerByID("own")
+		worker.IsFired = true
+		if err := storage.UpdateWorker(worker); err != nil {
+			t.Fatal(err)
+		}
+		if w := request("GET", "/object/object/inventory", nil, user); w.Code != 403 {
+			t.Fatal("fired worker retained inventory access")
+		}
+		if w := request("POST", itemPath+"/adjust", url.Values{"_csrf_token": {csrf}, "delta": {"1000"}}, user); w.Code != 403 {
+			t.Fatal("fired worker can edit inventory")
+		}
+		worker.IsFired = false
+		if err := storage.UpdateWorker(worker); err != nil {
+			t.Fatal(err)
+		}
+		other := login("other")
+		otherPage := request("GET", "/profile", nil, other).Body.String()
+		otherCSRF := regexp.MustCompile(`name="_csrf_token" value="([^"]+)"`).FindStringSubmatch(otherPage)[1]
+		if w := request("POST", itemPath+"/adjust", url.Values{"_csrf_token": {otherCSRF}, "delta": {"1000"}}, other); w.Code != 200 {
+			t.Fatal("another assigned worker cannot edit", w.Body.String())
+		}
+		adminPage := request("GET", "/profile", nil, admin).Body.String()
+		adminCSRF := regexp.MustCompile(`name="_csrf_token" value="([^"]+)"`).FindStringSubmatch(adminPage)[1]
+		if w := request("POST", itemPath+"/delete", url.Values{"_csrf_token": {adminCSRF}, "version": {"3"}}, admin); w.Code != 200 {
+			t.Fatal("admin cannot delete", w.Body.String())
+		}
+		if state := storage.GetInventory("object"); len(state.Items) != 0 || len(state.Catalog) != 1 {
+			t.Fatal("catalog lost after deletion")
+		}
+	})
 	for _, path := range []string{"/schedule/edit/private-entry", "/schedule/delete/private-entry", "/schedule/edit/absence", "/workers/edit/own", "/users/new", "/gallery/delete"} {
 		w := request("POST", path, url.Values{"_csrf_token": {csrf}}, user)
 		if w.Code != 403 {
@@ -217,6 +438,101 @@ func TestSiteIntegration(t *testing.T) {
 	if w.Code != 302 {
 		t.Fatal(w.Code)
 	}
+	t.Run("availability privacy and date changes", func(t *testing.T) {
+		w := request("GET", "/schedule/availability?date=2026-09-22", nil, user)
+		if w.Code != 200 || !strings.Contains(w.Body.String(), `"other":true`) || strings.Contains(w.Body.String(), "PRIVATE_OTHER_WORK") || strings.Contains(w.Body.String(), "08:00") {
+			t.Fatal("availability response", w.Code, w.Body.String())
+		}
+		w = request("GET", "/schedule/availability?date=2026-09-21&exclude_id=own-entry", nil, user)
+		if w.Code != 200 || strings.Contains(w.Body.String(), `"own":true`) {
+			t.Fatal("current entry not excluded", w.Body.String())
+		}
+		if w = request("GET", "/schedule/availability?date=2026-09-22&exclude_id=private-entry", nil, user); w.Code != 403 {
+			t.Fatal("can exclude another worker's private entry")
+		}
+		if w = request("GET", "/schedule/availability?date=invalid", nil, user); w.Code != 400 {
+			t.Fatal("invalid date accepted")
+		}
+		if w = request("GET", "/schedule/availability?date=2026-09-03", nil, user); !strings.Contains(w.Body.String(), `"own":true`) {
+			t.Fatal("period not marked busy")
+		}
+	})
+	t.Run("object status inventory warning", func(t *testing.T) {
+		adminPage := request("GET", "/profile", nil, admin).Body.String()
+		token := regexp.MustCompile(`name="_csrf_token" value="([^"]+)"`).FindStringSubmatch(adminPage)[1]
+		object, err := storage.CreateObject(models.Object{Name: "Объект с остатком", Address: "Минск", ResponsibleUserID: "admin"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = storage.ChangeInventory(object.ID, "admin", "Администратор", storage.InventoryMutation{Action: "add", Name: "Лестница", Unit: "pcs", Quantity: 1000}); err != nil {
+			t.Fatal(err)
+		}
+		values := url.Values{"_csrf_token": {token}, "name": {object.Name}, "address": {object.Address}, "responsible_user_id": {"admin"}, "status": {"paused"}}
+		path := "/objects/edit/" + object.ID
+		if w := request("POST", path, values, admin); w.Code != 409 {
+			t.Fatal("pause without confirmation", w.Code, w.Body.String())
+		}
+		if got, _ := storage.GetObjectByID(object.ID); got.Status != "in_progress" {
+			t.Fatal("warning already changed status")
+		}
+		values.Set("inventory_confirmed_status", "paused")
+		if w := request("POST", path, values, admin); w.Code != 302 {
+			t.Fatal(w.Body.String())
+		}
+		values.Set("status", "completed")
+		if w := request("POST", path, values, admin); w.Code != 409 {
+			t.Fatal("confirmation for another status accepted")
+		}
+		values.Set("inventory_confirmed_status", "completed")
+		if w := request("POST", path, values, admin); w.Code != 302 {
+			t.Fatal(w.Body.String())
+		}
+		item := storage.GetInventory(object.ID).Items[0]
+		if item.Quantity != 1000 {
+			t.Fatal("inventory silently removed")
+		}
+		if err := storage.ChangeInventory(object.ID, "admin", "", storage.InventoryMutation{Action: "quantity", ItemID: item.ID, Version: item.Version, Quantity: 0}); err != nil {
+			t.Fatal(err)
+		}
+		values.Set("status", "paused")
+		values.Del("inventory_confirmed_status")
+		if w := request("POST", path, values, admin); w.Code != 302 {
+			t.Fatal("zero stock requires confirmation", w.Body.String())
+		}
+	})
+	t.Run("vehicle ownership controls and conflicts", func(t *testing.T) {
+		adminPage := request("GET", "/profile", nil, admin).Body.String()
+		token := regexp.MustCompile(`name="_csrf_token" value="([^"]+)"`).FindStringSubmatch(adminPage)[1]
+		path := "/vehicles/" + vehicle.ID
+		page := request("GET", path, nil, admin).Body.String()
+		if strings.Contains(page, `name="assigned_user_id"`) || !strings.Contains(page, "Снять привязку") {
+			t.Fatal("owner chooser shown for assigned vehicle")
+		}
+		request("POST", path+"/assign", url.Values{"_csrf_token": {token}, "assigned_user_id": {"other"}}, admin)
+		if got, _ := storage.GetVehicleByID(vehicle.ID); got.AssignedUserID != "user" {
+			t.Fatal("direct reassignment accepted")
+		}
+		request("POST", path+"/unassign", url.Values{"_csrf_token": {token}, "expected_owner_id": {"user"}}, admin)
+		page = request("GET", path, nil, admin).Body.String()
+		if !strings.Contains(page, `name="assigned_user_id"`) || strings.Contains(page, "Снять привязку") {
+			t.Fatal("unassigned controls incorrect")
+		}
+		request("POST", path+"/assign", url.Values{"_csrf_token": {token}, "assigned_user_id": {"other"}}, admin)
+		request("POST", path+"/unassign", url.Values{"_csrf_token": {token}, "expected_owner_id": {"user"}}, admin)
+		if got, _ := storage.GetVehicleByID(vehicle.ID); got.AssignedUserID != "other" || len(got.OwnerHistory) != 3 {
+			t.Fatal("stale unassign changed history", got)
+		}
+		request("POST", path+"/unassign", url.Values{"_csrf_token": {csrf}, "expected_owner_id": {"other"}}, user)
+		if got, _ := storage.GetVehicleByID(vehicle.ID); got.AssignedUserID != "other" {
+			t.Fatal("former owner unassigned current owner")
+		}
+		pdf := request("GET", path+"/waybill?month="+time.Now().Format("2006-01"), nil, admin)
+		if pdf.Code != 200 || !bytes.HasPrefix(pdf.Body.Bytes(), []byte("%PDF-")) {
+			t.Fatal("waybill export failed")
+		}
+		request("POST", path+"/unassign", url.Values{"_csrf_token": {token}, "expected_owner_id": {"other"}}, admin)
+		request("POST", path+"/assign", url.Values{"_csrf_token": {token}, "assigned_user_id": {"user"}}, admin)
+	})
 	page := request("GET", "/vehicles/"+vehicle.ID, nil, user).Body.String()
 	if !strings.Contains(page, `value="fuel" selected`) {
 		t.Fatal("fuel not default")

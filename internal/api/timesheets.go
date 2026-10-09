@@ -469,6 +469,11 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 	}
 
 	workerItems := make([][2]string, 0, len(workers))
+	if entry.Date == "" {
+		entry.Date = time.Now().Format("2006-01-02")
+	}
+	allEntries, _ := storage.GetTimesheets()
+	busy := busyWorkersOnDate(allEntries, entry.Date, entry.ID)
 	for _, worker := range workers {
 		if worker.IsFired {
 			continue
@@ -476,6 +481,9 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 		workerItems = append(workerItems, [2]string{worker.ID, worker.Name})
 	}
 	sort.SliceStable(workerItems, func(i, j int) bool {
+		if busy[workerItems[i][0]] != busy[workerItems[j][0]] {
+			return !busy[workerItems[i][0]]
+		}
 		return strings.ToLower(workerItems[i][1]) < strings.ToLower(workerItems[j][1])
 	})
 	objectItems := make([][2]string, 0, len(objects))
@@ -536,7 +544,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 	isModal := IsModalRequest(c)
 	headerBlock := `<div class="page-header"><h1>{{TITLE}}</h1></div>`
 	if isEdit {
-		deleteBtn = `<button type="button" class="btn btn-danger" onclick="confirmDeleteSchedule()">Удалить</button>`
+		deleteBtn = `<button type="button" class="btn btn-danger" data-delete-schedule>Удалить</button>`
 	}
 	if isModal {
 		headerBlock = ""
@@ -549,7 +557,7 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 {{BACK_LINK}}
 {{HEADER_BLOCK}}
 <div class="card{{CARD_CLASS}}">
-<form action="{{ACTION_URL}}" method="POST" class="form-grid-edit timesheet-form">
+<form action="{{ACTION_URL}}" method="POST" class="form-grid-edit timesheet-form" data-entry-id="{{ENTRY_ID}}">
 {{CSRF_FIELD}}
 <input type="hidden" name="return_to" value="{{RETURN_TO}}">
 <input type="hidden" name="special_mark" id="special_mark" value="{{SPECIAL_MARK}}">
@@ -588,6 +596,8 @@ func renderScheduleForm(c *gin.Context, entry models.TimesheetEntry, actionURL, 
 
 <form id="schedule-delete-form" action="{{DELETE_ACTION}}" method="POST" style="display:none;">{{CSRF_FIELD}}<input type="hidden" name="return_to" value="{{RETURN_TO}}"></form>
 <script>
+(function(){
+const scope=document.currentScript.closest('#app-action-modal') || document;
 function makeSelectRow(name, optionsHTML){
   const row=document.createElement('div');
   row.className='dynamic-select-row';
@@ -670,7 +680,7 @@ function ensureDynamicSelectRows(group){
   ensureRequiredWorker(group);
   if(window.WorkServiceUI) window.WorkServiceUI.prepare(group);
 }
-document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group){
+scope.querySelectorAll('[data-dynamic-select-group]').forEach(function(group){
   const firstSelect=group.querySelector('select');
   if(!group.getAttribute('data-options-template') && firstSelect){
     group.setAttribute('data-options-template', firstSelect.innerHTML);
@@ -682,20 +692,21 @@ document.querySelectorAll('[data-dynamic-select-group]').forEach(function(group)
 });
 function confirmDeleteSchedule(){
   if(!window.confirm('Удалить назначение? Действие нельзя отменить.')) return;
-  const form=document.getElementById('schedule-delete-form');
+  const form=scope.querySelector('#schedule-delete-form');
   if(form) form.requestSubmit();
 }
-const kind=document.getElementById('entry_kind');
-const periodWrap=document.getElementById('period_wrap');
-const special=document.getElementById('special_mark');
-const st=document.getElementById('start_time');
-const et=document.getElementById('end_time');
-const lunch=document.getElementById('lunch_break_minutes');
-const workFieldsWrap=document.getElementById('work_fields_wrap');
-const dateInput=document.getElementById('date');
-const dateLabel=document.getElementById('date_label');
-const periodLabel=document.getElementById('period_end_label');
-const objectWrap=document.getElementById('object_wrap');
+scope.querySelector('[data-delete-schedule]')?.addEventListener('click',confirmDeleteSchedule);
+const kind=scope.querySelector('#entry_kind');
+const periodWrap=scope.querySelector('#period_wrap');
+const special=scope.querySelector('#special_mark');
+const st=scope.querySelector('#start_time');
+const et=scope.querySelector('#end_time');
+const lunch=scope.querySelector('#lunch_break_minutes');
+const workFieldsWrap=scope.querySelector('#work_fields_wrap');
+const dateInput=scope.querySelector('#date');
+const dateLabel=scope.querySelector('#date_label');
+const periodLabel=scope.querySelector('#period_end_label');
+const objectWrap=scope.querySelector('#object_wrap');
 function localTodayValue(){
   const d=new Date();
   d.setMinutes(d.getMinutes()-d.getTimezoneOffset());
@@ -708,7 +719,7 @@ function syncEntryKind(){
   if(!kind) return;
   const v=kind.value;
   const isSpec=v!=='work';
-  const workerGroup=document.querySelector('[data-required-worker-id]');
+  const workerGroup=scope.querySelector('[data-required-worker-id]');
   if(workerGroup && workerGroup.dataset.requiredWorkerId){
     workerGroup.querySelectorAll('.dynamic-select-row').forEach(function(row){
       const select=row.querySelector('select');
@@ -721,7 +732,7 @@ function syncEntryKind(){
     if(v==='vacation') special.value='ОТ'; else if(v==='sick') special.value='Б'; else if(v==='absence') special.value='ПР'; else if(v==='weekend') special.value='В'; else special.value='';
   }
   if(st&&et&&lunch){ st.disabled=isSpec; et.disabled=isSpec; lunch.disabled=isSpec; }
-  const endInput=document.getElementById('period_end');
+  const endInput=scope.querySelector('#period_end');
   if(endInput){endInput.disabled=!(v==='vacation'||v==='sick'||v==='absence');endInput.min=dateInput.value;}
   if(workFieldsWrap) workFieldsWrap.style.display=isSpec?'none':'contents';
   if(dateLabel) dateLabel.textContent = isSpec ? 'С' : 'Дата';
@@ -730,7 +741,10 @@ function syncEntryKind(){
 }
 if(kind){ kind.addEventListener('change', syncEntryKind); syncEntryKind(); }
 if(dateInput){ dateInput.addEventListener('change',syncEntryKind); }
+})();
 </script>
+<link rel="stylesheet" href="/static/css/operation-controls.css?v=1">
+<script src="/static/js/schedule-workers.js?v=1" defer></script>
 </body></html>`
 
 	layoutStart := RenderSidebar(c, "schedule")
@@ -766,6 +780,7 @@ if(dateInput){ dateInput.addEventListener('change',syncEntryKind); }
 	final = strings.Replace(final, "{{CARD_CLASS}}", cardClass, 1)
 	final = strings.Replace(final, "{{TITLE}}", template.HTMLEscapeString(title), -1)
 	final = strings.Replace(final, "{{ACTION_URL}}", template.HTMLEscapeString(formActionURL), 1)
+	final = strings.Replace(final, "{{ENTRY_ID}}", template.HTMLEscapeString(entry.ID), 1)
 	final = strings.Replace(final, "{{CSRF_FIELD}}", CSRFHiddenInput(c), -1)
 	final = strings.Replace(final, "{{RETURN_TO}}", template.HTMLEscapeString(returnTo), -1)
 	final = strings.Replace(final, "{{DELETE_ACTION}}", template.HTMLEscapeString(deleteActionURL), 1)

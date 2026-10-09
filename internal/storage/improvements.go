@@ -22,12 +22,12 @@ func LoadImprovements() error {
 	improvementsMutex.Lock()
 	defer improvementsMutex.Unlock()
 
-	if _, err := os.Stat(improvementsFile); os.IsNotExist(err) {
+	data, err := readData(improvementsFile)
+	if os.IsNotExist(err) {
 		improvements = []models.ImprovementItem{}
 		return saveImprovementsLocked()
 	}
 
-	data, err := os.ReadFile(improvementsFile)
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func saveImprovementsLocked() error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(improvementsFile, data, 0644)
+	return writeData(improvementsFile, data)
 }
 
 func GetImprovements() ([]models.ImprovementItem, error) {
@@ -79,7 +79,11 @@ func AddImprovement(item models.ImprovementItem) error {
 		item.Status = "open"
 	}
 	improvements = append(improvements, item)
-	return saveImprovementsLocked()
+	if err := saveImprovementsLocked(); err != nil {
+		improvements = improvements[:len(improvements)-1]
+		return err
+	}
+	return nil
 }
 
 func MarkImprovementDone(id, doneByID, doneBy string) error {
@@ -88,11 +92,16 @@ func MarkImprovementDone(id, doneByID, doneBy string) error {
 
 	for i := range improvements {
 		if improvements[i].ID == id {
+			previous := improvements[i]
 			improvements[i].Status = "done"
 			improvements[i].DoneAt = time.Now()
 			improvements[i].DoneByID = doneByID
 			improvements[i].DoneBy = doneBy
-			return saveImprovementsLocked()
+			if err := saveImprovementsLocked(); err != nil {
+				improvements[i] = previous
+				return err
+			}
+			return nil
 		}
 	}
 	return fmt.Errorf("improvement not found")

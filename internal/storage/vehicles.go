@@ -22,6 +22,8 @@ type fleetFileData struct {
 var (
 	ErrVehicleRecordNotFound      = errors.New("vehicle record not found")
 	ErrVehicleRecordDeleteExpired = errors.New("vehicle record delete window expired")
+	ErrVehicleOwnerConflict       = errors.New("Привязка уже изменена. Обновите страницу")
+	ErrVehicleAlreadyAssigned     = errors.New("Сначала снимите текущую привязку транспорта")
 )
 
 var (
@@ -37,7 +39,7 @@ func LoadVehicles() error {
 
 	vehicles = []models.Vehicle{}
 	vehicleRecords = []models.VehicleRecord{}
-	file, err := os.ReadFile(vehiclesFile)
+	file, err := readData(vehiclesFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil
@@ -61,10 +63,7 @@ func saveVehicles() error {
 	if err != nil {
 		return err
 	}
-	if err := os.MkdirAll("storage", 0o755); err != nil {
-		return err
-	}
-	return os.WriteFile(vehiclesFile, data, 0o644)
+	return writeData(vehiclesFile, data)
 }
 
 func GetVehicles() ([]models.Vehicle, error) {
@@ -72,6 +71,9 @@ func GetVehicles() ([]models.Vehicle, error) {
 	defer vehiclesMutex.RUnlock()
 
 	result := append([]models.Vehicle(nil), vehicles...)
+	for i := range result {
+		result[i].OwnerHistory = append([]models.VehicleOwnerChange(nil), result[i].OwnerHistory...)
+	}
 	sort.SliceStable(result, func(i, j int) bool {
 		left := strings.ToLower(result[i].Name + " " + result[i].RegistrationNumber)
 		right := strings.ToLower(result[j].Name + " " + result[j].RegistrationNumber)
@@ -85,6 +87,7 @@ func GetVehicleByID(id string) (models.Vehicle, error) {
 	defer vehiclesMutex.RUnlock()
 	for _, vehicle := range vehicles {
 		if vehicle.ID == id {
+			vehicle.OwnerHistory = append([]models.VehicleOwnerChange(nil), vehicle.OwnerHistory...)
 			return vehicle, nil
 		}
 	}
@@ -92,6 +95,7 @@ func GetVehicleByID(id string) (models.Vehicle, error) {
 }
 
 func CreateVehicle(vehicle models.Vehicle) (models.Vehicle, error) {
+	ownerName := vehicleOwnerName(vehicle.AssignedUserID)
 	vehiclesMutex.Lock()
 	defer vehiclesMutex.Unlock()
 
@@ -107,21 +111,52 @@ func CreateVehicle(vehicle models.Vehicle) (models.Vehicle, error) {
 	}
 	vehicle.ID = uuid.New().String()
 	vehicle.CreatedAt = time.Now().Format(time.RFC3339)
+	vehicle.OwnerHistory = []models.VehicleOwnerChange{{At: vehicle.CreatedAt, UserID: vehicle.AssignedUserID, UserName: ownerName, ActorID: vehicle.CreatedByUserID, ActorName: vehicle.CreatedByName, Initial: true}}
 	vehicles = append(vehicles, vehicle)
 	if err := saveVehicles(); err != nil {
 		vehicles = vehicles[:len(vehicles)-1]
 		return models.Vehicle{}, err
 	}
+	vehicle.OwnerHistory = append([]models.VehicleOwnerChange(nil), vehicle.OwnerHistory...)
 	return vehicle, nil
 }
 
-func AssignVehicle(vehicleID, userID string) error {
+func vehicleOwnerName(userID string) string {
+	if userID == "" {
+		return ""
+	}
+	if user, err := GetUserByID(userID); err == nil {
+		return user.Name
+	}
+	return "Пользователь " + userID
+}
+
+func AssignVehicle(vehicleID, expectedUserID, userID, actorID, actorName string) error {
+	userID = strings.TrimSpace(userID)
+	previousName, nextName := vehicleOwnerName(expectedUserID), vehicleOwnerName(userID)
 	vehiclesMutex.Lock()
 	defer vehiclesMutex.Unlock()
 	for i := range vehicles {
 		if vehicles[i].ID == vehicleID {
-			vehicles[i].AssignedUserID = strings.TrimSpace(userID)
-			return saveVehicles()
+			previous := vehicles[i]
+			if previous.AssignedUserID != expectedUserID {
+				return ErrVehicleOwnerConflict
+			}
+			if previous.AssignedUserID == userID {
+				return nil
+			}
+			if previous.AssignedUserID != "" && userID != "" {
+				return ErrVehicleAlreadyAssigned
+			}
+			history := append([]models.VehicleOwnerChange(nil), previous.OwnerHistory...)
+			vehicles[i].OwnerHistory = append(history, models.VehicleOwnerChange{At: time.Now().UTC().Format(time.RFC3339Nano), PreviousUserID: expectedUserID, PreviousName: previousName, UserID: userID, UserName: nextName, ActorID: actorID, ActorName: actorName})
+			vehicles[i].AssignedUserID = userID
+			vehicles[i].LastMileageReminderMonth = ""
+			if err := saveVehicles(); err != nil {
+				vehicles[i] = previous
+				return err
+			}
+			return nil
 		}
 	}
 	return errors.New("vehicle not found")
@@ -247,8 +282,13 @@ func MarkVehicleMileageReminder(vehicleID, month string) error {
 	defer vehiclesMutex.Unlock()
 	for i := range vehicles {
 		if vehicles[i].ID == vehicleID {
+			previous := vehicles[i]
 			vehicles[i].LastMileageReminderMonth = month
-			return saveVehicles()
+			if err := saveVehicles(); err != nil {
+				vehicles[i] = previous
+				return err
+			}
+			return nil
 		}
 	}
 	return errors.New("vehicle not found")

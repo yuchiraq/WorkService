@@ -3,6 +3,7 @@ package api
 import (
 	"fmt"
 	"html/template"
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -49,6 +50,8 @@ func navItemsForStatus(userStatus string) []navItem {
 			navItem{PageID: "gallery", Path: "/gallery", Label: "Галерея"},
 			navItem{PageID: "settings", Path: "/settings", Label: "Настройки"},
 		)
+	} else {
+		items = slices.Insert(items, 1, navItem{PageID: "objects", Path: "/objects", Label: "Объекты"})
 	}
 	return items
 }
@@ -688,6 +691,7 @@ document.addEventListener('click', function(e){
 
 if(modalContent){
   modalContent.addEventListener('submit', function(e){
+    if(e.defaultPrevented) return;
     const form=e.target.closest('form');
     if(!form) return;
     if(form.target && form.target !== '_self') return;

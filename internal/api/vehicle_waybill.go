@@ -44,6 +44,84 @@ type vehicleWaybillData struct {
 	TotalLiters    float64
 	TotalAmount    float64
 	Rows           []vehicleWaybillRow
+	OwnerRows      []vehicleWaybillOwnerRow
+	OwnerNote      string
+}
+
+type vehicleWaybillOwnerRow struct {
+	At, Previous, Owner, Actor string
+}
+
+var vehicleWaybillLocation = time.FixedZone("Europe/Minsk", 3*60*60)
+
+func addWaybillOwnership(data *vehicleWaybillData, vehicle models.Vehicle, month time.Time) {
+	if len(vehicle.OwnerHistory) == 0 {
+		data.OwnerNote = "История привязок для этого ТС ранее не велась. Водитель указан по текущей привязке."
+		return
+	}
+	history := append([]models.VehicleOwnerChange(nil), vehicle.OwnerHistory...)
+	sort.SliceStable(history, func(i, j int) bool {
+		a, _ := time.Parse(time.RFC3339Nano, history[i].At)
+		b, _ := time.Parse(time.RFC3339Nano, history[j].At)
+		return a.Before(b)
+	})
+	start := time.Date(month.Year(), month.Month(), 1, 0, 0, 0, 0, vehicleWaybillLocation)
+	end := start.AddDate(0, 1, 0)
+	ownerID, ownerName, known := "", "", history[0].Initial
+	for _, change := range history {
+		at, err := time.Parse(time.RFC3339Nano, change.At)
+		if err == nil && at.Before(start) {
+			ownerID, ownerName, known = change.UserID, change.UserName, true
+		}
+	}
+	names := []string{}
+	seen := map[string]bool{}
+	addDriver := func(id, name string) {
+		if id != "" && !seen[id] {
+			names = append(names, name)
+			seen[id] = true
+		}
+	}
+	label := func(id, name string) string {
+		if id == "" {
+			return "Без привязки"
+		}
+		if name == "" {
+			return "Пользователь " + id
+		}
+		return name
+	}
+	if known {
+		addDriver(ownerID, label(ownerID, ownerName))
+		data.OwnerRows = append(data.OwnerRows, vehicleWaybillOwnerRow{At: "На начало месяца", Previous: "", Owner: label(ownerID, ownerName), Actor: ""})
+	} else {
+		at, _ := time.Parse(time.RFC3339Nano, history[0].At)
+		data.OwnerNote = "История привязок ведётся с " + at.In(vehicleWaybillLocation).Format("02.01.2006 15:04") + ". Более ранние смены владельца не восстановлены."
+	}
+	for _, change := range history {
+		at, err := time.Parse(time.RFC3339Nano, change.At)
+		if err != nil || at.Before(start) || !at.Before(end) {
+			continue
+		}
+		if change.Initial && change.UserID == "" {
+			continue
+		}
+		addDriver(change.PreviousUserID, label(change.PreviousUserID, change.PreviousName))
+		addDriver(change.UserID, label(change.UserID, change.UserName))
+		data.OwnerRows = append(data.OwnerRows, vehicleWaybillOwnerRow{At: at.In(vehicleWaybillLocation).Format("02.01.2006 15:04"), Previous: label(change.PreviousUserID, change.PreviousName), Owner: label(change.UserID, change.UserName), Actor: change.ActorName})
+	}
+	switch len(names) {
+	case 0:
+		if known {
+			data.DriverName = "Не закреплён"
+		} else {
+			data.DriverName = "Нет истории привязки"
+		}
+	case 1:
+		data.DriverName = names[0]
+	default:
+		data.DriverName = "Несколько водителей (см. привязки)"
+	}
 }
 
 func parseVehicleWaybillMonth(value string) (time.Time, error) {
@@ -135,6 +213,7 @@ func buildVehicleWaybillData(vehicle models.Vehicle, driverName string, records 
 	if data.DriverName == "" {
 		data.DriverName = "Не указан"
 	}
+	addWaybillOwnership(&data, vehicle, month)
 	return data
 }
 
@@ -189,7 +268,7 @@ func buildVehicleWaybillPDF(data vehicleWaybillData, generatedAt time.Time) ([]b
 		pdf.SetFont("Go", "B", 9)
 		pdf.CellFormat(42, 6, "Водитель:", "", 0, "L", false, 0, "")
 		pdf.SetFont("Go", "", 9)
-		pdf.CellFormat(95, 6, data.DriverName, "B", 0, "L", false, 0, "")
+		pdf.CellFormat(95, 6, truncateWaybillText(data.DriverName, 48), "B", 0, "L", false, 0, "")
 		pdf.SetFont("Go", "B", 9)
 		pdf.CellFormat(32, 6, "Составлено в:", "", 0, "L", false, 0, "")
 		pdf.SetFont("Go", "", 8)
@@ -201,7 +280,7 @@ func buildVehicleWaybillPDF(data vehicleWaybillData, generatedAt time.Time) ([]b
 		pdf.Ln(4)
 	}
 
-	columnWidths := []float64{22, 34, 28, 25, 25, 28, 95}
+	columnWidths := []float64{22, 34, 28, 25, 25, 28, 115}
 	headings := []string{"Дата", "Операция", "Одометр, км", "Пробег, км", "Топливо, л", "Сумма, руб.", "Описание / маршрут / основание"}
 	addTableHeader := func() {
 		pdf.SetFillColor(225, 232, 226)
@@ -237,7 +316,59 @@ func buildVehicleWaybillPDF(data vehicleWaybillData, generatedAt time.Time) ([]b
 		pdf.Ln(-1)
 	}
 
-	if pdf.GetY() > 155 {
+	if len(data.OwnerRows) > 0 || data.OwnerNote != "" {
+		ownerWidths := []float64{34, 81, 81, 81}
+		ownerHeader := func() {
+			pdf.Ln(4)
+			pdf.SetFont("Go", "B", 10)
+			pdf.CellFormat(0, 7, "Привязка транспорта (время Минска)", "", 1, "L", false, 0, "")
+			pdf.SetFont("Go", "B", 8)
+			for i, text := range []string{"Дата и время", "Предыдущий владелец", "Новый владелец", "Изменил"} {
+				pdf.CellFormat(ownerWidths[i], 8, text, "1", 0, "L", true, 0, "")
+			}
+			pdf.Ln(-1)
+		}
+		if pdf.GetY() > 153 {
+			pdf.AddPage()
+			addDocumentHeader()
+		}
+		ownerHeader()
+		for _, row := range data.OwnerRows {
+			pdf.SetFont("Go", "", 8)
+			values := []string{row.At, row.Previous, row.Owner, row.Actor}
+			height := 8.0
+			for i, text := range values {
+				values[i] = truncateWaybillText(text, 300)
+				lines := pdf.SplitText(values[i], ownerWidths[i]-2)
+				if h := float64(len(lines))*4 + 4; h > height {
+					height = h
+				}
+			}
+			if pdf.GetY()+height > 190 {
+				pdf.AddPage()
+				addDocumentHeader()
+				ownerHeader()
+				pdf.SetFont("Go", "", 8)
+			}
+			x, y := pdf.GetXY()
+			for i, text := range values {
+				pdf.Rect(x, y, ownerWidths[i], height, "D")
+				pdf.SetXY(x+1, y+2)
+				pdf.MultiCell(ownerWidths[i]-2, 4, text, "", "L", false)
+				x += ownerWidths[i]
+			}
+			pdf.SetXY(10, y+height)
+		}
+		if data.OwnerNote != "" {
+			pdf.SetFont("Go", "", 8)
+			pdf.Ln(3)
+			pdf.MultiCell(0, 4, data.OwnerNote, "", "L", false)
+		}
+	}
+	disclaimer := "Самостоятельно разработанная форма первичного учетного документа с учетом основных реквизитов статьи 10 Закона Республики Беларусь от 12.07.2013 № 57-З «О бухгалтерском учете и отчетности». Для применения форма должна быть утверждена руководителем организации и подписана ответственными лицами."
+	pdf.SetFont("Go", "", 7)
+	summaryHeight := 39 + float64(len(pdf.SplitText(disclaimer, 277)))*4
+	if pdf.GetY()+summaryHeight > 194 {
 		pdf.AddPage()
 		addDocumentHeader()
 	}
@@ -268,13 +399,13 @@ func buildVehicleWaybillPDF(data vehicleWaybillData, generatedAt time.Time) ([]b
 	}
 	pdf.Ln(8)
 	pdf.SetFont("Go", "", 8)
-	pdf.CellFormat(92, 7, "Водитель: ____________________ / "+data.DriverName+" /", "", 0, "L", false, 0, "")
+	pdf.CellFormat(92, 7, "Водитель: ____________________", "", 0, "L", false, 0, "")
 	pdf.CellFormat(92, 7, "Ответственный за выпуск: ____________________", "", 0, "L", false, 0, "")
 	pdf.CellFormat(0, 7, "Бухгалтер: ____________________", "", 1, "L", false, 0, "")
 	pdf.Ln(4)
 	pdf.SetFont("Go", "", 7)
 	pdf.SetTextColor(75, 82, 86)
-	pdf.MultiCell(0, 4, "Самостоятельно разработанная форма первичного учетного документа с учетом основных реквизитов статьи 10 Закона Республики Беларусь от 12.07.2013 № 57-З «О бухгалтерском учете и отчетности». Для применения форма должна быть утверждена руководителем организации и подписана ответственными лицами.", "", "L", false)
+	pdf.MultiCell(0, 4, disclaimer, "", "L", false)
 
 	var output bytes.Buffer
 	if err := pdf.Output(&output); err != nil {
