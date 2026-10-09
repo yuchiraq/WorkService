@@ -56,7 +56,7 @@ func testSiteIntegration(t *testing.T, mode string) {
 			t.Fatal(e)
 		}
 	}
-	write("users", []models.User{{ID: "admin", Username: "admin", Password: "testpass", Name: "Администратор", Status: "admin"}, {ID: "user", Username: "worker", Password: "testpass", Name: "Иванов Иван", Status: "user"}, {ID: "other", Username: "other", Password: "testpass", Name: "Петров Петр", Status: "user"}})
+	write("users", []models.User{{ID: "admin", Username: "admin", Password: "testpass", Name: "Администратор", Status: "admin"}, {ID: "user", Username: "worker", Password: "testpass", Name: "Иванов Иван", Status: "user"}, {ID: "other", Username: "other", Password: "testpass", Name: "Петров Петр", Status: "user"}, {ID: "admin2", Username: "admin2", Password: "testpass", Name: "Второй администратор", Status: "admin"}})
 	write("workers", []models.Worker{{ID: "own", UserID: "user", Name: "Иванов Иван", Position: "Монтажник", HourlyRate: 15, BirthDate: "1990-04-12"}, {ID: "other", UserID: "other", Name: "Петров Петр", Position: "Прораб"}, {ID: "fired", Name: "Сидоров Сергей", IsFired: true}, {ID: "idle", Name: "Без назначений"}})
 	write("objects", []models.Object{{ID: "object", Name: "Жилой комплекс на улице Центральной", Address: "Минск, Центральная 15", Status: "in_progress"}})
 	write("timesheets", []models.TimesheetEntry{
@@ -68,6 +68,9 @@ func testSiteIntegration(t *testing.T, mode string) {
 	t.Setenv("WORKSERVICE_STORAGE", mode)
 	t.Setenv("WORKSERVICE_SQLITE_PATH", filepath.Join(dir, "storage", "workservice.db"))
 	t.Setenv("WORKSERVICE_PHOTO_DIR", filepath.Join(dir, "storage", "object_photos"))
+	t.Setenv("WORKSERVICE_CLOUD_DIR", filepath.Join(dir, "storage", "cloud"))
+	t.Setenv("WORKSERVICE_CLOUD_QUOTA_MB", "10")
+	t.Setenv("WORKSERVICE_CLOUD_MAX_FILE_MB", "2")
 	if mode == "sqlite" {
 		db, e := persistence.OpenSQLite(os.Getenv("WORKSERVICE_SQLITE_PATH"), true)
 		if e != nil {
@@ -93,7 +96,7 @@ func testSiteIntegration(t *testing.T, mode string) {
 			t.Error(err)
 		}
 	})
-	for _, load := range []func() error{storage.LoadUsers, storage.LoadWorkers, storage.LoadObjects, storage.LoadTimesheets, storage.LoadImprovements, storage.LoadAppSettings, storage.LoadTelegramContacts, storage.LoadVehicles, storage.LoadInventory, storage.LoadObjectPhotos} {
+	for _, load := range []func() error{storage.LoadUsers, storage.LoadWorkers, storage.LoadObjects, storage.LoadTimesheets, storage.LoadImprovements, storage.LoadAppSettings, storage.LoadTelegramContacts, storage.LoadVehicles, storage.LoadInventory, storage.LoadObjectPhotos, storage.LoadCloud} {
 		if err = load(); err != nil {
 			t.Fatal(err)
 		}
@@ -159,6 +162,8 @@ func testSiteIntegration(t *testing.T, mode string) {
 		return w.Result().Cookies()[0]
 	}
 	admin, user := login("admin"), login("worker")
+	t.Run("personal cloud", func(t *testing.T) { testPersonalCloud(t, r, admin, login("admin2"), user) })
+	t.Run("assignment privacy", func(t *testing.T) { testAssignmentPrivacy(t, r, admin, user) })
 	for _, path := range []string{"/worker/other", "/workers", "/workers/new", "/workers/edit/own", "/objects/new", "/objects/edit/object", "/users", "/settings", "/gallery", "/schedule/edit/private-entry", "/schedule/edit/absence"} {
 		w := request("GET", path, nil, user)
 		if w.Code != 403 {

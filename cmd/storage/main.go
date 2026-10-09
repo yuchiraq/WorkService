@@ -15,7 +15,7 @@ import (
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: storage check|import|verify|export [--source storage] [--db storage/workservice.db] [--photos directory] [--out new-directory]")
+		return errors.New("usage: storage check|import|verify|export [--source storage] [--db storage/workservice.db] [--photos directory] [--cloud directory] [--out new-directory]")
 	}
 	command := args[0]
 	if command != "check" && command != "import" && command != "verify" && command != "export" {
@@ -25,6 +25,7 @@ func run(args []string) error {
 	source := flags.String("source", "storage", "source JSON directory; server must be stopped")
 	dbPath := flags.String("db", "storage/workservice.db", "SQLite file")
 	photoDir := flags.String("photos", "", "photo directory (default: source/object_photos)")
+	cloudDir := flags.String("cloud", "", "private cloud directory (default: source/cloud)")
 	out := flags.String("out", "", "new export directory")
 	if err := flags.Parse(args[1:]); err != nil {
 		return err
@@ -39,6 +40,9 @@ func run(args []string) error {
 	defer unlock()
 	if *photoDir == "" {
 		*photoDir = filepath.Join(*source, "object_photos")
+	}
+	if *cloudDir == "" {
+		*cloudDir = filepath.Join(*source, "cloud")
 	}
 	if command == "export" {
 		if *out == "" {
@@ -56,12 +60,12 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		if _, err = storage.ValidateDocuments(docs, *photoDir); err != nil {
+		if _, err = storage.ValidateDocuments(docs, *photoDir, *cloudDir); err != nil {
 			return err
 		}
-		return storage.ExportDocuments(docs, *photoDir, *out)
+		return storage.ExportDocuments(docs, *photoDir, *out, *cloudDir)
 	}
-	documents, report, err := storage.ReadMigrationSource(*source, *photoDir)
+	documents, report, err := storage.ReadMigrationSource(*source, *photoDir, *cloudDir)
 	if err != nil {
 		return err
 	}

@@ -1,6 +1,5 @@
-const CACHE_VERSION = 'avayusstroy-v17';
+const CACHE_VERSION = 'avayusstroy-v18';
 const APP_SHELL = [
-  '/login',
   '/static/css/style.css?v=17',
   '/static/js/ui.js?v=17',
   '/static/img/logo.svg',
@@ -28,9 +27,10 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
-        .catch(async () => {
-          return caches.match('/login');
-        })
+        .catch(() => new Response('<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Нет соединения</title></head><body><h1>Нет соединения</h1><p>Подключитесь к интернету и обновите страницу.</p></body></html>', {
+          status: 503,
+          headers: {'Content-Type':'text/html; charset=utf-8','Cache-Control':'no-store'}
+        }))
     );
     return;
   }

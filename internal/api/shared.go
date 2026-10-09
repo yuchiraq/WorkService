@@ -48,6 +48,7 @@ func navItemsForStatus(userStatus string) []navItem {
 		items = append(items,
 			navItem{PageID: "users", Path: "/users", Label: "Пользователи"},
 			navItem{PageID: "gallery", Path: "/gallery", Label: "Галерея"},
+			navItem{PageID: "cloud", Path: "/cloud", Label: "Моё облако"},
 			navItem{PageID: "settings", Path: "/settings", Label: "Настройки"},
 		)
 	} else {
@@ -158,6 +159,9 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 		navInnerClass += " has-actions"
 	}
 	floatingAction := `<div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение" title="Создать назначение">+</a></div>`
+	if activePage == "cloud" {
+		floatingAction = `<div class="floating-create-wrap"><button type="button" class="floating-create-btn" id="cloud-floating-upload" aria-label="Загрузить файлы" title="Загрузить файлы">+</button></div>`
+	}
 
 	uiScript := `<script>(function(){
 const body=document.body;

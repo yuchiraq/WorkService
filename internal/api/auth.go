@@ -345,6 +345,14 @@ func CSRFMiddleware() gin.HandlerFunc {
 			return
 		}
 		limit := int64(64 << 20)
+		if c.FullPath() == "/cloud/upload" {
+			if c.GetHeader("X-CSRF-Token") == "" {
+				c.JSON(403, gin.H{"error": "Сессия завершилась. Обновите страницу"})
+				c.Abort()
+				return
+			}
+			limit = storage.CloudMaxFileBytes() + (1 << 20)
+		}
 		if c.FullPath() == "/object/:id/photos" {
 			limit = 25 << 20
 		}

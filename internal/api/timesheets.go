@@ -1234,6 +1234,11 @@ func TimesheetsPage(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "Failed to load timesheets: %v", err)
 		return
 	}
+	entries, err = getScopedEntries(c, entries)
+	if err != nil {
+		accessDenied(c)
+		return
+	}
 	workers, err := storage.GetWorkers()
 	if err != nil {
 		c.String(http.StatusInternalServerError, "Failed to load workers: %v", err)

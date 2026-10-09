@@ -47,6 +47,9 @@ func main() {
 	if err := storage.LoadObjectPhotos(); err != nil {
 		log.Fatalf("Failed to load object photos: %v", err)
 	}
+	if err := storage.LoadCloud(); err != nil {
+		log.Fatalf("Failed to load cloud: %v", err)
+	}
 	telegrambot.StartMileageReminderScheduler()
 
 	r := gin.Default()

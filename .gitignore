@@ -5,6 +5,8 @@ storage/.workservice.lock
 storage/object_photos/
 storage/object_photos.json
 storage/backups/
+storage/cloud/
+storage/cloud.json
 *.exe
 *.out
 *.test
@@ -15,6 +17,9 @@ logs/
 
 # Dependency directory
 vendor/
+!web/static/vendor/
+web/static/vendor/*
+!web/static/vendor/pdfjs-6.4.299/
 
 # IDE and environment files
 .idea/

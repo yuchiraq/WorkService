@@ -295,8 +295,16 @@ func ObjectProfilePage(c *gin.Context) {
 		}
 	}
 
-	entries, _ := storage.GetTimesheets()
-	entries, _ = getScopedEntries(c, entries)
+	entries, err := storage.GetTimesheets()
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Не удалось загрузить назначения")
+		return
+	}
+	entries, err = getScopedEntries(c, entries)
+	if err != nil {
+		accessDenied(c)
+		return
+	}
 	workersMap, _ := buildWorkersMap()
 	related := make([]models.TimesheetEntry, 0)
 	for _, entry := range entries {
@@ -320,9 +328,17 @@ func ObjectProfilePage(c *gin.Context) {
 
 	var assignments strings.Builder
 	if len(related) == 0 {
-		assignments.WriteString(`<div class="info-card"><p>По объекту пока нет назначений.</p></div>`)
+		if isAdmin(c) {
+			assignments.WriteString(`<div class="info-card"><p>По объекту пока нет назначений.</p></div>`)
+		} else {
+			assignments.WriteString(`<div class="info-card"><p>У вас пока нет назначений на этом объекте.</p></div>`)
+		}
 	} else {
 		for _, entry := range related {
+			workerNames := joinMappedValues(entry.WorkerIDs, workersMap)
+			if isAdmin(c) {
+				workerNames = joinMappedLinks(entry.WorkerIDs, workersMap, "/worker")
+			}
 			commentHTML := ""
 			if strings.TrimSpace(entry.Notes) != "" {
 				commentHTML = `<div class="assignment-note"><span>Комментарий</span><p>` + template.HTMLEscapeString(entry.Notes) + `</p></div>`
@@ -331,7 +347,7 @@ func ObjectProfilePage(c *gin.Context) {
 			if strings.TrimSpace(entry.CreatedByName) != "" {
 				creatorHTML = `<div class="assignment-meta"><span>Создал</span><p>` + template.HTMLEscapeString(entry.CreatedByName) + `</p></div>`
 			}
-			assignments.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s · %s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s%s</div></article>`, template.HTMLEscapeString(formatScheduleDateLabel(entry.Date)), template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)), joinMappedLinks(entry.WorkerIDs, workersMap, "/worker"), creatorHTML, commentHTML))
+			assignments.WriteString(fmt.Sprintf(`<article class="schedule-entry-vertical assignment-card"><div class="assignment-head"><strong>%s · %s — %s</strong><span>%s ч</span></div><div class="assignment-body"><div class="assignment-meta"><span>Работники</span><p>%s</p></div>%s%s</div></article>`, template.HTMLEscapeString(formatScheduleDateLabel(entry.Date)), template.HTMLEscapeString(entry.StartTime), template.HTMLEscapeString(entry.EndTime), template.HTMLEscapeString(formatWorkHours(entry.StartTime, entry.EndTime, entry.LunchBreakMinutes)), workerNames, creatorHTML, commentHTML))
 		}
 	}
 
@@ -351,7 +367,7 @@ func ObjectProfilePage(c *gin.Context) {
   {{OBJECT_SECTIONS}}
   {{INVENTORY}}
   {{PHOTOS}}
-  <div class="card" id="object-assignments"><div class="history-header"><h2>Назначения по объекту</h2></div><div class="schedule-vertical">{{ASSIGNMENTS}}</div></div>
+  <div class="card" id="object-assignments"><div class="history-header"><h2>{{ASSIGNMENTS_TITLE}}</h2></div><div class="schedule-vertical">{{ASSIGNMENTS}}</div></div>
 </div></body></html>`
 
 	final := strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "objects"), 1)
@@ -369,6 +385,11 @@ func ObjectProfilePage(c *gin.Context) {
 	final = strings.Replace(final, "{{RESPONSIBLE}}", template.HTMLEscapeString(responsible), 1)
 	final = strings.Replace(final, "{{OBJECT_ID}}", template.HTMLEscapeString(object.ID), -1)
 	final = strings.Replace(final, "{{ASSIGNMENTS}}", assignments.String(), 1)
+	assignmentsTitle := "Мои назначения"
+	if isAdmin(c) {
+		assignmentsTitle = "Назначения по объекту"
+	}
+	final = strings.Replace(final, "{{ASSIGNMENTS_TITLE}}", assignmentsTitle, 1)
 	final = strings.Replace(final, "{{INVENTORY}}", renderObjectInventory(c, object), 1)
 	final = strings.Replace(final, "{{PHOTOS}}", renderObjectPhotos(c, object), 1)
 	sections := ""

@@ -26,7 +26,7 @@ type MigrationReport struct {
 
 // ValidateDocuments never normalizes or rewrites source data, including unknown
 // model fields. Historical references to removed entities are reported, not lost.
-func ValidateDocuments(documents map[string][]byte, photoDir string) (MigrationReport, error) {
+func ValidateDocuments(documents map[string][]byte, photoDir string, cloudDirs ...string) (MigrationReport, error) {
 	report := MigrationReport{Counts: map[string]int{}, Warnings: []string{}}
 	var u []models.User
 	var w []models.Worker
@@ -38,8 +38,15 @@ func ValidateDocuments(documents map[string][]byte, photoDir string) (MigrationR
 	var fleet fleetFileData
 	var inv inventoryData
 	var photos []models.ObjectPhoto
+	var cloud []models.CloudItem
 	targets := map[string]any{"users.json": &u, "workers.json": &w, "objects.json": &o, "timesheets.json": &t, "improvements.json": &improvements, "app_settings.json": &settings, "telegram_contacts.json": &contacts, "vehicles.json": &fleet, "inventory.json": &inv, "object_photos.json": &photos}
 	for name, data := range documents {
+		if name == "cloud.json" {
+			if err := json.Unmarshal(data, &cloud); err != nil {
+				return report, err
+			}
+			continue
+		}
 		target, ok := targets[name]
 		if !ok {
 			return report, fmt.Errorf("unknown document %s", name)
@@ -132,16 +139,47 @@ func ValidateDocuments(documents map[string][]byte, photoDir string) (MigrationR
 			}
 		}
 	}
+	if err := ValidateCloudMetadata(cloud); err != nil {
+		return report, err
+	}
+	cloudDir := CloudDirectory()
+	if len(cloudDirs) > 0 {
+		cloudDir = cloudDirs[0]
+	}
+	report.Counts["cloud_items"] = len(cloud)
+	for _, item := range cloud {
+		reference("users", item.OwnerID, "cloud item "+item.ID)
+		if item.Kind != "file" {
+			continue
+		}
+		file, err := OpenCloudBlob(cloudDir, item.ID)
+		if err != nil {
+			return report, fmt.Errorf("cloud file %s: %w", item.ID, err)
+		}
+		hash := sha256.New()
+		size, err := io.Copy(hash, file)
+		_ = file.Close()
+		if err != nil {
+			return report, err
+		}
+		if size != item.Size || hex.EncodeToString(hash.Sum(nil)) != item.SHA256 {
+			return report, fmt.Errorf("cloud file %s checksum mismatch", item.ID)
+		}
+	}
 	sort.Strings(report.Warnings)
 	return report, nil
 }
 
-func ReadMigrationSource(directory, photoDir string) (map[string][]byte, MigrationReport, error) {
+func ReadMigrationSource(directory, photoDir string, cloudDirs ...string) (map[string][]byte, MigrationReport, error) {
 	documents, err := persistence.OpenJSON(directory).Snapshot()
 	if err != nil {
 		return nil, MigrationReport{}, err
 	}
-	report, err := ValidateDocuments(documents, photoDir)
+	cloudDir := filepath.Join(directory, "cloud")
+	if len(cloudDirs) > 0 {
+		cloudDir = cloudDirs[0]
+	}
+	report, err := ValidateDocuments(documents, photoDir, cloudDir)
 	return documents, report, err
 }
 
@@ -159,7 +197,7 @@ func CompareDocuments(left, right map[string][]byte) error {
 
 // ExportDocuments publishes a new complete directory; existing destinations are
 // never overwritten. Metadata and referenced photos travel together for rollback.
-func ExportDocuments(documents map[string][]byte, photoDir, destination string) error {
+func ExportDocuments(documents map[string][]byte, photoDir, destination string, cloudDirs ...string) error {
 	if _, err := os.Lstat(destination); !os.IsNotExist(err) {
 		return errors.New("export destination already exists or is inaccessible")
 	}
@@ -216,6 +254,52 @@ func ExportDocuments(documents map[string][]byte, photoDir, destination string) 
 			hashes[filepath.ToSlash(name)] = hex.EncodeToString(hash.Sum(nil))
 		}
 	}
+	cloudDir := CloudDirectory()
+	if len(cloudDirs) > 0 {
+		cloudDir = cloudDirs[0]
+	}
+	var cloud []models.CloudItem
+	if data, ok := documents["cloud.json"]; ok {
+		if err = json.Unmarshal(data, &cloud); err != nil {
+			return err
+		}
+	}
+	if err = ValidateCloudMetadata(cloud); err != nil {
+		return err
+	}
+	for _, item := range cloud {
+		if item.Kind != "file" {
+			continue
+		}
+		source, e := OpenCloudBlob(cloudDir, item.ID)
+		if e != nil {
+			return e
+		}
+		if e = os.MkdirAll(filepath.Join(stage, "cloud"), 0700); e != nil {
+			_ = source.Close()
+			return e
+		}
+		relative, _ := CloudBlobPath("cloud", item.ID)
+		target, e := os.OpenFile(filepath.Join(stage, relative), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+		if e != nil {
+			_ = source.Close()
+			return e
+		}
+		hash := sha256.New()
+		size, e := io.Copy(io.MultiWriter(target, hash), source)
+		if e == nil {
+			e = target.Sync()
+		}
+		e = errors.Join(e, target.Close(), source.Close())
+		if e != nil {
+			return e
+		}
+		checksum := hex.EncodeToString(hash.Sum(nil))
+		if checksum != item.SHA256 || size != item.Size {
+			return fmt.Errorf("cloud file %s checksum mismatch", item.ID)
+		}
+		hashes[filepath.ToSlash(relative)] = checksum
+	}
 	manifest, err := json.MarshalIndent(struct {
 		Format    int               `json:"format"`
 		CreatedAt string            `json:"createdAt"`
@@ -231,6 +315,8 @@ func ExportDocuments(documents map[string][]byte, photoDir, destination string) 
 }
 
 func CreateDataBackup(destination string) error {
+	cloudMutex.RLock()
+	defer cloudMutex.RUnlock()
 	photosMutex.RLock()
 	defer photosMutex.RUnlock()
 	store := backend
