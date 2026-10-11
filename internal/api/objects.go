@@ -103,7 +103,7 @@ func ObjectsPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Объекты</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=17">
+    <link rel="stylesheet" href="/static/css/style.css?v=20">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -112,7 +112,7 @@ func ObjectsPage(c *gin.Context) {
             <h1>Объекты</h1>
             {{NEW_OBJECT}}
         </div>
-        <div class="card"><div class="tab-switcher" style="margin-bottom:10px;display:flex;gap:8px;"><a class="btn btn-secondary{{TAB_ACTIVE_CLASS}}" href="/objects?tab=active">В работе</a><a class="btn btn-secondary{{TAB_COMPLETED_CLASS}}" href="/objects?tab=completed">Оконченные</a></div><div class="compact-grid">{{CARDS}}</div></div>
+        <div class="card" data-fluid-page><nav class="tab-switcher" data-fluid-navigation aria-label="Статус объектов"><a class="btn btn-secondary{{TAB_ACTIVE_CLASS}}" href="/objects?tab=active">В работе</a><a class="btn btn-secondary{{TAB_COMPLETED_CLASS}}" href="/objects?tab=completed">Оконченные</a></nav><div data-fluid-results role="region" aria-label="Список объектов"><div class="compact-grid">{{CARDS}}</div></div></div>
     </div>
 </body>
 </html>`
@@ -168,7 +168,7 @@ func renderObjectForm(c *gin.Context, object models.Object, actionURL, title, su
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>{{TITLE}}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=17">
+    <link rel="stylesheet" href="/static/css/style.css?v=20">
 </head>
 <body>
     {{LAYOUT_START}}
@@ -352,7 +352,7 @@ func ObjectProfilePage(c *gin.Context) {
 	}
 
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Объект: {{OBJECT_NAME}}</title><link rel="stylesheet" href="/static/css/style.css?v=17"></head><body>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Объект: {{OBJECT_NAME}}</title><link rel="stylesheet" href="/static/css/style.css?v=20"></head><body>
 {{SIDEBAR_HTML}}
 <div class="main-content">
   {{OBJECT_BACK}}
@@ -394,7 +394,7 @@ func ObjectProfilePage(c *gin.Context) {
 	final = strings.Replace(final, "{{PHOTOS}}", renderObjectPhotos(c, object), 1)
 	sections := ""
 	if canManageInventory(c, object) {
-		sections = `<nav class="object-section-links" aria-label="Разделы объекта"><a href="#object-inventory">Инвентарь</a><a href="#object-photos">Фото</a><a href="#object-assignments">Назначения</a></nav>`
+		sections = `<nav class="tab-switcher object-tabs" data-object-tabs aria-label="Разделы объекта"><a class="btn btn-secondary active" href="#object-inventory">Инвентарь</a><a class="btn btn-secondary" href="#object-photos">Фото</a><a class="btn btn-secondary" href="#object-assignments">Назначения</a></nav>`
 	}
 	final = strings.Replace(final, "{{OBJECT_SECTIONS}}", sections, 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))

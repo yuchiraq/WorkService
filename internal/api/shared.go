@@ -158,10 +158,8 @@ func RenderSidebar(c *gin.Context, activePage string) string {
 	if topNavActions != "" {
 		navInnerClass += " has-actions"
 	}
-	floatingAction := `<div class="floating-create-wrap"><a class="floating-create-btn" href="/schedule/new" data-modal-url="/schedule/new" data-modal-title="Новое назначение" aria-label="Создать назначение" title="Создать назначение">+</a></div>`
-	if activePage == "cloud" {
-		floatingAction = `<div class="floating-create-wrap"><button type="button" class="floating-create-btn" id="cloud-floating-upload" aria-label="Загрузить файлы" title="Загрузить файлы">+</button></div>`
-	}
+	vehicles, _ := storage.GetVehicles()
+	floatingAction := renderFloatingActions(c.GetString("userID"), activePage, vehicles)
 
 	uiScript := `<script>(function(){
 const body=document.body;
@@ -486,6 +484,7 @@ function openModal(url, title, ret, trigger){
   const requestURL=buildModalURL(url, effectiveRet);
   const seq=++modalRequestSeq;
   lastModalTrigger=trigger || document.activeElement;
+  if(trigger && trigger.getAttribute('data-modal-focus')) lastModalTrigger=document.querySelector(trigger.getAttribute('data-modal-focus')) || lastModalTrigger;
   closeNav();
   closeTimesheetMenus();
   hideHoursTooltip();
@@ -800,7 +799,7 @@ syncNavState();
     <div class="action-modal-header"><strong id="app-action-modal-title">Форма</strong><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">&times;</button></div>
     <div class="action-modal-body"><div id="app-action-modal-content" class="action-modal-content"></div></div>
   </div>
-</div>%s%s<script src="/static/js/ui.js?v=17" defer></script>`, navInnerClass, pageTitle, topNavActions, template.HTMLEscapeString(userInitial), template.HTMLEscapeString(userName), roleLabel, nav.String(), floatingAction, csrfScript, uiScript)
+</div>%s%s<script src="/static/js/ui.js?v=17" defer></script><script src="/static/js/motion.js?v=2" defer></script><script src="/static/js/quick-actions.js?v=1" defer></script>`, navInnerClass, pageTitle, topNavActions, template.HTMLEscapeString(userInitial), template.HTMLEscapeString(userName), roleLabel, nav.String(), floatingAction, csrfScript, uiScript)
 }
 
 func IsModalRequest(c *gin.Context) bool {

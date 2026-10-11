@@ -18,7 +18,7 @@ const output = path.join(os.tmpdir(), 'workservice-photos');
     await page.locator('#username').fill('worker');
     await page.locator('#password').fill('testpass');
     await Promise.all([page.waitForURL('**/schedule'),page.locator('button[type=submit]').click()]);
-    await page.goto(base+'/object/object');
+    await page.goto(base+'/object/object#object-photos');
     const root = page.locator('#object-photos');
     const files = [];
     for (let i=0;i<3;i++) {

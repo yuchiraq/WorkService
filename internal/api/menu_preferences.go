@@ -36,10 +36,10 @@ func MenuPreferencesPage(c *gin.Context) {
 		status = `<div class="dashboard-alert-item is-success"><strong>Меню сохранено</strong><p>Изменения уже применены в боковой панели.</p></div>`
 	}
 	page := `<!DOCTYPE html><html lang="ru"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Настройка меню</title><link rel="stylesheet" href="/static/css/style.css?v=17"></head><body>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Настройка меню</title><link rel="stylesheet" href="/static/css/style.css?v=20"></head><body>
 {{SIDEBAR_HTML}}
 <main class="main-content"><div class="page-header"><div><h1>Настройка меню</h1><p class="text-muted">Оставьте только разделы, которыми пользуетесь. Скрытые страницы по-прежнему можно открыть по прямой ссылке.</p></div></div>
-{{STATUS}}<section class="card"><form method="POST" action="/profile/menu" class="menu-preferences-form">{{CSRF_FIELD}}<div class="menu-preferences-grid">{{OPTIONS}}</div><div class="form-actions-edit"><button class="btn btn-primary" type="submit">Сохранить меню</button><a class="btn btn-secondary" href="/profile">Назад к профилю</a></div></form></section></main>
+{{STATUS}}<section class="appearance-settings" aria-labelledby="appearance-title"><h2 id="appearance-title">Оформление</h2><fieldset class="appearance-theme"><legend>Тема</legend><div class="appearance-segments"><label><input type="radio" name="appearance-theme" value="system" checked><span>Системная</span></label><label><input type="radio" name="appearance-theme" value="light"><span>Светлая</span></label><label><input type="radio" name="appearance-theme" value="dark"><span>Тёмная</span></label></div></fieldset><label class="appearance-motion"><span>Анимация интерфейса</span><input type="checkbox" role="switch" id="appearance-motion" checked></label></section><section class="card"><form method="POST" action="/profile/menu" class="menu-preferences-form">{{CSRF_FIELD}}<div class="menu-preferences-grid">{{OPTIONS}}</div><div class="form-actions-edit"><button class="btn btn-primary" type="submit">Сохранить меню</button><a class="btn btn-secondary" href="/profile">Назад к профилю</a></div></form></section></main>
 </body></html>`
 	page = strings.Replace(page, "{{SIDEBAR_HTML}}", RenderSidebar(c, "menu-settings"), 1)
 	page = strings.Replace(page, "{{CSRF_FIELD}}", CSRFHiddenInput(c), 1)

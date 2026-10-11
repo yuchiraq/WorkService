@@ -162,6 +162,22 @@ func testSiteIntegration(t *testing.T, mode string) {
 		return w.Result().Cookies()[0]
 	}
 	admin, user := login("admin"), login("worker")
+	t.Run("quick actions and object tabs", func(t *testing.T) {
+		workerPage := request("GET", "/object/object", nil, user).Body.String()
+		for _, expected := range []string{"data-quick-actions", "/vehicles/" + vehicle.ID + "#vehicle-record-form", "data-object-tabs", `href="#object-photos"`, `href="#object-inventory"`, `href="#object-assignments"`} {
+			if !strings.Contains(workerPage, expected) {
+				t.Errorf("worker object page missing %s", expected)
+			}
+		}
+		adminPage := request("GET", "/objects", nil, admin).Body.String()
+		if strings.Contains(adminPage, "data-quick-actions") || !strings.Contains(adminPage, "data-fluid-navigation") {
+			t.Fatal("admin without owned vehicles must not see a fleet dial; list tabs must be present")
+		}
+		vehiclePage := request("GET", "/vehicles/"+vehicle.ID, nil, user).Body.String()
+		if !strings.Contains(vehiclePage, `id="vehicle-record-form"`) {
+			t.Fatal("vehicle record deep link missing")
+		}
+	})
 	t.Run("personal cloud", func(t *testing.T) { testPersonalCloud(t, r, admin, login("admin2"), user) })
 	t.Run("assignment privacy", func(t *testing.T) { testAssignmentPrivacy(t, r, admin, user) })
 	for _, path := range []string{"/worker/other", "/workers", "/workers/new", "/workers/edit/own", "/objects/new", "/objects/edit/object", "/users", "/settings", "/gallery", "/schedule/edit/private-entry", "/schedule/edit/absence"} {

@@ -191,7 +191,8 @@ func LoginPage(c *gin.Context) {
     <link rel="manifest" href="/manifest.webmanifest">
     <link rel="apple-touch-icon" href="/static/img/logo-192.png">
     <title>Вход в систему</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=17">
+    <link rel="stylesheet" href="/static/css/style.css?v=20">
+    <script src="/static/js/motion.js?v=2" defer></script>
 </head>
 <body class="login-screen">
     <div class="center-page">

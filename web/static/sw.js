@@ -1,7 +1,9 @@
-const CACHE_VERSION = 'avayusstroy-v18';
+const CACHE_VERSION = 'avayusstroy-v20';
 const APP_SHELL = [
-  '/static/css/style.css?v=17',
+  '/static/css/style.css?v=20',
   '/static/js/ui.js?v=17',
+  '/static/js/motion.js?v=2',
+  '/static/js/quick-actions.js?v=1',
   '/static/img/logo.svg',
   '/static/img/logo-192.png',
   '/manifest.webmanifest'

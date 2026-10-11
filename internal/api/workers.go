@@ -133,7 +133,7 @@ func WorkersPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Работники</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=17">
+    <link rel="stylesheet" href="/static/css/style.css?v=20">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -142,12 +142,13 @@ func WorkersPage(c *gin.Context) {
             <h1>Работники</h1>
             <a href="/workers/new" class="btn btn-primary" data-modal-url="/workers/new" data-modal-title="Добавить работника" data-modal-return="{{WORKERS_RETURN}}">Добавить работника</a>
         </div>
-        <div class="card">
+        <div class="card" data-fluid-page>
 
-            <div class="tab-switcher">
+            <nav class="tab-switcher" data-fluid-navigation aria-label="Статус работников">
                 <a class="btn btn-secondary{{TAB_ACTIVE_CLASS}}" href="/workers?tab=active">Текущие</a>
                 <a class="btn btn-secondary{{TAB_FIRED_CLASS}}" href="/workers?tab=fired">Уволенные</a>
-            </div>
+            </nav>
+            <div data-fluid-results role="region" aria-label="Список работников">
             <button type="button" class="btn btn-secondary workers-search-toggle{{FILTER_TOGGLE_ACTIVE}}" data-search-toggle aria-expanded="{{FILTER_EXPANDED}}">Поиск и фильтры</button>
             <form action="/workers" method="GET" class="workers-filters{{FILTERS_CLASS}}" data-search-panel>
                 <input type="hidden" name="tab" value="{{TAB}}">
@@ -169,15 +170,16 @@ func WorkersPage(c *gin.Context) {
             </form>
             <p class="workers-summary">Найдено: <strong>{{FILTERED_COUNT}}</strong> из <strong>{{TOTAL_COUNT}}</strong>.</p>
             <div class="workers-grid">%s</div>
+            </div>
         </div>
     </div>
 
     <script>
       (function(){
-        const toggle=document.querySelector('[data-search-toggle]');
-        const panel=document.querySelector('[data-search-panel]');
-        if(!toggle||!panel) return;
-        toggle.addEventListener('click', function(){
+        document.addEventListener('click', function(event){
+          const toggle=event.target.closest('[data-search-toggle]');
+          const panel=document.querySelector('[data-search-panel]');
+          if(!toggle||!panel) return;
           panel.classList.toggle('is-open');
           const expanded=panel.classList.contains('is-open');
           toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
@@ -350,7 +352,7 @@ func WorkerProfilePage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Профиль: {{WORKER_NAME}}</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=17">
+    <link rel="stylesheet" href="/static/css/style.css?v=20">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -445,7 +447,7 @@ func AddWorkerPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Добавить работника</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=17">
+    <link rel="stylesheet" href="/static/css/style.css?v=20">
 </head>
 <body>
     {{SIDEBAR_HTML}}
@@ -561,7 +563,7 @@ func EditWorkerPage(c *gin.Context) {
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Редактировать профиль</title>
-    <link rel="stylesheet" href="/static/css/style.css?v=17">
+    <link rel="stylesheet" href="/static/css/style.css?v=20">
 </head>
 <body>
     {{SIDEBAR_HTML}}
