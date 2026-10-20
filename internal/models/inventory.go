@@ -1,14 +1,16 @@
 package models
 
 type InventoryName struct {
-	Name string `json:"name"`
-	Unit string `json:"unit"`
+	Name     string `json:"name"`
+	Unit     string `json:"unit"`
+	Material string `json:"material,omitempty"`
 }
 
 type InventoryItem struct {
 	ID        string `json:"id"`
 	ObjectID  string `json:"object_id"`
 	Name      string `json:"name"`
+	Material  string `json:"material,omitempty"`
 	Unit      string `json:"unit"`
 	Quantity  int64  `json:"quantity"` // Thousandths of the selected unit.
 	Note      string `json:"note"`

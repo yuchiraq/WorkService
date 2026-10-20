@@ -14,6 +14,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -129,7 +130,15 @@ func testSiteIntegration(t *testing.T, mode string) {
 		r := gin.New()
 		SetupRouter(r)
 		t.Log("preview vehicle", vehicle.ID)
-		if err = http.ListenAndServe("127.0.0.1:8100", r); err != nil {
+		port := os.Getenv("WORKSERVICE_UI_PORT")
+		if port == "" {
+			port = "8099"
+		}
+		if number, e := strconv.Atoi(port); e != nil || number < 1 || number > 65535 {
+			t.Fatal("WORKSERVICE_UI_PORT must be a port number from 1 to 65535")
+		}
+		t.Log("isolated preview: http://127.0.0.1:" + port)
+		if err = http.ListenAndServe("127.0.0.1:"+port, r); err != nil {
 			t.Fatal(err)
 		}
 		return
@@ -324,6 +333,7 @@ func testSiteIntegration(t *testing.T, mode string) {
 			t.Fatal("missing CSRF accepted")
 		}
 		values := url.Values{"_csrf_token": {csrf}, "name": {"Дрель </script><script>alert(1)</script>"}, "unit": {"pcs"}, "quantity": {"2,5"}, "note": {"<img src=x onerror=alert(1)>"}}
+		values.Set("material", "Нержавейка")
 		if w := request("POST", "/object/"+privateObject.ID+"/inventory", values, user); w.Code != 403 {
 			t.Fatal("private mutation accepted")
 		}
@@ -331,7 +341,7 @@ func testSiteIntegration(t *testing.T, mode string) {
 			t.Fatal(w.Code, w.Body.String())
 		}
 		state := storage.GetInventory("object")
-		if len(state.Items) != 1 || state.Items[0].Quantity != 2500 || state.History[0].ActorID != "user" {
+		if len(state.Items) != 1 || state.Items[0].Quantity != 2500 || state.Items[0].Material != "Нержавейка" || state.Catalog[0].Material != "Нержавейка" || state.History[0].ActorID != "user" {
 			t.Fatal("inventory not persisted", state)
 		}
 		item := state.Items[0]

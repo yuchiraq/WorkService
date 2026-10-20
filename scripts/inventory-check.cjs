@@ -4,7 +4,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const base = process.env.UI_BASE_URL || 'http://127.0.0.1:8100';
+const base = process.env.UI_BASE_URL || 'http://127.0.0.1:8099';
 const output = path.join(os.tmpdir(), 'workservice-inventory');
 
 (async () => {
@@ -64,6 +64,7 @@ const output = path.join(os.tmpdir(), 'workservice-inventory');
     await cable.locator('input').press('Enter');
     await settle();
     assert.equal(await cable.locator('input').inputValue(), '20,75');
+    await cable.locator('[data-action=menu]').click();
     await cable.locator('[data-action=edit]').click();
     await page.locator('#inventory-note').fill('Щитовая, второй этаж');
     await page.locator('#inventory-submit').click();
@@ -173,6 +174,7 @@ const output = path.join(os.tmpdir(), 'workservice-inventory');
     }
 
     await page.setViewportSize({width:390,height:844});
+    await cable.locator('[data-action=menu]').click();
     await cable.locator('[data-action=delete]').click();
     await page.locator('#inventory-delete-confirm').click();
     await page.locator('#inventory-delete').waitFor({state:'hidden'});

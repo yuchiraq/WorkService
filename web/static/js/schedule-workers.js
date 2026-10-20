@@ -44,7 +44,8 @@
             search.value = '';
             dialog.uiReturnFocus = button;
             dialog.showModal();
-            search.focus();
+            if (matchMedia('(hover: hover) and (pointer: fine)').matches) search.focus({preventScroll:true});
+            else dialog.querySelector('button').focus({preventScroll:true});
             renderChoices();
             refresh();
           });

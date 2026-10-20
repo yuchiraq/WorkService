@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"project/internal/models"
 	"project/internal/persistence"
@@ -113,8 +114,30 @@ func ValidateDocuments(documents map[string][]byte, photoDir string, cloudDirs .
 	for _, record := range fleet.Records {
 		reference("vehicles", record.VehicleID, "vehicle record "+record.ID)
 	}
+	inventoryKeys := map[string]bool{}
+	materials := map[string]bool{}
 	for _, item := range inv.Items {
 		reference("objects", item.ObjectID, "inventory "+item.ID)
+		if strings.TrimSpace(item.Name) == "" || utf8.RuneCountInString(item.Name) > 120 || utf8.RuneCountInString(item.Note) > 500 || utf8.RuneCountInString(item.Material) > 60 || !validInventoryUnit(item.Unit) || item.Quantity < 0 || item.Quantity > MaxInventoryQuantity || item.Version < 1 {
+			return report, fmt.Errorf("inventory %s: invalid name, material, quantity, unit or version", item.ID)
+		}
+		key := item.ObjectID + "\x00" + strings.ToLower(strings.Join(strings.Fields(item.Name), " ")) + "\x00" + item.Unit
+		if inventoryKeys[key] {
+			return report, fmt.Errorf("inventory %s: duplicate name and unit on object %s", item.ID, item.ObjectID)
+		}
+		inventoryKeys[key] = true
+		if material := InventoryMaterial(item.Name, item.Material); material != "" {
+			materials[strings.ToLower(material)] = true
+		}
+	}
+	report.Counts["inventory_materials"] = len(materials)
+	catalogKeys := map[string]bool{}
+	for _, entry := range inv.Catalog {
+		key := strings.ToLower(strings.Join(strings.Fields(entry.Name), " ")) + "\x00" + entry.Unit
+		if strings.TrimSpace(entry.Name) == "" || utf8.RuneCountInString(entry.Name) > 120 || utf8.RuneCountInString(entry.Material) > 60 || !validInventoryUnit(entry.Unit) || catalogKeys[key] {
+			return report, fmt.Errorf("inventory catalog: invalid or duplicate name %q", entry.Name)
+		}
+		catalogKeys[key] = true
 	}
 	for _, photo := range photos {
 		if !sets["objects"][photo.ObjectID] {

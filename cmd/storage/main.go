@@ -15,10 +15,10 @@ import (
 
 func run(args []string) error {
 	if len(args) == 0 {
-		return errors.New("usage: storage check|import|verify|export [--source storage] [--db storage/workservice.db] [--photos directory] [--cloud directory] [--out new-directory]")
+		return errors.New("usage: storage check|import|verify|audit|export [--source storage] [--db storage/workservice.db] [--photos directory] [--cloud directory] [--out new-directory]")
 	}
 	command := args[0]
-	if command != "check" && command != "import" && command != "verify" && command != "export" {
+	if command != "check" && command != "import" && command != "verify" && command != "audit" && command != "export" {
 		return errors.New("unknown command")
 	}
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
@@ -44,8 +44,8 @@ func run(args []string) error {
 	if *cloudDir == "" {
 		*cloudDir = filepath.Join(*source, "cloud")
 	}
-	if command == "export" {
-		if *out == "" {
+	if command == "export" || command == "audit" {
+		if command == "export" && *out == "" {
 			return errors.New("export requires --out pointing to a new directory")
 		}
 		db, err := persistence.OpenSQLite(*dbPath, false)
@@ -60,8 +60,14 @@ func run(args []string) error {
 		if err != nil {
 			return err
 		}
-		if _, err = storage.ValidateDocuments(docs, *photoDir, *cloudDir); err != nil {
+		report, err := storage.ValidateDocuments(docs, *photoDir, *cloudDir)
+		if err != nil {
 			return err
+		}
+		if command == "audit" {
+			encoded, _ := json.MarshalIndent(report, "", "  ")
+			fmt.Println(string(encoded))
+			return nil
 		}
 		return storage.ExportDocuments(docs, *photoDir, *out, *cloudDir)
 	}

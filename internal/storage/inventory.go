@@ -10,6 +10,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"project/internal/models"
@@ -44,6 +45,32 @@ type InventorySnapshot struct {
 type InventoryMutation struct {
 	Action, ItemID, Name, Unit, Note string
 	Quantity, Delta, Version         int64
+	Material                         *string
+}
+
+// Legacy items are grouped at read time; migration keeps the original bytes intact.
+func InventoryMaterial(name, material string) string {
+	aliases := map[string]string{
+		"нерж": "Нержавейка", "нержавейка": "Нержавейка", "нержавеющая": "Нержавейка",
+		"пвх": "ПВХ", "pvc": "ПВХ", "оцинк": "Оцинковка", "оцинковка": "Оцинковка", "оцинкованная": "Оцинковка",
+	}
+	material = strings.Join(strings.Fields(material), " ")
+	if material != "" {
+		if canonical := aliases[strings.ToLower(strings.TrimSuffix(material, "."))]; canonical != "" {
+			return canonical
+		}
+		return material
+	}
+	result := ""
+	for _, word := range strings.FieldsFunc(strings.ToLower(name), func(r rune) bool { return !unicode.IsLetter(r) }) {
+		if match := aliases[word]; match != "" {
+			if result != "" && result != match {
+				return ""
+			}
+			result = match
+		}
+	}
+	return result
 }
 
 func LoadInventory() error {
@@ -113,8 +140,12 @@ func GetInventory(objectID string) InventorySnapshot {
 	inventoryMutex.RLock()
 	defer inventoryMutex.RUnlock()
 	result := InventorySnapshot{Catalog: append([]models.InventoryName{}, inventory.Catalog...), Items: []models.InventoryItem{}, History: []models.InventoryChange{}}
+	for i := range result.Catalog {
+		result.Catalog[i].Material = InventoryMaterial(result.Catalog[i].Name, result.Catalog[i].Material)
+	}
 	for _, item := range inventory.Items {
 		if item.ObjectID == objectID {
+			item.Material = InventoryMaterial(item.Name, item.Material)
 			result.Items = append(result.Items, item)
 		}
 	}
@@ -175,17 +206,40 @@ func ChangeInventory(objectID, actorID, actorName string, mutation InventoryMuta
 		if mutation.Name == "" || utf8.RuneCountInString(mutation.Name) > 120 || utf8.RuneCountInString(mutation.Note) > 500 || !validInventoryUnit(mutation.Unit) {
 			return fmt.Errorf("%w: название до 120 символов, примечание до 500 символов и единица измерения обязательны", ErrInventoryInvalid)
 		}
-		found := false
-		for _, name := range next.Catalog {
+		material := ""
+		if mutation.Material != nil {
+			material = strings.Join(strings.Fields(*mutation.Material), " ")
+		} else if index >= 0 {
+			material = next.Items[index].Material
+		}
+		if utf8.RuneCountInString(material) > 60 {
+			return fmt.Errorf("%w: материал до 60 символов", ErrInventoryInvalid)
+		}
+		catalogIndex := -1
+		for i, name := range next.Catalog {
 			if sameInventoryName(name.Name, name.Unit, mutation.Name, mutation.Unit) {
 				mutation.Name = name.Name
-				found = true
+				if mutation.Material == nil && index < 0 {
+					material = name.Material
+				}
+				catalogIndex = i
 				break
 			}
 		}
-		if !found {
-			next.Catalog = append(next.Catalog, models.InventoryName{Name: mutation.Name, Unit: mutation.Unit})
+		material = InventoryMaterial(mutation.Name, material)
+		for _, entry := range next.Catalog {
+			canonical := InventoryMaterial(entry.Name, entry.Material)
+			if strings.EqualFold(canonical, material) {
+				material = canonical
+				break
+			}
 		}
+		if catalogIndex < 0 {
+			next.Catalog = append(next.Catalog, models.InventoryName{Name: mutation.Name, Unit: mutation.Unit, Material: material})
+		} else if mutation.Action == "update" && mutation.Material != nil {
+			next.Catalog[catalogIndex].Material = material
+		}
+		mutation.Material = &material
 		for i, item := range next.Items {
 			if item.ObjectID == objectID && sameInventoryName(item.Name, item.Unit, mutation.Name, mutation.Unit) {
 				if mutation.Action == "update" && i != index {
@@ -213,11 +267,13 @@ func ChangeInventory(objectID, actorID, actorName string, mutation InventoryMuta
 		item.Quantity += mutation.Quantity
 		if index < 0 {
 			item.Note = mutation.Note
+			item.Material = *mutation.Material
 		} else if mutation.Note != "" && mutation.Note != item.Note {
 			return fmt.Errorf("%w: позиция уже есть; измените её примечание через редактирование", ErrInventoryInvalid)
 		}
 	case "update":
 		item.Name, item.Unit, item.Note, item.Quantity = mutation.Name, mutation.Unit, mutation.Note, mutation.Quantity
+		item.Material = *mutation.Material
 	case "quantity":
 		item.Quantity = mutation.Quantity
 	case "adjust":

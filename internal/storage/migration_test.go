@@ -18,7 +18,7 @@ func TestMigrationRoundtrip(t *testing.T) {
 		"objects.json":           []byte(`[{"id":"o","responsibleUserId":"u"}]`),
 		"timesheets.json":        []byte(`[{"id":"t","workerIds":["w"],"objectIds":["o"],"periodEnd":"2026-10-05"}]`),
 		"vehicles.json":          []byte(`{"vehicles":[{"id":"v","assignedUserId":"u","ownerHistory":[{"at":"2026-10-01","userId":"u","userName":"Snapshot"}]}],"records":[{"id":"r","vehicleId":"v","liters":3.25}]}`),
-		"inventory.json":         []byte(`{"catalog":[{"name":"item","unit":"pcs"}],"items":[{"id":"i","object_id":"o","quantity":1234}],"history":[{"id":"h","object_id":"o","after":{"id":"i","quantity":1234}}]}`),
+		"inventory.json":         []byte(`{"catalog":[{"name":"Нерж 160","unit":"pcs","material":"Нержавейка"}],"items":[{"id":"i","object_id":"o","name":"Нерж 160","unit":"pcs","quantity":1234,"version":1,"material":"Нержавейка"}],"history":[{"id":"h","object_id":"o","after":{"id":"i","quantity":1234,"material":"Нержавейка"}}]}`),
 		"app_settings.json":      []byte(`{"telegramBotToken":"secret"}`),
 		"telegram_contacts.json": []byte(`[{"phone":"+375290000000","chatId":1234567890123456}]`),
 		"improvements.json":      []byte(`[]`), "object_photos.json": []byte(`[]`),
@@ -32,7 +32,7 @@ func TestMigrationRoundtrip(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(report.Warnings) != 0 || report.Counts["vehicle_owner_changes"] != 1 {
+	if len(report.Warnings) != 0 || report.Counts["vehicle_owner_changes"] != 1 || report.Counts["inventory_materials"] != 1 {
 		t.Fatal(report)
 	}
 	db, err := persistence.OpenSQLite(filepath.Join(t.TempDir(), "data.db"), true)

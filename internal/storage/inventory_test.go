@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"sync"
 	"testing"
 )
@@ -16,6 +17,94 @@ func inventoryFixture(t *testing.T) {
 	inventoryFile = filepath.Join(t.TempDir(), "inventory.json")
 	if err := LoadInventory(); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestInventoryMaterials(t *testing.T) {
+	for name, want := range map[string]string{"Нерж 160, отвод": "Нержавейка", "нержавейка 250": "Нержавейка", "ПВХ 250 1,5 м": "ПВХ", "PVC160": "ПВХ", "оцинк. 160": "Оцинковка", "Перфоратор": "", "Переходник ПВХ-нерж": "", "ПВХтест": ""} {
+		if got := InventoryMaterial(name, ""); got != want {
+			t.Errorf("%s: %s, want %s", name, got, want)
+		}
+	}
+	if InventoryMaterial("Нерж 160", "  Свой   материал  ") != "Свой материал" {
+		t.Fatal("explicit material must override detection")
+	}
+	inventoryFixture(t)
+	material := "ПВХ"
+	add := InventoryMutation{Action: "add", Name: "Труба 250", Material: &material, Unit: "pcs", Quantity: 1000}
+	if err := ChangeInventory("one", "actor", "", add); err != nil {
+		t.Fatal(err)
+	}
+	item := GetInventory("one").Items[0]
+	if item.Material != "ПВХ" || GetInventory("one").Catalog[0].Material != "ПВХ" {
+		t.Fatal("material not saved in catalog and item")
+	}
+	material = "Нержавейка"
+	if err := ChangeInventory("one", "actor", "", add); err != nil {
+		t.Fatal(err)
+	}
+	item = GetInventory("one").Items[0]
+	if item.Quantity != 2000 || item.Material != "ПВХ" {
+		t.Fatal("adding quantity must not regroup an existing item")
+	}
+	update := InventoryMutation{Action: "update", ItemID: item.ID, Version: item.Version, Name: item.Name, Unit: item.Unit, Quantity: item.Quantity, Material: &material}
+	if err := ChangeInventory("one", "actor", "", update); err != nil {
+		t.Fatal(err)
+	}
+	snapshot := GetInventory("one")
+	if snapshot.Items[0].Material != "Нержавейка" || snapshot.History[0].Before.Material != "ПВХ" || snapshot.History[0].After.Material != "Нержавейка" {
+		t.Fatal("regrouping or history incorrect")
+	}
+	if err := ChangeInventory("one", "actor", "", update); !errors.Is(err, ErrInventoryConflict) {
+		t.Fatal("stale material update accepted", err)
+	}
+	update.Version++
+	update.Material = nil
+	if err := ChangeInventory("one", "actor", "", update); err != nil {
+		t.Fatal(err)
+	}
+	if GetInventory("one").Items[0].Material != "Нержавейка" {
+		t.Fatal("old client erased the material")
+	}
+	material = strings.Repeat("я", 61)
+	update.Material = &material
+	update.Version++
+	before := GetInventory("one")
+	if err := ChangeInventory("one", "actor", "", update); !errors.Is(err, ErrInventoryInvalid) || !reflect.DeepEqual(before, GetInventory("one")) {
+		t.Fatal("invalid material changed inventory", err)
+	}
+	if err := LoadInventory(); err != nil || !reflect.DeepEqual(before, GetInventory("one")) {
+		t.Fatal("material lost after reload", err)
+	}
+}
+
+func TestLegacyInventoryMaterialDoesNotRewrite(t *testing.T) {
+	inventoryFixture(t)
+	data := []byte(`{"catalog":[{"name":"Нерж 160","unit":"pcs"}],"items":[{"id":"old","object_id":"one","name":"Нерж 160","unit":"pcs","quantity":1000,"version":1}]}`)
+	if err := os.WriteFile(inventoryFile, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := LoadInventory(); err != nil {
+		t.Fatal(err)
+	}
+	if GetInventory("one").Items[0].Material != "Нержавейка" || inventory.Items[0].Material != "" {
+		t.Fatal("legacy material not inferred or raw data modified")
+	}
+	after, err := os.ReadFile(inventoryFile)
+	if err != nil || string(after) != string(data) {
+		t.Fatal("reading grouped inventory rewrote storage", err)
+	}
+	material := "Алюминий"
+	for _, name := range []string{"Труба", "Уголок"} {
+		if err := ChangeInventory("one", "actor", "", InventoryMutation{Action: "add", Name: name, Unit: "pcs", Quantity: 1000, Material: &material}); err != nil {
+			t.Fatal(err)
+		}
+		material = "алюминий"
+	}
+	for _, item := range GetInventory("one").Items {
+		if item.ID != "old" && item.Material != "Алюминий" {
+			t.Fatal("case variations created separate material groups")
+		}
 	}
 }
 

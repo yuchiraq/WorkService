@@ -82,6 +82,10 @@ func MutateObjectInventory(c *gin.Context) {
 		action = "add"
 	}
 	mutation := storage.InventoryMutation{Action: action, ItemID: c.Param("itemID"), Name: c.PostForm("name"), Unit: c.PostForm("unit"), Note: c.PostForm("note")}
+	if values, exists := c.Request.PostForm["material"]; exists && len(values) > 0 {
+		material := values[0]
+		mutation.Material = &material
+	}
 	mutation.Version, _ = strconv.ParseInt(c.PostForm("version"), 10, 64)
 	var err error
 	switch action {
@@ -119,33 +123,45 @@ func MutateObjectInventory(c *gin.Context) {
 }
 
 var inventorySectionTemplate = template.Must(template.New("inventory").Parse(`
-<link rel="stylesheet" href="/static/css/inventory.css?v=1">
+<link rel="stylesheet" href="/static/css/inventory.css?v=3">
 <section id="object-inventory" class="inventory-section" aria-labelledby="inventory-title" data-endpoint="/object/{{.ObjectID}}/inventory" data-csrf="{{.CSRF}}">
   <header class="inventory-heading">
     <div class="inventory-heading-title"><h2 id="inventory-title">Инвентарь</h2><span id="inventory-count" class="inventory-count"></span></div>
     <button type="button" class="btn btn-primary" id="inventory-add"><span class="inv-icon inv-plus" aria-hidden="true"></span>Добавить</button>
   </header>
-  <div class="inventory-toolbar">
-    <label class="inventory-search"><span class="inv-icon inv-search" aria-hidden="true"></span><input id="inventory-search" type="search" aria-label="Поиск инвентаря" placeholder="Найти позицию" autocomplete="off"></label>
+  <div class="inventory-tools">
+   <div class="inventory-toolbar">
+    <div class="inventory-search"><span class="inv-icon inv-search" aria-hidden="true"></span><input id="inventory-search" type="search" aria-label="Поиск инвентаря" placeholder="Найти позицию" autocomplete="off" enterkeyhint="search"><button type="button" class="inv-button" id="inventory-search-clear" aria-label="Очистить поиск" title="Очистить поиск" hidden><span class="inv-icon inv-x" aria-hidden="true"></span></button></div>
     <button type="button" class="inv-button" id="inventory-refresh" aria-label="Обновить инвентарь" title="Обновить инвентарь"><span class="inv-icon inv-refresh" aria-hidden="true"></span></button>
+    <button type="button" class="inv-button" id="inventory-collapse" aria-label="Свернуть разделы" title="Свернуть разделы"><span class="inv-icon inv-collapse" aria-hidden="true"></span></button>
+   </div>
+   <div class="inventory-filters">
+    <select id="inventory-filter-material" aria-label="Фильтр по материалу"><option value="">Все материалы</option></select>
+    <select id="inventory-filter-stock" aria-label="Фильтр по наличию"><option value="">Любой остаток</option><option value="available">В наличии</option><option value="empty">Нет в наличии</option></select>
+    <button type="button" class="inv-button" id="inventory-filter-reset" aria-label="Сбросить поиск и фильтры" title="Сбросить поиск и фильтры" hidden><span class="inv-icon inv-x" aria-hidden="true"></span></button>
+   </div>
   </div>
   <p id="inventory-status" class="inventory-status" role="status" aria-live="polite"></p>
-  <ul id="inventory-items" class="inventory-items" aria-label="Инвентарь объекта"></ul>
+  <button type="button" id="inventory-search-create" class="inventory-search-create" hidden><span class="inv-icon inv-plus" aria-hidden="true"></span><span></span></button>
+  <div id="inventory-items" class="inventory-items" role="region" aria-label="Инвентарь объекта"></div>
   <p id="inventory-empty" class="inventory-empty" hidden></p>
   <details class="inventory-history"><summary>Последние изменения</summary><ol id="inventory-history"></ol></details>
   <noscript>Для работы с инвентарём включите JavaScript.</noscript>
   <dialog id="inventory-editor" class="confirmation-dialog inventory-dialog" aria-labelledby="inventory-editor-title">
     <div class="modal-content">
-      <header class="inventory-dialog-heading"><h2 id="inventory-editor-title">Добавить позицию</h2><button type="button" class="inv-button" data-close-dialog aria-label="Закрыть" title="Закрыть"><span class="inv-icon inv-x" aria-hidden="true"></span></button></header>
+      <header class="inventory-dialog-heading"><h2 id="inventory-editor-title" tabindex="-1">Добавить позицию</h2><button type="button" class="inv-button" data-close-dialog aria-label="Закрыть" title="Закрыть"><span class="inv-icon inv-x" aria-hidden="true"></span></button></header>
       <form id="inventory-form" method="post" data-native-submit>
+       <div class="inventory-dialog-fields">
         <button type="button" class="btn btn-secondary" id="inventory-reload-editor" hidden>Загрузить актуальные данные</button>
         <div class="inventory-field"><label for="inventory-name">Наименование</label><input id="inventory-name" name="name" list="inventory-names" maxlength="120" required autocomplete="off"><datalist id="inventory-names"></datalist></div>
+        <div class="inventory-field"><label for="inventory-material">Материал</label><input id="inventory-material" name="material" list="inventory-materials" maxlength="60" autocomplete="off" placeholder="Без раздела"><datalist id="inventory-materials"></datalist></div>
         <div class="inventory-form-pair">
           <div class="inventory-field"><label for="inventory-quantity">Количество</label><input id="inventory-quantity" name="quantity" type="text" inputmode="decimal" value="1" required maxlength="11" pattern="[0-9]+([.,][0-9]{1,3})?"></div>
           <div class="inventory-field"><label for="inventory-unit">Единица</label><select id="inventory-unit" name="unit"><option value="pcs">шт.</option><option value="set">компл.</option><option value="pack">упак.</option><option value="m">м</option><option value="m2">м²</option><option value="m3">м³</option><option value="kg">кг</option><option value="l">л</option></select></div>
         </div>
         <p id="inventory-existing" class="inventory-existing" hidden></p>
         <div class="inventory-field"><label for="inventory-note">Примечание <span class="inventory-optional">необязательно</span></label><textarea id="inventory-note" name="note" rows="2" maxlength="500"></textarea></div>
+       </div>
         <div class="inventory-dialog-actions"><button type="button" class="btn btn-secondary" data-close-dialog>Отмена</button><button type="submit" class="btn btn-primary" id="inventory-submit">Добавить</button></div>
       </form>
     </div>
@@ -155,7 +171,7 @@ var inventorySectionTemplate = template.Must(template.New("inventory").Parse(`
   </dialog>
   <script type="application/json" id="inventory-data">{{.Data}}</script>
 </section>
-<script src="/static/js/inventory.js?v=1" defer></script>`))
+<script src="/static/js/inventory.js?v=3" defer></script>`))
 
 func renderObjectInventory(c *gin.Context, object models.Object) string {
 	if !canManageInventory(c, object) {

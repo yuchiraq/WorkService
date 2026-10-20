@@ -744,7 +744,7 @@ if(dateInput){ dateInput.addEventListener('change',syncEntryKind); }
 })();
 </script>
 <link rel="stylesheet" href="/static/css/operation-controls.css?v=1">
-<script src="/static/js/schedule-workers.js?v=1" defer></script>
+<script src="/static/js/schedule-workers.js?v=2" defer></script>
 </body></html>`
 
 	layoutStart := RenderSidebar(c, "schedule")
