@@ -510,6 +510,10 @@ function openModal(url, title, ret, trigger){
       navigateAfterModal(payload.response.url);
       return;
     }
+    if(window.WorkServiceUI){
+      const error=window.WorkServiceUI.responseError(payload.response,payload.text);
+      if(error){ modalContent.innerHTML=''; window.WorkServiceUI.feedback(error); return; }
+    }
     renderModalHTML(payload.text, title, effectiveRet);
   }).catch(function(){
     if(seq !== modalRequestSeq) return;
@@ -799,7 +803,7 @@ syncNavState();
     <div class="action-modal-header"><strong id="app-action-modal-title">Форма</strong><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">&times;</button></div>
     <div class="action-modal-body"><div id="app-action-modal-content" class="action-modal-content"></div></div>
   </div>
-</div>%s%s<script src="/static/js/ui.js?v=17" defer></script><script src="/static/js/motion.js?v=2" defer></script><script src="/static/js/quick-actions.js?v=1" defer></script>`, navInnerClass, pageTitle, topNavActions, template.HTMLEscapeString(userInitial), template.HTMLEscapeString(userName), roleLabel, nav.String(), floatingAction, csrfScript, uiScript)
+</div><link rel="stylesheet" href="/static/css/quick-actions.css?v=1">%s%s<script src="/static/js/ui.js?v=18" defer></script><script src="/static/js/motion.js?v=2" defer></script><script src="/static/js/quick-actions.js?v=2" defer></script>`, navInnerClass, pageTitle, topNavActions, template.HTMLEscapeString(userInitial), template.HTMLEscapeString(userName), roleLabel, nav.String(), floatingAction, csrfScript, uiScript)
 }
 
 func IsModalRequest(c *gin.Context) bool {

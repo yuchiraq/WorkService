@@ -11,6 +11,7 @@
 
     function close(restore = false) {
       menu.hidden = true;
+      document.body.classList.remove('quick-actions-open');
       trigger.setAttribute('aria-expanded', 'false');
       trigger.setAttribute('aria-label', 'Добавить');
       trigger.title = 'Добавить';
@@ -18,6 +19,7 @@
     }
     function open(index = 0) {
       menu.hidden = false;
+      document.body.classList.add('quick-actions-open');
       trigger.setAttribute('aria-expanded', 'true');
       trigger.setAttribute('aria-label', 'Закрыть быстрые действия');
       trigger.title = 'Закрыть быстрые действия';
@@ -62,13 +64,19 @@
     document.addEventListener('pointerdown', event => {
       if (!menu.hidden && !dial.contains(event.target)) close(menu.contains(document.activeElement));
     });
-    dial.addEventListener('focusout', () => {
-      queueMicrotask(() => { if (!dial.contains(document.activeElement)) close(); });
+    dial.addEventListener('focusout', event => {
+      // activeElement may temporarily be body between blur and focus on another item.
+      if (event.relatedTarget && !dial.contains(event.relatedTarget)) close();
     });
     window.addEventListener('pagehide', () => close());
     if (picker) {
       picker.querySelector('[data-quick-close]').addEventListener('click', () => picker.close());
       picker.addEventListener('click', event => {
+        if (event.target.closest('.quick-vehicle-choice')) {
+          picker.close();
+          window.WorkServiceUI?.syncLayers();
+          return;
+        }
         if (event.target !== picker) return;
         const rect = picker.getBoundingClientRect();
         if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) picker.close();

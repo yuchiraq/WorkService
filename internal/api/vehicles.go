@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"html/template"
+	"math"
 	"net/http"
 	"net/url"
 	"sort"
@@ -399,27 +400,50 @@ func VehiclePage(c *gin.Context) {
 }
 
 func CreateVehicleRecord(c *gin.Context) {
+	fail := func(status int, path, message string) {
+		if c.PostForm("quick") == "1" {
+			c.JSON(status, gin.H{"error": message})
+			return
+		}
+		redirectVehicleMessage(c, path, "error", message)
+	}
 	vehicle, err := storage.GetVehicleByID(c.Param("id"))
 	if err != nil {
-		redirectVehicleMessage(c, "/vehicles", "error", "Транспорт не найден.")
+		fail(404, "/vehicles", "Транспорт не найден.")
 		return
 	}
 	if !canAccessVehicle(c, vehicle) {
-		redirectVehicleMessage(c, "/vehicles", "error", "У вас нет доступа к этому транспорту.")
+		fail(403, "/vehicles", "У вас нет доступа к этому транспорту.")
 		return
 	}
-	mileage, _ := strconv.Atoi(strings.TrimSpace(c.PostForm("mileage")))
-	liters, _ := strconv.ParseFloat(strings.TrimSpace(c.PostForm("liters")), 64)
-	amount, _ := strconv.ParseFloat(strings.TrimSpace(c.PostForm("amount")), 64)
+	mileageText := strings.TrimSpace(c.PostForm("mileage"))
+	mileage, mileageErr := strconv.Atoi(mileageText)
+	parseAmount := func(name string) (float64, error) {
+		text := strings.ReplaceAll(strings.TrimSpace(c.PostForm(name)), ",", ".")
+		if text == "" {
+			return 0, nil
+		}
+		n, err := strconv.ParseFloat(text, 64)
+		if math.IsNaN(n) || math.IsInf(n, 0) {
+			return 0, errors.New("invalid number")
+		}
+		return n, err
+	}
+	liters, litersErr := parseAmount("liters")
+	amount, amountErr := parseAmount("amount")
+	if (mileageText != "" && mileageErr != nil) || (c.PostForm("type") == "fuel" && (litersErr != nil || amountErr != nil)) {
+		fail(422, "/vehicles/"+vehicle.ID, "Проверьте пробег, количество топлива и сумму: нужны корректные числа.")
+		return
+	}
 	record := models.VehicleRecord{
 		VehicleID: vehicle.ID, Type: c.PostForm("type"), Date: c.PostForm("date"), Mileage: mileage, Liters: liters, Amount: amount, Notes: c.PostForm("notes"),
 		CreatedByID: c.GetString("userID"), CreatedByName: c.GetString("userName"),
 	}
 	if _, err := storage.CreateVehicleRecord(record); err != nil {
-		redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "error", vehicleRecordErrorMessage(err))
+		fail(422, "/vehicles/"+vehicle.ID, vehicleRecordErrorMessage(err))
 		return
 	}
-	redirectVehicleMessage(c, "/vehicles/"+vehicle.ID, "success", "Запись добавлена.")
+	redirectVehicleMessage(c, vehicleReturnPath(c.PostForm("return_to"), "/vehicles/"+vehicle.ID), "success", "Запись добавлена.")
 }
 
 func DeleteVehicleRecord(c *gin.Context) {

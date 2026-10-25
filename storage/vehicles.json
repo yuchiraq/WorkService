@@ -1,0 +1,30 @@
+{
+    "vehicles": [
+        {
+            "id": "954cac18-898a-4d13-be58-79ce912eb1fe",
+            "name": "Jsj",
+            "registrationNumber": "JJ",
+            "assignedUserId": "1",
+            "createdByUserId": "1",
+            "createdByName": "Test User",
+            "createdAt": "2026-09-28T22:34:57+03:00",
+            "ownerHistory": [
+                {
+                    "at": "2026-10-25T19:24:44.2189797Z",
+                    "previousUserId": "f186e173-e3fb-40a5-bf3c-8984b52e6185",
+                    "previousName": "Codex Smoke Admin",
+                    "actorId": "1",
+                    "actorName": "Test User"
+                },
+                {
+                    "at": "2026-10-25T19:24:47.6762068Z",
+                    "userId": "1",
+                    "userName": "Test User",
+                    "actorId": "1",
+                    "actorName": "Test User"
+                }
+            ]
+        }
+    ],
+    "records": []
+}

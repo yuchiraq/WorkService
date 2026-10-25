@@ -32,6 +32,9 @@ func SetupRouter(r *gin.Engine) {
 	r.GET("/login", api.LoginPage)
 	r.POST("/login", api.Login)
 	r.GET("/logout", api.Logout)
+	r.GET("/s/:token", api.SharedCloudPage)
+	r.GET("/s/:token/file/:id", api.SharedCloudFile)
+	r.HEAD("/s/:token/file/:id", api.SharedCloudFile)
 
 	authRequired := r.Group("/")
 	authRequired.Use(api.AuthRequired(), api.CSRFMiddleware())
@@ -95,6 +98,7 @@ func SetupRouter(r *gin.Engine) {
 
 		authRequired.GET("/vehicles", api.VehiclesPage)
 		authRequired.GET("/vehicles/:id", api.VehiclePage)
+		authRequired.GET("/vehicles/:id/records/new", api.NewVehicleRecordPage)
 		authRequired.POST("/vehicles/new", api.CreateVehicle)
 		authRequired.POST("/vehicles/:id/assign-self", api.AssignVehicleToSelf)
 		authRequired.POST("/vehicles/:id/assign", api.AssignVehicle)
@@ -117,6 +121,7 @@ func SetupRouter(r *gin.Engine) {
 		adminRequired.GET("/cloud", api.CloudPage)
 		adminRequired.GET("/cloud/items", api.CloudItems)
 		adminRequired.POST("/cloud/action", api.MutateCloud)
+		adminRequired.POST("/cloud/share/:id", api.SetCloudShare)
 		adminRequired.POST("/cloud/upload", api.UploadCloudFile)
 		adminRequired.GET("/cloud/file/:id", api.CloudFile)
 		adminRequired.POST("/cloud/archive", api.CloudArchive)

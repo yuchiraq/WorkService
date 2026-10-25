@@ -8,6 +8,9 @@
   let view = 'files', folder = '', visible = 100, selected = new Set(), busy = false, uploading = false;
   let editing = null, sequence = 0, previewSequence = 0, queue = [], stopped = false, activeXHR = null;
   let pdfDispose = null;
+  const share = $('cloud-share');
+  let sharing = null;
+  const shared = item => !!item.shareToken && (!item.shareExpiresAt || new Date(item.shareExpiresAt) > new Date());
   const collator = new Intl.Collator('ru', {numeric:true, sensitivity:'base'});
   const feedback = (message, error = true) => {
     window.WorkServiceUI.feedback(message, error);
@@ -96,6 +99,7 @@
     check.addEventListener('change',()=>{ if(check.checked && selected.size>=500) { check.checked=false; feedback('Выберите не более 500 элементов'); return; } check.checked?selected.add(item.id):selected.delete(item.id); node.classList.toggle('is-selected',check.checked); selectionUI(); }); label.append(check);
     const open=el('button','cloud-row-open'); open.type='button'; open.title=item.name; open.disabled=busy; open.append(icon(item.kind==='folder'?'folder':item.mime?.startsWith('image/')?'image':'file'));
     const copy=el('span','cloud-row-copy'); copy.append(el('span','cloud-row-name',item.name));
+    if(shared(item)) { const badge=el('span','cloud-shared-badge','Доступ по ссылке'); badge.prepend(icon('link')); copy.append(badge); }
     node.classList.toggle('is-starred',item.starred);
     const detail=item.kind==='folder'?'Папка':size(item.size);
     copy.append(el('span','cloud-row-meta',`${detail} · ${date(item.deletedAt||item.updatedAt)}`)); open.append(copy);
@@ -134,7 +138,7 @@
     return data;
   }
   async function refresh() {
-    if(busy || uploading || editor.open || preview.open || menu.open) return;
+    if(busy || uploading || editor.open || preview.open || menu.open || share.open) return;
     const request=++sequence;
     try { const data=await json(await fetch('/cloud/items',{cache:'no-store'})); if(request===sequence && !busy && !uploading && !editor.open && !preview.open && !menu.open) { state=data; render(); } }
     catch(error) { feedback(error.message); }
@@ -179,6 +183,7 @@
     if(item.deletedAt) { add('Восстановить','restore',()=>openEditor('restore',[item],trigger)); add('Удалить навсегда','trash',()=>openEditor('purge',[item],trigger)); }
     else {
       add('Скачать','download',()=>download([item]));
+      add('Доступ по ссылке','link',()=>openShare(item,trigger));
       add('Переименовать','pencil',()=>openEditor('rename',[item],trigger));
       add('Переместить','move',()=>openEditor('move',[item],trigger));
       add(item.starred?'Убрать из избранного':'В избранное','star',()=>mutate({action:'star',items:refs([item]),starred:!item.starred}));
@@ -186,6 +191,55 @@
     }
     menu.uiReturnFocus=trigger; menu.showModal();
   }
+  function renderShare() {
+    if(!sharing) return;
+    const active=shared(sharing);
+    $('cloud-share-name').textContent=sharing.name;
+    $('cloud-share-status').textContent=active ? (sharing.shareExpiresAt ? `Доступ открыт до ${date(sharing.shareExpiresAt)}` : 'Доступ открыт: только просмотр') : 'Доступ закрыт';
+    $('cloud-share-expiry-field').hidden=active;
+    $('cloud-share-link-field').hidden=!active;
+    $('cloud-share-revoke').hidden=!sharing.shareToken;
+    $('cloud-share-create').hidden=active;
+    $('cloud-share-link').value=active?new URL(`/s/${sharing.shareToken}`,location.origin).href:'';
+  }
+  async function openShare(item,trigger) {
+    sharing={...item}; share.uiReturnFocus=trigger; $('cloud-share-expiry').value='0'; renderShare(); share.showModal();
+    const id=item.id;
+    const request=++sequence;
+    try {
+      const next=await json(await fetch('/cloud/items',{cache:'no-store'}));
+      if(!share.open || sharing?.id!==id || request!==sequence || busy) return;
+      state=next; render(); sharing=index.get(id);
+      if(!sharing || sharing.deletedAt) {share.close();feedback('Файл или папка недоступны');return;}
+      renderShare();
+    } catch(error) {feedback(error.message);}
+  }
+  async function changeShare(enabled) {
+    if(busy || !sharing) return;
+    busy=true; sequence++; render();
+    share.querySelectorAll('button,select').forEach(node=>node.disabled=true);
+    try {
+      state=await json(await fetch(`/cloud/share/${encodeURIComponent(sharing.id)}`,{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':root.dataset.csrf},body:JSON.stringify({version:sharing.version,enabled,days:Number($('cloud-share-expiry').value)})}));
+      reindex(); sharing=index.get(sharing.id); renderShare();
+      feedback(enabled?'Ссылка создана':'Доступ по ссылке закрыт',false);
+    } catch(error) {
+      if(error.status===409) {
+        try {state=await json(await fetch('/cloud/items',{cache:'no-store'}));reindex();sharing=index.get(sharing.id);if(sharing&&!sharing.deletedAt)renderShare();else share.close();} catch(_) {}
+      }
+      feedback(error.message);
+    } finally {busy=false;share.querySelectorAll('button,select').forEach(node=>node.disabled=false);render();}
+  }
+  $('cloud-share-create').addEventListener('click',()=>changeShare(true));
+  $('cloud-share-revoke').addEventListener('click',()=>changeShare(false));
+  $('cloud-share-copy').addEventListener('click',async()=>{
+    const field=$('cloud-share-link');
+    try {
+      if(navigator.clipboard && isSecureContext) await navigator.clipboard.writeText(field.value);
+      else {field.focus();field.select();if(!document.execCommand('copy'))throw new Error();}
+      feedback('Ссылка скопирована',false);
+    } catch(_) {field.focus();field.select();feedback('Не удалось скопировать автоматически. Ссылка выделена для копирования.');}
+  });
+  share.addEventListener('cancel',event=>{if(busy)event.preventDefault();});
   async function showPreview(item,trigger) {
     const request=++previewSequence; const body=$('cloud-preview-body');
     $('cloud-preview-title').textContent=item.name; $('cloud-preview-meta').textContent=`${size(item.size)} · ${date(item.updatedAt)}`;
@@ -277,7 +331,7 @@
   for(const btn of root.querySelectorAll('[data-close-dialog]')) btn.addEventListener('click',()=>{if(!busy) btn.closest('dialog').close();});
   editor.addEventListener('cancel',event=>{if(busy)event.preventDefault();});
   preview.addEventListener('close',()=>{previewSequence++; pdfDispose?.();pdfDispose=null;$('cloud-preview-body').replaceChildren();});
-  for(const dialog of [editor,preview,menu]) dialog.addEventListener('close',()=>{if(!dialog.uiReturnFocus?.isConnected)$('cloud-refresh').focus({preventScroll:true});});
+  for(const dialog of [editor,preview,menu,share]) dialog.addEventListener('close',()=>{if(!dialog.uiReturnFocus?.isConnected)$('cloud-refresh').focus({preventScroll:true});});
   for(const btn of root.querySelectorAll('[data-view]')) btn.addEventListener('click',()=>navigate('',btn.dataset.view));
   $('cloud-search').addEventListener('input',()=>{selected.clear();visible=100;saveLocation(true);render();});
   $('cloud-sort').addEventListener('change',render);

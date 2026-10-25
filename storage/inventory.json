@@ -1,0 +1,160 @@
+{
+  "catalog": [
+    {
+      "name": "Труба 160 6м",
+      "unit": "pcs"
+    },
+    {
+      "name": "Болгарка",
+      "unit": "pcs"
+    },
+    {
+      "name": "Труба 50 3м",
+      "unit": "pcs"
+    }
+  ],
+  "items": [
+    {
+      "id": "e064386a-3d2a-4784-b3c2-58ba99461f0e",
+      "object_id": "1",
+      "name": "Труба 160 6м",
+      "unit": "pcs",
+      "quantity": 2000,
+      "note": "",
+      "version": 2,
+      "updated_at": "2026-10-09T16:23:26.696121Z"
+    },
+    {
+      "id": "814cab42-e3fd-48d2-b7e3-fad529f8462a",
+      "object_id": "1",
+      "name": "Болгарка",
+      "unit": "pcs",
+      "quantity": 1000,
+      "note": "",
+      "version": 1,
+      "updated_at": "2026-10-09T16:23:34.8511843Z"
+    },
+    {
+      "id": "d08c5c29-876e-4e9d-98ab-0b5c0488d2d8",
+      "object_id": "99a5b5a3-827c-449f-8fcd-5353ede92609",
+      "name": "Болгарка",
+      "unit": "pcs",
+      "quantity": 1000,
+      "note": "",
+      "version": 1,
+      "updated_at": "2026-10-09T16:24:04.6951491Z"
+    },
+    {
+      "id": "38d5242b-e362-442e-83e5-a76ade39c341",
+      "object_id": "99a5b5a3-827c-449f-8fcd-5353ede92609",
+      "name": "Труба 50 3м",
+      "unit": "pcs",
+      "quantity": 1000,
+      "note": "",
+      "version": 1,
+      "updated_at": "2026-10-09T16:24:20.5880557Z"
+    }
+  ],
+  "history": [
+    {
+      "id": "9b07882f-50c9-4ec0-afff-b1d78a66b958",
+      "object_id": "1",
+      "action": "add",
+      "actor_id": "1",
+      "actor_name": "Test User",
+      "at": "2026-10-09T16:23:24.3856511Z",
+      "after": {
+        "id": "e064386a-3d2a-4784-b3c2-58ba99461f0e",
+        "object_id": "1",
+        "name": "Труба 160 6м",
+        "unit": "pcs",
+        "quantity": 1000,
+        "note": "",
+        "version": 1,
+        "updated_at": "2026-10-09T16:23:24.3856511Z"
+      }
+    },
+    {
+      "id": "c692fc8f-8b12-48af-a74c-3a7a303001d8",
+      "object_id": "1",
+      "action": "adjust",
+      "actor_id": "1",
+      "actor_name": "Test User",
+      "at": "2026-10-09T16:23:26.696121Z",
+      "before": {
+        "id": "e064386a-3d2a-4784-b3c2-58ba99461f0e",
+        "object_id": "1",
+        "name": "Труба 160 6м",
+        "unit": "pcs",
+        "quantity": 1000,
+        "note": "",
+        "version": 1,
+        "updated_at": "2026-10-09T16:23:24.3856511Z"
+      },
+      "after": {
+        "id": "e064386a-3d2a-4784-b3c2-58ba99461f0e",
+        "object_id": "1",
+        "name": "Труба 160 6м",
+        "unit": "pcs",
+        "quantity": 2000,
+        "note": "",
+        "version": 2,
+        "updated_at": "2026-10-09T16:23:26.696121Z"
+      }
+    },
+    {
+      "id": "36912480-3559-45f4-83fb-cff24d582054",
+      "object_id": "1",
+      "action": "add",
+      "actor_id": "1",
+      "actor_name": "Test User",
+      "at": "2026-10-09T16:23:34.8511843Z",
+      "after": {
+        "id": "814cab42-e3fd-48d2-b7e3-fad529f8462a",
+        "object_id": "1",
+        "name": "Болгарка",
+        "unit": "pcs",
+        "quantity": 1000,
+        "note": "",
+        "version": 1,
+        "updated_at": "2026-10-09T16:23:34.8511843Z"
+      }
+    },
+    {
+      "id": "a1d63e52-66e0-49d2-85bf-9a3187c5c341",
+      "object_id": "99a5b5a3-827c-449f-8fcd-5353ede92609",
+      "action": "add",
+      "actor_id": "1",
+      "actor_name": "Test User",
+      "at": "2026-10-09T16:24:04.6951491Z",
+      "after": {
+        "id": "d08c5c29-876e-4e9d-98ab-0b5c0488d2d8",
+        "object_id": "99a5b5a3-827c-449f-8fcd-5353ede92609",
+        "name": "Болгарка",
+        "unit": "pcs",
+        "quantity": 1000,
+        "note": "",
+        "version": 1,
+        "updated_at": "2026-10-09T16:24:04.6951491Z"
+      }
+    },
+    {
+      "id": "289ed4af-0366-40f9-b865-b0dfb55b42d9",
+      "object_id": "99a5b5a3-827c-449f-8fcd-5353ede92609",
+      "action": "add",
+      "actor_id": "1",
+      "actor_name": "Test User",
+      "at": "2026-10-09T16:24:20.5880557Z",
+      "after": {
+        "id": "38d5242b-e362-442e-83e5-a76ade39c341",
+        "object_id": "99a5b5a3-827c-449f-8fcd-5353ede92609",
+        "name": "Труба 50 3м",
+        "unit": "pcs",
+        "quantity": 1000,
+        "note": "",
+        "version": 1,
+        "updated_at": "2026-10-09T16:24:20.5880557Z"
+      }
+    }
+  ]
+}

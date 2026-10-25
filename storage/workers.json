@@ -1,0 +1,16 @@
+[
+    {
+        "id": "dd9f63c5-9866-4623-8f7f-99624b91769d",
+        "name": "выа ваы",
+        "position": "Машинист экскаватора",
+        "createdBy": "1",
+        "createdByName": "Test User"
+    },
+    {
+        "id": "86fbaf30-0984-4e0b-a001-b47e036d40b8",
+        "name": "ВЫА ыва",
+        "position": "Монтажник",
+        "createdBy": "1",
+        "createdByName": "Test User"
+    }
+]

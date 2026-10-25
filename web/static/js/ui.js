@@ -70,6 +70,9 @@
       if (detail?.textContent.trim()) return detail.textContent.trim();
     }
     if (!response.ok) {
+      if ((response.headers.get('content-type') || '').includes('application/json')) {
+        try { const data=JSON.parse(text); if(typeof data.error==='string') return data.error.slice(0,600); } catch (_) {}
+      }
       if (response.status >= 500 || (response.headers.get('content-type') || '').includes('text/html')) return 'Не удалось сохранить изменения. Данные остались в форме. Повторите попытку позже.';
       return text.trim().slice(0, 600) || 'Сервер не принял изменения. Проверьте данные.';
     }

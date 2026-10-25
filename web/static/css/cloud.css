@@ -106,6 +106,30 @@
 .cl-search { --cl-icon: url('/static/icons/lucide/search.svg'); }
 .cl-previous { --cl-icon: url('/static/icons/lucide/chevron-left.svg'); }
 .cl-next { --cl-icon: url('/static/icons/lucide/chevron-right.svg'); }
+.cl-link { --cl-icon: url('/static/icons/lucide/link.svg'); }
+.cl-copy { --cl-icon: url('/static/icons/lucide/copy.svg'); }
+.cloud-shared-badge { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted-strong); }
+.cloud-shared-badge .cl-icon { width: 14px; height: 14px; flex-basis: 14px; }
+#cloud-share-name { font-weight: 600; overflow-wrap: anywhere; }
+#cloud-share .text-muted, #cloud-share-status { font-size: 14px; line-height: 1.5; }
+#cloud-share-link, #cloud-share-expiry { width: 100%; min-width: 0; min-height: 48px; margin: 6px 0 12px; font-size: 16px; }
+#cloud-share .btn { min-height: 48px; }
+.cloud-share-page { margin: 0; color: var(--text); background: var(--bg); }
+.cloud-public { width: min(100% - 32px,960px); margin: 24px auto; min-width: 0; }
+.cloud-public-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: 16px; margin-bottom: 24px; }
+.cloud-public-header > span:last-child { font-size: 13px; color: var(--muted-strong); }
+.cloud-public h1 { font-size: 24px; margin: 16px 0; overflow-wrap: anywhere; }
+.cloud-public-list { list-style: none; padding: 0; margin: 0; }
+.cloud-public-list li { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--border); }
+.cloud-public-open { display: flex; align-items: center; min-height: 64px; gap: 12px; flex: 1; min-width: 0; color: var(--text); text-decoration: none; }
+.cloud-public-open > span:not(.cl-icon) { overflow-wrap: anywhere; flex: 1; min-width: 0; }
+.cloud-public-open small { color: var(--muted-strong); white-space: nowrap; }
+.cloud-public .cl-button { display: grid; place-items: center; flex: 0 0 48px; height: 48px; color: var(--text); }
+.cloud-public .cloud-breadcrumbs a { min-height: 48px; }
+.cloud-public .cloud-breadcrumbs a + a::before { content: '/'; margin-right: 8px; color: var(--muted-strong); }
+.cloud-public-file img { display: block; max-width: 100%; max-height: 65dvh; object-fit: contain; margin: 16px 0; }
+.cloud-public-file .btn { display: inline-flex; gap: 8px; align-items: center; min-height: 48px; }
+.cloud-public :is(a,button):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 @media (max-width: 900px) {
   .cloud-row { grid-template-columns: 32px minmax(0, 1fr) 44px; gap: 6px; }
   .cloud-list-heading { grid-template-columns: minmax(0, 1fr); }

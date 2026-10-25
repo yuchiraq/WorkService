@@ -186,6 +186,9 @@ func ValidateCloudMetadata(items []models.CloudItem) error {
 	}
 	names := map[string]bool{}
 	for _, item := range items {
+		if err := validateCloudShare(item); err != nil {
+			return err
+		}
 		if _, err := uuid.Parse(item.ID); err != nil || len(item.ID) != 36 || item.OwnerID == "" || item.Version < 1 {
 			return errors.New("invalid cloud identity")
 		}
@@ -559,6 +562,8 @@ func ChangeCloud(owner string, mutation CloudMutation) error {
 				if selected[id] {
 					next[i].DeletedAt = now
 					next[i].TrashRootID = id
+					next[i].ShareToken = ""
+					next[i].ShareExpiresAt = ""
 					bump(i)
 					break
 				}

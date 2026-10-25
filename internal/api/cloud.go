@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"project/internal/models"
 	"project/internal/storage"
 )
 
@@ -116,6 +117,10 @@ func CloudFile(c *gin.Context) {
 		return
 	}
 	defer file.Close()
+	serveCloudFile(c, item, file)
+}
+
+func serveCloudFile(c *gin.Context, item models.CloudItem, file *os.File) {
 	cloudHeaders(c)
 	if c.Query("preview") == "text" {
 		if !strings.HasPrefix(item.MIME, "text/plain") {
