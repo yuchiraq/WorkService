@@ -15,7 +15,7 @@
   }
 
   function activeLayer() {
-    const confirmation = document.querySelector('dialog[open]');
+    const confirmation = document.activeElement?.closest('dialog[open]') || [...document.querySelectorAll('dialog[open]')].at(-1);
     if (confirmation) return confirmation;
     if (modal?.classList.contains('visible')) return modal;
     if (!desktop.matches && document.body.classList.contains('nav-open')) return sidebar;
@@ -25,10 +25,10 @@
   function syncLayers() {
     const layer = activeLayer();
     document.querySelectorAll('body > .main-content,body > .top-nav,body > .floating-create-wrap,body > .skip-link,body > .site-toast').forEach(element => {
-      element.inert = !!layer;
+      element.inert = !!layer && !element.contains(layer);
     });
     if (sidebar) {
-      sidebar.inert = layer === modal || (!desktop.matches && layer !== sidebar);
+      sidebar.inert = layer?.tagName === 'DIALOG' || layer === modal || (!desktop.matches && layer !== sidebar);
       if (!desktop.matches) sidebar.setAttribute('aria-hidden', layer === sidebar ? 'false' : 'true');
       else sidebar.removeAttribute('aria-hidden');
     }
@@ -226,6 +226,8 @@
 
   document.addEventListener('keydown', event => {
     const layer = activeLayer();
+    // Native modal dialogs already trap focus, including stacked editors.
+    if (layer?.matches('dialog:modal')) return;
     if (event.key !== 'Tab' || !layer) return;
     const items = [...layer.querySelectorAll(focusable)].filter(visible);
     const first = items[0];

@@ -803,7 +803,7 @@ syncNavState();
     <div class="action-modal-header"><strong id="app-action-modal-title">Форма</strong><button type="button" class="action-modal-close" data-modal-close aria-label="Закрыть">&times;</button></div>
     <div class="action-modal-body"><div id="app-action-modal-content" class="action-modal-content"></div></div>
   </div>
-</div><link rel="stylesheet" href="/static/css/quick-actions.css?v=1">%s%s<script src="/static/js/ui.js?v=18" defer></script><script src="/static/js/motion.js?v=2" defer></script><script src="/static/js/quick-actions.js?v=2" defer></script>`, navInnerClass, pageTitle, topNavActions, template.HTMLEscapeString(userInitial), template.HTMLEscapeString(userName), roleLabel, nav.String(), floatingAction, csrfScript, uiScript)
+</div><link rel="stylesheet" href="/static/css/quick-actions.css?v=1">%s%s<script src="/static/js/ui.js?v=19" defer></script><script src="/static/js/motion.js?v=2" defer></script><script src="/static/js/quick-actions.js?v=2" defer></script>`, navInnerClass, pageTitle, topNavActions, template.HTMLEscapeString(userInitial), template.HTMLEscapeString(userName), roleLabel, nav.String(), floatingAction, csrfScript, uiScript)
 }
 
 func IsModalRequest(c *gin.Context) bool {

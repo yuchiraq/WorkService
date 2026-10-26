@@ -1,0 +1,162 @@
+package router
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"regexp"
+	"strings"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+	"project/internal/models"
+	"project/internal/storage"
+)
+
+func testConstructionDocuments(t *testing.T, r *gin.Engine, admin, worker *http.Cookie) {
+	t.Helper()
+	call := func(method, path string, body any, cookie *http.Cookie, token string) *httptest.ResponseRecorder {
+		var data []byte
+		if body != nil {
+			data, _ = json.Marshal(body)
+		}
+		req := httptest.NewRequest(method, path, bytes.NewReader(data))
+		if cookie != nil {
+			req.AddCookie(cookie)
+		}
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-CSRF-Token", token)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w
+	}
+	page := call("GET", "/object/object", nil, admin, "").Body.String()
+	if !strings.Contains(page, `href="#object-documents"`) {
+		t.Fatal("document tab missing")
+	}
+	token := regexp.MustCompile(`data-csrf="([^"]+)"`).FindStringSubmatch(page)[1]
+	base := "/object/object/documents"
+	if w := call("GET", base, nil, worker, ""); w.Code != 403 {
+		t.Fatal("worker read", w.Code)
+	}
+	if w := call("GET", base+"/sources?from=2026-09-01&to=2026-09-30", nil, worker, ""); w.Code != 403 {
+		t.Fatal("source privacy", w.Code)
+	}
+	if strings.Contains(call("GET", "/object/object", nil, worker, "").Body.String(), `id="object-documents"`) {
+		t.Fatal("worker tab exposed")
+	}
+	content := models.ConstructionContent{Kind: "act", Fields: map[string]string{"work_name": "Монтаж <script>alert(1)</script>", "object_name": "Объект", "address": "Минск"}}
+	payload := func(id string, version int64, c models.ConstructionContent, reason string) any {
+		return map[string]any{"id": id, "version": version, "content": c, "reason": reason}
+	}
+	if w := call("POST", base, payload("", 0, content, ""), admin, ""); w.Code != 403 {
+		t.Fatal("CSRF", w.Code)
+	}
+	w := call("POST", base, payload("", 0, content, ""), admin, token)
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	var doc models.ConstructionDocument
+	if err := json.Unmarshal(w.Body.Bytes(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	if doc.Content.Number != "АСР-001" || len(doc.History) != 1 || doc.Version != 1 {
+		t.Fatal("new document", doc)
+	}
+	if w := call("GET", base+"/"+doc.ID, nil, worker, ""); w.Code != 403 {
+		t.Fatal("detail privacy", w.Code)
+	}
+	if w := call("GET", base+"/"+doc.ID+"/pdf", nil, worker, ""); w.Code != 403 {
+		t.Fatal("PDF privacy", w.Code)
+	}
+	other, err := storage.CreateObject(models.Object{Name: "Документы другого объекта", Address: "Минск", ResponsibleUserID: "admin", Status: "in_progress"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	otherBase := "/object/" + other.ID + "/documents"
+	if w := call("GET", otherBase+"/"+doc.ID, nil, admin, ""); w.Code != 404 {
+		t.Fatal("cross object GET", w.Code)
+	}
+	if w := call("POST", otherBase, payload(doc.ID, 1, doc.Content, "Изменение"), admin, token); w.Code != 404 {
+		t.Fatal("cross object POST", w.Code)
+	}
+	content = doc.Content
+	content.Fields["work_name"] = "Уточнённые работы"
+	if w := call("POST", base, payload(doc.ID, 1, content, ""), admin, token); w.Code != 422 {
+		t.Fatal("reason required", w.Code)
+	}
+	w = call("POST", base, payload(doc.ID, 1, content, "Уточнение наименования по проекту"), admin, token)
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	if w := call("POST", base, payload(doc.ID, 1, content, "Повтор"), admin, token); w.Code != 409 {
+		t.Fatal("conflict", w.Code)
+	}
+	if err = storage.LoadConstructionDocuments(); err != nil {
+		t.Fatal(err)
+	}
+	saved, err := storage.GetConstructionDocument("object", doc.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if saved.Version != 2 || saved.History[0].Content.Fields["work_name"] == content.Fields["work_name"] {
+		t.Fatal("history overwritten")
+	}
+	saved.Content.Fields["work_name"] = "mutated externally"
+	again, _ := storage.GetConstructionDocument("object", doc.ID)
+	if again.Content.Fields["work_name"] == "mutated externally" {
+		t.Fatal("mutable snapshot")
+	}
+	for _, suffix := range []string{"/pdf", "/pdf?version=1"} {
+		w := call("GET", base+"/"+doc.ID+suffix, nil, admin, "")
+		if w.Code != 200 || !bytes.HasPrefix(w.Body.Bytes(), []byte("%PDF-")) {
+			t.Fatal("PDF", w.Code, w.Body.String())
+		}
+	}
+	if w := call("GET", base+"/"+doc.ID+"/pdf?version=100", nil, admin, ""); w.Code != 404 {
+		t.Fatal("unknown revision")
+	}
+	content.Fields["start_date"] = "2026-10-02"
+	content.Fields["end_date"] = "2026-10-01"
+	if w := call("POST", base, payload(doc.ID, 2, content, "Ошибочная дата"), admin, token); w.Code != 422 {
+		t.Fatal("date validation", w.Code)
+	}
+	w = call("GET", base+"/sources?from=2026-09-01&to=2026-09-30", nil, admin, "")
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	var source struct {
+		Rows []models.ConstructionRow `json:"rows"`
+	}
+	_ = json.Unmarshal(w.Body.Bytes(), &source)
+	if len(source.Rows) != 2 || source.Rows[0].Reviewed || source.Rows[0].Fields["weather"] != "" || source.Rows[0].Fields["quantity"] != "" {
+		t.Fatal("source fabrication", w.Body.String())
+	}
+	journal := models.ConstructionContent{Kind: "journal", Fields: map[string]string{"object_name": "Объект"}, Rows: source.Rows}
+	w = call("POST", base, payload("", 0, journal, ""), admin, token)
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	var j models.ConstructionDocument
+	_ = json.Unmarshal(w.Body.Bytes(), &j)
+	w = call("GET", base+"/"+j.ID+"/pdf", nil, admin, "")
+	if w.Code != 200 || w.Body.Len() < 10000 {
+		t.Fatal("journal PDF", w.Code)
+	}
+	journal.Rows[0].Reviewed = true
+	if w := call("POST", base, payload(j.ID, 1, journal, "Проверка"), admin, token); w.Code != 422 {
+		t.Fatal("empty reviewed row allowed")
+	}
+	if err := storage.ValidateConstructionDocuments([]models.ConstructionDocument{again, j}); err != nil {
+		t.Fatal("migration validation", err)
+	}
+	docBytes, _ := json.Marshal([]models.ConstructionDocument{again, j})
+	userBytes, _ := json.Marshal([]models.User{{ID: "admin", Username: "admin", Password: "fixture", Status: "admin"}})
+	objectBytes, _ := json.Marshal([]models.Object{{ID: "object", Name: "Объект"}})
+	report, err := storage.ValidateDocuments(map[string][]byte{"construction_documents.json": docBytes, "users.json": userBytes, "objects.json": objectBytes}, "")
+	if err != nil || report.Counts["construction_documents"] != 2 || report.Counts["construction_revisions"] != 3 {
+		t.Fatal("migration report", report, err)
+	}
+}

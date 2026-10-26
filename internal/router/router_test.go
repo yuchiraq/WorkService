@@ -97,7 +97,7 @@ func testSiteIntegration(t *testing.T, mode string) {
 			t.Error(err)
 		}
 	})
-	for _, load := range []func() error{storage.LoadUsers, storage.LoadWorkers, storage.LoadObjects, storage.LoadTimesheets, storage.LoadImprovements, storage.LoadAppSettings, storage.LoadTelegramContacts, storage.LoadVehicles, storage.LoadInventory, storage.LoadObjectPhotos, storage.LoadCloud} {
+	for _, load := range []func() error{storage.LoadUsers, storage.LoadWorkers, storage.LoadObjects, storage.LoadTimesheets, storage.LoadImprovements, storage.LoadAppSettings, storage.LoadTelegramContacts, storage.LoadVehicles, storage.LoadInventory, storage.LoadObjectPhotos, storage.LoadCloud, storage.LoadConstructionDocuments} {
 		if err = load(); err != nil {
 			t.Fatal(err)
 		}
@@ -191,6 +191,7 @@ func testSiteIntegration(t *testing.T, mode string) {
 	t.Run("cloud sharing", func(t *testing.T) { testCloudSharing(t, r, admin, login("admin2"), user) })
 	t.Run("quick vehicle records", func(t *testing.T) { testQuickVehicleRecords(t, r, vehicle.ID, admin, user, login("other")) })
 	t.Run("assignment privacy", func(t *testing.T) { testAssignmentPrivacy(t, r, admin, user) })
+	t.Run("construction documents", func(t *testing.T) { testConstructionDocuments(t, r, admin, user) })
 	for _, path := range []string{"/worker/other", "/workers", "/workers/new", "/workers/edit/own", "/objects/new", "/objects/edit/object", "/users", "/settings", "/gallery", "/schedule/edit/private-entry", "/schedule/edit/absence"} {
 		w := request("GET", path, nil, user)
 		if w.Code != 403 {

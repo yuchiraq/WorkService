@@ -367,6 +367,7 @@ func ObjectProfilePage(c *gin.Context) {
   {{OBJECT_SECTIONS}}
   {{INVENTORY}}
   {{PHOTOS}}
+  {{DOCUMENTS}}
   <div class="card" id="object-assignments"><div class="history-header"><h2>{{ASSIGNMENTS_TITLE}}</h2></div><div class="schedule-vertical">{{ASSIGNMENTS}}</div></div>
 </div></body></html>`
 
@@ -392,9 +393,13 @@ func ObjectProfilePage(c *gin.Context) {
 	final = strings.Replace(final, "{{ASSIGNMENTS_TITLE}}", assignmentsTitle, 1)
 	final = strings.Replace(final, "{{INVENTORY}}", renderObjectInventory(c, object), 1)
 	final = strings.Replace(final, "{{PHOTOS}}", renderObjectPhotos(c, object), 1)
+	final = strings.Replace(final, "{{DOCUMENTS}}", renderConstructionDocuments(c, object), 1)
 	sections := ""
 	if canManageInventory(c, object) {
 		sections = `<nav class="tab-switcher object-tabs" data-object-tabs aria-label="Разделы объекта"><a class="btn btn-secondary active" href="#object-inventory">Инвентарь</a><a class="btn btn-secondary" href="#object-photos">Фото</a><a class="btn btn-secondary" href="#object-assignments">Назначения</a></nav>`
+		if isAdmin(c) {
+			sections = strings.Replace(sections, "</nav>", `<a class="btn btn-secondary" href="#object-documents">Документы</a></nav>`, 1)
+		}
 	}
 	final = strings.Replace(final, "{{OBJECT_SECTIONS}}", sections, 1)
 	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(final))
@@ -489,6 +494,10 @@ func UpdateObject(c *gin.Context) {
 
 func DeleteObject(c *gin.Context) {
 	if !requireAdmin(c) {
+		return
+	}
+	if len(storage.GetConstructionDocuments(c.Param("id"))) > 0 {
+		c.String(http.StatusConflict, "На объекте есть исполнительная документация. Закройте объект вместо удаления, чтобы сохранить документы и историю.")
 		return
 	}
 	if err := storage.DeleteObject(c.Param("id")); err != nil {

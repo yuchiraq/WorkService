@@ -51,6 +51,11 @@ func SetupRouter(r *gin.Engine) {
 
 		authRequired.GET("/objects", api.ObjectsPage)
 		authRequired.GET("/object/:id", api.ObjectProfilePage)
+		authRequired.GET("/object/:id/documents", api.ConstructionDocuments)
+		authRequired.POST("/object/:id/documents", api.SaveConstructionDocument)
+		authRequired.GET("/object/:id/documents/sources", api.ConstructionSources)
+		authRequired.GET("/object/:id/documents/:documentID", api.ConstructionDocument)
+		authRequired.GET("/object/:id/documents/:documentID/pdf", api.ConstructionDocumentPDF)
 		authRequired.GET("/object/:id/photos", api.ObjectPhotos)
 		authRequired.POST("/object/:id/photos", api.UploadObjectPhoto)
 		authRequired.GET("/object/:id/photos/:photoID/image", api.ObjectPhotoImage)

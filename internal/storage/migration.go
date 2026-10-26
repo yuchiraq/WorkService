@@ -40,8 +40,18 @@ func ValidateDocuments(documents map[string][]byte, photoDir string, cloudDirs .
 	var inv inventoryData
 	var photos []models.ObjectPhoto
 	var cloud []models.CloudItem
+	var constructionDocs []models.ConstructionDocument
 	targets := map[string]any{"users.json": &u, "workers.json": &w, "objects.json": &o, "timesheets.json": &t, "improvements.json": &improvements, "app_settings.json": &settings, "telegram_contacts.json": &contacts, "vehicles.json": &fleet, "inventory.json": &inv, "object_photos.json": &photos}
 	for name, data := range documents {
+		if name == "construction_documents.json" {
+			if err := json.Unmarshal(data, &constructionDocs); err != nil {
+				return report, err
+			}
+			if err := ValidateConstructionDocuments(constructionDocs); err != nil {
+				return report, err
+			}
+			continue
+		}
 		if name == "cloud.json" {
 			if err := json.Unmarshal(data, &cloud); err != nil {
 				return report, err
@@ -98,6 +108,11 @@ func ValidateDocuments(documents map[string][]byte, photoDir string, cloudDirs .
 	}
 	for _, object := range o {
 		reference("users", object.ResponsibleUserID, "object "+object.ID)
+	}
+	report.Counts["construction_documents"] = len(constructionDocs)
+	for _, doc := range constructionDocs {
+		reference("objects", doc.ObjectID, "construction document "+doc.ID)
+		report.Counts["construction_revisions"] += len(doc.History)
 	}
 	for _, entry := range t {
 		for _, id := range entry.WorkerIDs {

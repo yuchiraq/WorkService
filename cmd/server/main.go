@@ -50,6 +50,9 @@ func main() {
 	if err := storage.LoadCloud(); err != nil {
 		log.Fatalf("Failed to load cloud: %v", err)
 	}
+	if err := storage.LoadConstructionDocuments(); err != nil {
+		log.Fatalf("Failed to load construction documents: %v", err)
+	}
 	telegrambot.StartMileageReminderScheduler()
 
 	r := gin.Default()

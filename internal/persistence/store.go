@@ -17,7 +17,7 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-var Names = []string{"users.json", "workers.json", "objects.json", "timesheets.json", "improvements.json", "app_settings.json", "telegram_contacts.json", "vehicles.json", "inventory.json", "object_photos.json", "cloud.json"}
+var Names = []string{"users.json", "workers.json", "objects.json", "timesheets.json", "improvements.json", "app_settings.json", "telegram_contacts.json", "vehicles.json", "inventory.json", "object_photos.json", "cloud.json", "construction_documents.json"}
 
 type Store struct {
 	mu   sync.Mutex
