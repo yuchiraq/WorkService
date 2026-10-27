@@ -13,9 +13,8 @@ import (
 
 	"codeberg.org/go-pdf/fpdf"
 	"github.com/gin-gonic/gin"
-	"golang.org/x/image/font/gofont/gobold"
-	"golang.org/x/image/font/gofont/goregular"
 	"project/internal/construction"
+	"project/internal/documentfont"
 	"project/internal/models"
 	"project/internal/storage"
 )
@@ -43,6 +42,10 @@ func ConstructionDocumentPDF(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Реквизиты не являются печатным документом"})
 		return
 	}
+	if _, err := documentfont.Times(); err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		return
+	}
 	data, err := buildConstructionPDF(doc)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сформировать PDF"})
@@ -53,12 +56,29 @@ func ConstructionDocumentPDF(c *gin.Context) {
 	c.Data(http.StatusOK, "application/pdf", data)
 }
 
+const documentFont = "TimesNewRoman"
+
+func constructionDate(value string) string {
+	if d, err := time.Parse("2006-01-02", value); err == nil {
+		return d.Format("02.01.2006")
+	}
+	if d, err := time.Parse("2006-01-02T15:04", value); err == nil {
+		return d.Format("02.01.2006 15:04")
+	}
+	return value
+}
+
 func buildConstructionPDF(doc models.ConstructionDocument) ([]byte, error) {
+	fonts, fontErr := documentfont.Times()
+	if fontErr != nil {
+		return nil, fontErr
+	}
 	p := fpdf.New("P", "mm", "A4", "")
-	p.SetMargins(12, 14, 12)
-	p.SetAutoPageBreak(true, 17)
-	p.AddUTF8FontFromBytes("Go", "", goregular.TTF)
-	p.AddUTF8FontFromBytes("Go", "B", gobold.TTF)
+	p.SetMargins(30, 20, 10)
+	p.SetAutoPageBreak(true, 20)
+	p.AddUTF8FontFromBytes(documentFont, "", fonts.Regular)
+	p.AddUTF8FontFromBytes(documentFont, "B", fonts.Bold)
+	p.AddUTF8FontFromBytes(documentFont, "I", fonts.Italic)
 	p.SetTitle(doc.Content.Number+" - "+doc.Content.Fields["object_name"], true)
 	p.SetCreator("WorkService", true)
 	stamp, err := time.Parse(time.RFC3339Nano, doc.UpdatedAt)
@@ -68,125 +88,149 @@ func buildConstructionPDF(doc models.ConstructionDocument) ([]byte, error) {
 	p.SetCreationDate(stamp)
 	p.SetModificationDate(stamp)
 	p.AliasNbPages("")
+	p.SetHeaderFunc(func() {
+		if p.PageNo() > 1 {
+			p.SetFont(documentFont, "", 13)
+			p.SetTextColor(20, 20, 20)
+			pageW, _ := p.GetPageSize()
+			p.SetXY(0, 10)
+			p.CellFormat(pageW, 6, strconv.Itoa(p.PageNo()), "", 0, "C", false, 0, "")
+		}
+		p.SetXY(30, 20)
+	})
 	p.SetFooterFunc(func() {
 		p.SetY(-13)
-		p.SetFont("Go", "", 8)
-		p.SetTextColor(85, 85, 85)
-		p.CellFormat(0, 4, fmt.Sprintf("Проект для проверки и подписания · Версия %d · Страница %d/{nb}", doc.Version, p.PageNo()), "", 1, "C", false, 0, "")
-		p.CellFormat(0, 4, "СН 1.03.04-2020, изменение № 1. Подписи оформляются уполномоченными лицами.", "", 0, "C", false, 0, "")
+		p.SetFont(documentFont, "", 9)
+		p.SetTextColor(75, 75, 75)
+		p.MultiCell(0, 4, fmt.Sprintf("Проект для проверки и подписания · %s · Версия %d", doc.Content.Number, doc.Version), "", "C", false)
+		if slices.ContainsFunc(doc.Content.Rows, func(row models.ConstructionRow) bool {
+			return strings.HasPrefix(row.Fields["weather_source"], "Open-Meteo")
+		}) {
+			p.SetFont(documentFont, "", 8)
+			pageW, _ := p.GetPageSize()
+			p.SetX(30)
+			p.CellFormat(pageW-40, 3, "Погода: Open-Meteo · CC BY 4.0 · open-meteo.com", "", 0, "C", false, 0, "https://open-meteo.com/")
+		}
 	})
+	if doc.Content.Kind == "journal" {
+		constructionTitle(p, doc)
+	}
 	p.AddPage()
 	p.SetTextColor(20, 20, 20)
-	paragraph := func(label, value string) {
-		if p.GetY() > 251 {
+	p.SetFont(documentFont, "", 13)
+	fields := doc.Content.Fields
+	need := func(height float64) {
+		_, pageH := p.GetPageSize()
+		if p.GetY()+height > pageH-20 {
 			p.AddPage()
 		}
-		p.SetFont("Go", "B", 10)
-		p.MultiCell(0, 5, label, "", "L", false)
-		p.SetFont("Go", "", 10)
-		if strings.TrimSpace(value) == "" {
-			value = "________________________________________________________________"
-		}
-		p.MultiCell(0, 5, value, "", "L", false)
-		p.Ln(2)
 	}
-	title := func(value string) { p.SetFont("Go", "B", 14); p.MultiCell(0, 7, value, "", "C", false); p.Ln(3) }
-	f := doc.Content.Fields
-	formatDate := func(v string) string {
-		if d, e := time.Parse("2006-01-02", v); e == nil {
-			return d.Format("02.01.2006")
-		}
-		return v
+	write := func(text, style string, size, height float64, align string) {
+		p.SetFont(documentFont, style, size)
+		p.MultiCell(0, height, text, "", align, false)
 	}
-	if doc.Content.Kind == "act" {
-		title("АКТ № " + doc.Content.Number + "\nосвидетельствования скрытых работ")
-		paragraph("Наименование работ", f["work_name"])
-		paragraph("Выполненных в (наименование и местонахождение объекта)", f["object_name"]+"\n"+f["address"])
-		paragraph("Дата освидетельствования", formatDate(f["act_date"]))
-		p.SetFont("Go", "B", 11)
-		p.MultiCell(0, 6, "Комиссия в составе:", "", "L", false)
-		for _, person := range []struct{ key, label string }{{"contractor_rep", "Представитель подрядчика"}, {"subcontractor_rep", "Представитель субподрядной организации (при её участии)"}, {"technical_rep", "Представитель технического надзора"}, {"author_rep", "Представитель авторского надзора"}} {
-			paragraph(person.label+" (должность, фамилия, инициалы)", f[person.key])
+	layout := construction.ActLayout
+	if doc.Content.Kind == "journal" {
+		layout = construction.CoverLayout
+	}
+	for _, block := range layout {
+		if block.Optional && strings.TrimSpace(fields[block.Key]) == "" {
+			continue
 		}
-		paragraph("Произвела осмотр работ, выполненных (строительно-монтажная организация)", f["performer"])
-		p.SetFont("Go", "", 10)
-		p.MultiCell(0, 5, "И составила настоящий акт о нижеследующем:", "", "L", false)
-		p.Ln(2)
-		for _, field := range construction.Act[2:5] {
-			paragraph(field.Label, f[field.Key])
+		if block.Key == "deviations" && fields["violations"] != "present" {
+			continue
 		}
-		violations := "Не указано (требуется проверка)"
-		if f["violations"] == "none" {
-			violations = "Отсутствуют"
-		} else if f["violations"] == "present" {
-			violations = "Допущены\n" + f["deviations"]
-		}
-		paragraph("4. Нарушения требований ТНПА и (или) проектной документации", violations)
-		paragraph("5. Даты начала и окончания работ", "Начало: "+formatDate(f["start_date"])+"\nОкончание: "+formatDate(f["end_date"]))
-		if f["attachments"] != "" {
-			paragraph("Дополнительные сведения и приложения", f["attachments"])
-		}
-		if p.GetY() > 178 {
-			p.AddPage()
-		}
-		p.SetFont("Go", "B", 11)
-		p.MultiCell(0, 6, "Подписи представителей", "", "L", false)
-		p.Ln(3)
-		for _, role := range []string{"Подрядчика", "Субподрядной организации (при её участии)", "Технического надзора", "Авторского надзора"} {
-			p.SetFont("Go", "", 10)
-			p.MultiCell(0, 5, role, "", "L", false)
-			p.MultiCell(0, 7, "__________________    ______________    __________________________", "", "L", false)
-			p.SetFont("Go", "", 8)
-			p.MultiCell(0, 4, "дата и время                         подпись                       фамилия, инициалы", "", "L", false)
+		switch block.Kind {
+		case "reference":
+			write(block.Text, "", 10, 4, "R")
+			p.Ln(4)
+		case "title":
+			need(20)
+			write(block.Text+" № "+doc.Content.Number, "B", 14, 6, "C")
+			p.Ln(2)
+		case "subtitle":
+			write(block.Text, "B", 13, 5.5, "C")
+			p.Ln(3)
+		case "text":
+			need(12)
+			text := block.Text
+			if strings.Contains(text, "______ пронумерованных") {
+				text = strings.Replace(text, "______", "{nb}", 1)
+			}
+			write(text, "", 13, 5.5, "L")
+			p.Ln(2)
+		case "signature-line":
+			need(10)
+			write("Подпись ____________________", "", 13, 5.5, "L")
+			p.Ln(2)
+		case "signatures":
+			constructionSignatures(p, fields)
+		case "date":
+			need(14)
+			value := constructionDate(fields[block.Key])
+			if block.Key == "act_date" && fields[block.Key] != "" {
+				if d, e := time.Parse("2006-01-02", fields[block.Key]); e == nil {
+					months := []string{"января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"}
+					value = fmt.Sprintf("«%02d» %s %d г.", d.Day(), months[d.Month()-1], d.Year())
+				}
+			}
+			if value == "" {
+				value = "____________________"
+			}
+			write(block.Text+": "+value, "", 13, 5.5, "L")
+			p.Ln(3)
+		case "violations":
+			need(22)
+			value := "отсутствуют / допущены (результат не выбран)"
+			if fields[block.Key] == "none" {
+				value = "отсутствуют"
+			}
+			if fields[block.Key] == "present" {
+				value = "допущены"
+			}
+			write(block.Text+" "+value+" "+block.Hint, "", 13, 5.5, "L")
+			p.Ln(3)
+		default:
+			need(25)
+			if block.Text != "" {
+				write(block.Text, "", 13, 5.5, "L")
+			}
+			value := fields[block.Key]
+			if value == "" {
+				y := p.GetY()
+				p.SetDrawColor(90, 90, 90)
+				p.Line(30, y+5, 200, y+5)
+				p.Ln(6)
+			} else {
+				write(value, "", 13, 5.5, "L")
+			}
+			if block.Hint != "" {
+				p.SetTextColor(65, 65, 65)
+				write("("+block.Hint+")", "", 10, 4, "C")
+				p.SetTextColor(20, 20, 20)
+			}
 			p.Ln(3)
 		}
-	} else {
-		title("ЖУРНАЛ ПРОИЗВОДСТВА РАБОТ\n№ " + doc.Content.Number)
-		p.SetFont("Go", "B", 11)
-		p.MultiCell(0, 7, "Раздел 1. Общие сведения", "", "L", false)
-		p.Ln(2)
-		for _, field := range construction.JournalCover {
-			value := f[field.Key]
-			if field.Type == "date" {
-				value = formatDate(value)
-			}
-			paragraph(field.Label, value)
-			if field.Key == "responsible" || field.Key == "designer" || field.Key == "customer" || field.Key == "technical_rep" || field.Key == "issuer" {
-				p.SetFont("Go", "", 9)
-				p.MultiCell(0, 6, "Подпись ____________________", "", "L", false)
-				p.Ln(2)
-			}
-		}
-		paragraph("Оформление бумажного журнала", "В настоящем журнале ______ пронумерованных и прошнурованных страниц.\nПодпись руководителя ____________________\nПечать организации (при её применении) ____________________")
+	}
+	if doc.Content.Kind == "journal" {
 		for _, spec := range construction.JournalSections {
-			columns := constructionColumns(spec.Number)
+			columns := construction.Columns(spec.Number)
 			newPage := func() {
 				p.AddPageFormat("L", fpdf.SizeType{Wd: 210, Ht: 297})
 				p.SetTextColor(20, 20, 20)
-				p.SetFont("Go", "B", 11)
-				titles := map[int]string{
-					2: "Список инженерно-технического персонала, занятого на строительстве объекта",
-					3: "Перечень актов промежуточной приемки ответственных конструкций и освидетельствования скрытых работ",
-					4: "Сведения о производстве строительно-монтажных работ с учетом результатов операционного контроля их качества",
-					5: "Перечень специальных журналов работ",
-					6: "Замечания лиц, контролирующих производство и безопасность работ",
-					7: "Сведения о мероприятиях технического (технологического, поверочного) характера в рамках контроля (надзора)",
+				write(fmt.Sprintf("Раздел %d\n%s", spec.Number, construction.SectionTitle(spec.Number)), "B", 13, 5.5, "C")
+				name := []rune(fields["object_name"])
+				if len(name) > 120 {
+					name = append(name[:120], '.', '.', '.')
 				}
-				p.MultiCell(0, 6, fmt.Sprintf("Раздел %d. %s", spec.Number, titles[spec.Number]), "", "L", false)
-				p.SetFont("Go", "", 8)
-				objectName := []rune(f["object_name"])
-				if len(objectName) > 130 {
-					objectName = append(objectName[:130], []rune("...")...)
-				}
-				p.MultiCell(0, 4, "Журнал № "+doc.Content.Number+" · "+string(objectName), "", "L", false)
+				write("Журнал № "+doc.Content.Number+" · "+string(name), "", 10, 4, "L")
 				p.Ln(3)
-				p.SetFont("Go", "B", 8.5)
 				head := make([]string, len(columns))
 				for i, col := range columns {
-					head[i] = col.label
+					head[i] = col.Label
 				}
+				p.SetFont(documentFont, "", 11)
 				constructionGrid(p, columns, head, nil, true)
-				p.SetFont("Go", "", 9)
 			}
 			newPage()
 			count := 0
@@ -197,17 +241,21 @@ func buildConstructionPDF(doc models.ConstructionDocument) ([]byte, error) {
 				count++
 				values := make([]string, len(columns))
 				for i, col := range columns {
-					parts := []string{}
-					for _, key := range col.keys {
+					var parts []string
+					for _, key := range col.Keys {
 						if row.Fields[key] != "" {
-							parts = append(parts, formatDate(row.Fields[key]))
+							value := constructionDate(row.Fields[key])
+							if key == "crew" {
+								value = "Бригада (по назначениям):\n" + value
+							}
+							parts = append(parts, value)
 						}
 					}
 					values[i] = strings.Join(parts, "\n")
-					if col.keys[0] == "_number" {
+					if col.Keys[0] == "_number" {
 						values[i] = strconv.Itoa(count)
 					}
-					if col.keys[0] == "_signature" {
+					if col.Keys[0] == "_signature" {
 						values[i] = "\n________"
 					}
 				}
@@ -232,81 +280,138 @@ func buildConstructionPDF(doc models.ConstructionDocument) ([]byte, error) {
 	return output.Bytes(), nil
 }
 
-type constructionColumn struct {
-	label string
-	keys  []string
-	width float64
+func constructionTitle(p *fpdf.Fpdf, doc models.ConstructionDocument) {
+	p.AddPage()
+	p.SetTextColor(20, 20, 20)
+	for _, block := range construction.JournalTitleLayout {
+		switch block.Kind {
+		case "reference":
+			p.SetFont(documentFont, "", 11)
+			p.MultiCell(0, 5, block.Text, "", "R", false)
+		case "title":
+			p.SetY(103)
+			p.SetFont(documentFont, "B", 26)
+			p.MultiCell(0, 12, block.Text, "", "C", false)
+		case "subtitle":
+			p.SetFont(documentFont, "B", 22)
+			p.MultiCell(0, 10, block.Text, "", "C", false)
+			p.Ln(8)
+			p.SetFont(documentFont, "", 14)
+			p.MultiCell(0, 6, "№ "+doc.Content.Number, "", "C", false)
+		case "cover-summary":
+			p.SetY(180)
+			p.SetFont(documentFont, "", 12)
+			for _, key := range []string{"object_name", "address", "contractor"} {
+				value := strings.TrimSpace(doc.Content.Fields[key])
+				// The title identifies the volume; full requisites follow in section 1.
+				if text := []rune(value); len(text) > 260 {
+					value = string(text[:260]) + "…"
+				}
+				if value != "" {
+					p.MultiCell(0, 5, value, "", "C", false)
+					p.Ln(3)
+				}
+			}
+		}
+	}
 }
 
-func constructionColumns(section int) []constructionColumn {
-	col := func(label string, width float64, keys ...string) constructionColumn {
-		return constructionColumn{label, keys, width}
+func constructionSignatures(p *fpdf.Fpdf, fields map[string]string) {
+	_, pageH := p.GetPageSize()
+	if p.GetY() > pageH-45 {
+		p.AddPage()
 	}
-	switch section {
-	case 2:
-		return []constructionColumn{col("ФИО, должность, участок работ", 100, "person"), col("Дата начала работ", 38, "start"), col("Разрешение / аттестация", 97, "qualification"), col("Дата окончания работ", 38, "end")}
-	case 3:
-		return []constructionColumn{col("Наименование, номер акта и расположение конструкций / работ", 150, "act"), col("Дата подписания, фамилии, инициалы и должности подписавших", 123, "signed_date", "signers")}
-	case 4:
-		return []constructionColumn{col("Дата и смена", 29, "date", "shift"), col("Работы и их месторасположение", 56, "description"), col("Погода, температура", 26, "weather"), col("Меры в особых условиях", 30, "measures"), col("Приемка:\nед. изм.", 23, "unit"), col("Приемка:\nкол-во", 23, "quantity"), col("Операционный контроль, измерения", 43, "control"), col("Ответственный и оценивающий качество: должности, ФИО, подписи", 43, "persons", "_signature")}
-	case 5:
-		return []constructionColumn{col("Специальный журнал и дата выдачи", 100, "name", "issued"), col("Организация и ответственное лицо", 100, "organization"), col("Дата сдачи-приемки, должностное лицо, подпись", 73, "handed", "recipient", "_signature")}
-	case 6:
-		return []constructionColumn{col("Контролирующее лицо: ФИО, должность", 65, "inspector"), col("Дата", 28, "date"), col("Замечания / предписания", 100, "remark"), col("Принятие к исполнению и устранение", 80, "response")}
-	default:
-		return []constructionColumn{col("№ п/п", 16, "_number"), col("Контролирующий орган", 37, "authority"), col("Документ о назначении / допуске: номер и дата", 43, "order"), col("Должностное лицо: ФИО", 38, "inspector"), col("Начало и окончание", 30, "start", "end"), col("Подпись\nдолжн. лица", 26, "_signature"), col("Документ по результатам", 42, "result"), col("Примечание", 41, "note")}
+	p.Ln(3)
+	p.SetFont(documentFont, "B", 13)
+	p.MultiCell(0, 6, "Подписи представителей", "", "L", false)
+	p.Ln(2)
+	widths := []float64{61, 36, 25, 48}
+	head := []string{"Представитель", "Дата и время", "Подпись", "Фамилия, инициалы"}
+	drawHead := func() {
+		x, y := 30.0, p.GetY()
+		p.SetFont(documentFont, "", 10)
+		for i, label := range head {
+			p.SetXY(x, y)
+			p.MultiCell(widths[i], 4, label, "", "L", false)
+			x += widths[i]
+		}
+		p.SetXY(30, y+10)
 	}
+	drawHead()
+	for _, person := range construction.Signatories {
+		values := []string{person.Role, constructionDate(fields[person.At]), "________", fields[person.Name]}
+		if values[1] == "" {
+			values[1] = "____________"
+		}
+		if values[3] == "" {
+			values[3] = "________________"
+		}
+		p.SetFont(documentFont, "", 13)
+		height := 12.0
+		for i, value := range values {
+			height = math.Max(height, float64(len(p.SplitText(value, widths[i]-3)))*5.5+5)
+		}
+		if p.GetY()+height > pageH-20 {
+			p.AddPage()
+			drawHead()
+			p.SetFont(documentFont, "", 13)
+		}
+		x, y := 30.0, p.GetY()
+		for i, value := range values {
+			p.SetXY(x, y)
+			p.MultiCell(widths[i]-3, 5.5, value, "", "L", false)
+			x += widths[i]
+		}
+		p.SetXY(30, y+height)
+	}
+	p.Ln(3)
 }
 
-// Split tall rows across pages while repeating column headings. Each cell keeps
-// its own line offset; one long description cannot overprint the footer.
-func constructionGrid(p *fpdf.Fpdf, columns []constructionColumn, values []string, nextPage func(), header bool) {
+// Tall rows continue on a new page, with repeated headings and a visible row
+// identifier. Text never shrinks to force a record onto one sheet.
+func constructionGrid(p *fpdf.Fpdf, columns []construction.Column, values []string, nextPage func(), header bool) {
 	lines := make([][]string, len(columns))
 	maximum := 1
-	lineHeight := 4.5
+	lineHeight := 5.0
 	for i, col := range columns {
 		value := values[i]
-		if !header && slices.Contains(col.keys, "_signature") && col.keys[0] != "_signature" {
-			value += "\n\nПодписи: ______________"
+		if !header && slices.Contains(col.Keys, "_signature") && col.Keys[0] != "_signature" {
+			value += "\n\nПодписи: __________"
 		}
-		lines[i] = p.SplitText(value, col.width-4)
+		lines[i] = p.SplitText(value, col.Width-3)
 		if len(lines[i]) == 0 {
 			lines[i] = []string{""}
 		}
-		if len(lines[i]) > maximum {
-			maximum = len(lines[i])
-		}
+		maximum = max(maximum, len(lines[i]))
 	}
 	for offset := 0; offset < maximum; {
 		_, pageH := p.GetPageSize()
-		available := int(math.Floor((pageH - 17 - p.GetY() - 4) / lineHeight))
+		available := int(math.Floor((pageH - 20 - p.GetY() - 3) / lineHeight))
 		if available < 1 && nextPage != nil {
 			nextPage()
 			continue
 		}
-		if available < 1 {
-			available = 1
-		}
+		available = max(available, 1)
 		count := min(maximum-offset, available)
-		height := float64(count)*lineHeight + 4
-		y := p.GetY()
-		x := 12.0
-		p.SetDrawColor(130, 130, 130)
+		height := float64(count)*lineHeight + 3
+		x, y := 30.0, p.GetY()
+		p.SetDrawColor(70, 70, 70)
 		p.SetLineWidth(.2)
 		for i, col := range columns {
-			if header {
-				p.SetFillColor(238, 240, 242)
-				p.Rect(x, y, col.width, height, "DF")
-			} else {
-				p.Rect(x, y, col.width, height, "D")
+			p.Rect(x, y, col.Width, height, "D")
+			cell := lines[i]
+			start := offset
+			if !header && i == 0 && offset >= len(cell) {
+				cell = p.SplitText("Продолжение\n"+values[0], col.Width-3)
+				start = 0
 			}
-			for j := 0; j < count && offset+j < len(lines[i]); j++ {
-				p.SetXY(x+2, y+2+float64(j)*lineHeight)
-				p.CellFormat(col.width-4, lineHeight, lines[i][offset+j], "", 0, "L", false, 0, "")
+			for j := 0; j < count && start+j < len(cell); j++ {
+				p.SetXY(x+1.5, y+1.5+float64(j)*lineHeight)
+				p.CellFormat(col.Width-3, lineHeight, cell[start+j], "", 0, "L", false, 0, "")
 			}
-			x += col.width
+			x += col.Width
 		}
-		p.SetXY(12, y+height)
+		p.SetXY(30, y+height)
 		offset += count
 		if offset < maximum && nextPage != nil {
 			nextPage()

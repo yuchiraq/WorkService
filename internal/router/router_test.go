@@ -21,6 +21,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/xuri/excelize/v2"
+	"project/internal/documentfont"
 	"project/internal/models"
 	"project/internal/persistence"
 	"project/internal/storage"
@@ -40,6 +41,18 @@ func testSiteIntegration(t *testing.T, mode string) {
 	}
 	root := filepath.Clean(filepath.Join(old, "../.."))
 	dir := t.TempDir()
+	if os.Getenv("WORKSERVICE_UI_PREVIEW") != "1" {
+		fonts := filepath.Join(dir, "test-fonts")
+		if err = os.Mkdir(fonts, 0700); err != nil {
+			t.Fatal(err)
+		}
+		for name, b := range map[string][]byte{"times.ttf": documentfont.Regular, "timesbd.ttf": documentfont.Bold, "timesi.ttf": documentfont.Italic} {
+			if err = os.WriteFile(filepath.Join(fonts, name), b, 0600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		t.Setenv("WORKSERVICE_DOCUMENT_FONT_DIR", fonts)
+	}
 	if err = os.Chdir(dir); err != nil {
 		t.Fatal(err)
 	}

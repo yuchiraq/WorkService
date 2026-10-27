@@ -8,6 +8,7 @@ import (
 )
 
 func SetupRouter(r *gin.Engine) {
+	r.GET("/document-fonts/:name", api.ConstructionFont)
 	r.Static("/static", "./web/static")
 	r.GET("/manifest.webmanifest", func(c *gin.Context) {
 		c.Header("Content-Type", "application/manifest+json")
@@ -54,6 +55,8 @@ func SetupRouter(r *gin.Engine) {
 		authRequired.GET("/object/:id/documents", api.ConstructionDocuments)
 		authRequired.POST("/object/:id/documents", api.SaveConstructionDocument)
 		authRequired.GET("/object/:id/documents/sources", api.ConstructionSources)
+		authRequired.GET("/object/:id/documents/cities", api.ConstructionCities)
+		authRequired.GET("/object/:id/documents/weather", api.ConstructionWeather)
 		authRequired.GET("/object/:id/documents/:documentID", api.ConstructionDocument)
 		authRequired.GET("/object/:id/documents/:documentID/pdf", api.ConstructionDocumentPDF)
 		authRequired.GET("/object/:id/photos", api.ObjectPhotos)

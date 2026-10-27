@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'avayusstroy-v24';
+const CACHE_VERSION = 'avayusstroy-v27';
 const APP_SHELL = [
   '/static/css/style.css?v=20',
   '/static/js/ui.js?v=19',
@@ -40,6 +40,7 @@ self.addEventListener('fetch', (event) => {
 
   const isCacheableAsset = url.origin === self.location.origin && (
     url.pathname.startsWith('/static/') ||
+    url.pathname.startsWith('/document-fonts/') ||
     url.pathname === '/manifest.webmanifest' ||
     url.pathname === '/sw.js'
   );

@@ -61,6 +61,13 @@ go run ./cmd/server
 
 По умолчанию сервис поднимается на `http://localhost:8099`.
 
+Погода в документах объекта подключена к бесплатному Open-Meteo без ключа
+в режиме `noncommercial`. Этот режим предназначен для некоммерческого использования.
+Отключение: `WORKSERVICE_WEATHER_MODE=off`. Для коммерческого режима задайте
+`WORKSERVICE_WEATHER_MODE=customer` и `WORKSERVICE_WEATHER_API_KEY`.
+Настройка города, Times New Roman и форм журналов описана в
+[инструкции документов](docs/construction-documents.md).
+
 ### Проверка
 
 ```bash

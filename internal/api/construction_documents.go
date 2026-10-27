@@ -9,14 +9,11 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"slices"
-	"sort"
-	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"project/internal/construction"
+	"project/internal/documentfont"
 	"project/internal/models"
 	"project/internal/storage"
 )
@@ -62,7 +59,33 @@ func ConstructionDocuments(c *gin.Context) {
 		rowCounts[docs[i].ID] = len(docs[i].Content.Rows)
 		docs[i].Content.Rows = nil
 	}
-	c.JSON(http.StatusOK, gin.H{"documents": docs, "rowCounts": rowCounts, "object": object, "today": time.Now().In(vehicleWaybillLocation).Format("2006-01-02"), "basis": construction.Basis, "schema": gin.H{"requisites": construction.Common, "act": construction.Act, "journal": construction.JournalCover, "sections": construction.JournalSections}})
+	columns, titles := map[int][]construction.Column{}, map[int]string{}
+	for _, s := range construction.JournalSections {
+		columns[s.Number] = construction.Columns(s.Number)
+		titles[s.Number] = construction.SectionTitle(s.Number)
+	}
+	automation, err := storage.ConstructionAutomation(object)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось загрузить данные автозаполнения"})
+		return
+	}
+	fontState := gin.H{"name": "Times New Roman", "available": true}
+	if _, err := documentfont.Times(); err != nil {
+		fontState["available"] = false
+		fontState["reason"] = err.Error()
+	}
+	c.JSON(http.StatusOK, gin.H{"documents": docs, "rowCounts": rowCounts, "object": object, "automation": automation, "weather": documentWeatherStatus(), "font": fontState, "today": time.Now().In(vehicleWaybillLocation).Format("2006-01-02"), "basis": construction.Basis, "schema": gin.H{"requisites": construction.Common, "act": construction.Act, "journal": construction.JournalCover, "sections": construction.JournalSections}, "layouts": gin.H{"act": construction.ActLayout, "journal": construction.CoverLayout, "journalTitle": construction.JournalTitleLayout, "signatories": construction.Signatories, "columns": columns, "titles": titles}})
+}
+
+func ConstructionFont(c *gin.Context) {
+	data := documentfont.Lookup(c.Param("name"))
+	if data == nil {
+		c.Status(http.StatusNotFound)
+		return
+	}
+	c.Header("Cache-Control", "public, max-age=31536000, immutable")
+	c.Header("X-Content-Type-Options", "nosniff")
+	c.Data(http.StatusOK, "font/ttf", data)
 }
 
 func ConstructionDocument(c *gin.Context) {
@@ -138,28 +161,14 @@ func ConstructionSources(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Выберите период не больше года"})
 		return
 	}
-	entries, err := storage.GetTimesheets()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось загрузить назначения"})
-		return
+	section := 4
+	if c.Query("section") == "2" {
+		section = 2
 	}
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].Date == entries[j].Date {
-			return entries[i].ID < entries[j].ID
-		}
-		return entries[i].Date < entries[j].Date
-	})
-	rows := []models.ConstructionRow{}
-	for _, entry := range entries {
-		if entry.UserMark != "" || entry.Date < from || entry.Date > to || !slices.Contains(entry.ObjectIDs, object.ID) {
-			continue
-		}
-		description := strings.TrimSpace(entry.Notes)
-		// A shared assignment does not say which work belongs to this object.
-		if len(entry.ObjectIDs) > 1 {
-			description = ""
-		}
-		rows = append(rows, models.ConstructionRow{ID: uuid.NewString(), Section: 4, Fields: map[string]string{"date": entry.Date, "shift": entry.StartTime + " - " + entry.EndTime, "description": description}, Sources: []string{"assignment:" + entry.ID}})
+	rows, err := storage.ConstructionAssignmentRows(object, from, to, section)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось загрузить назначения"})
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"rows": rows})
 }

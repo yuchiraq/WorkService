@@ -16,6 +16,20 @@ import (
 
 func testConstructionDocuments(t *testing.T, r *gin.Engine, admin, worker *http.Cookie) {
 	t.Helper()
+	for _, name := range []string{"serif-regular.ttf", "serif-bold.ttf", "serif-italic.ttf"} {
+		req := httptest.NewRequest("GET", "/document-fonts/"+name, nil)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		if w.Code != 200 || !strings.HasPrefix(w.Header().Get("Content-Type"), "font/ttf") || !bytes.HasPrefix(w.Body.Bytes(), []byte{0, 1, 0, 0}) {
+			t.Fatal("document font", name, w.Code)
+		}
+	}
+	fontRequest := httptest.NewRequest("GET", "/document-fonts/unknown.ttf", nil)
+	fontResponse := httptest.NewRecorder()
+	r.ServeHTTP(fontResponse, fontRequest)
+	if fontResponse.Code != 404 {
+		t.Fatal("unknown font")
+	}
 	call := func(method, path string, body any, cookie *http.Cookie, token string) *httptest.ResponseRecorder {
 		var data []byte
 		if body != nil {
@@ -38,6 +52,16 @@ func testConstructionDocuments(t *testing.T, r *gin.Engine, admin, worker *http.
 	}
 	token := regexp.MustCompile(`data-csrf="([^"]+)"`).FindStringSubmatch(page)[1]
 	base := "/object/object/documents"
+	obj, err := storage.GetObjectByID("object")
+	if err != nil {
+		t.Fatal(err)
+	}
+	before := obj
+	obj.ResponsibleUserID = "admin"
+	if err = storage.UpdateObject(obj); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = storage.UpdateObject(before) })
 	if w := call("GET", base, nil, worker, ""); w.Code != 403 {
 		t.Fatal("worker read", w.Code)
 	}
@@ -50,6 +74,10 @@ func testConstructionDocuments(t *testing.T, r *gin.Engine, admin, worker *http.
 	content := models.ConstructionContent{Kind: "act", Fields: map[string]string{"work_name": "Монтаж <script>alert(1)</script>", "object_name": "Объект", "address": "Минск"}}
 	payload := func(id string, version int64, c models.ConstructionContent, reason string) any {
 		return map[string]any{"id": id, "version": version, "content": c, "reason": reason}
+	}
+	requisites := models.ConstructionContent{Kind: "requisites", Fields: map[string]string{"quality_rep": "Прораб Петров Петр", "technical_rep": "Внешний инженер Согласованный С. С."}}
+	if res := call("POST", base, payload("", 0, requisites, ""), admin, token); res.Code != 200 {
+		t.Fatal("automation defaults", res.Code, res.Body.String())
 	}
 	if w := call("POST", base, payload("", 0, content, ""), admin, ""); w.Code != 403 {
 		t.Fatal("CSRF", w.Code)
@@ -134,6 +162,17 @@ func testConstructionDocuments(t *testing.T, r *gin.Engine, admin, worker *http.
 	if len(source.Rows) != 2 || source.Rows[0].Reviewed || source.Rows[0].Fields["weather"] != "" || source.Rows[0].Fields["quantity"] != "" {
 		t.Fatal("source fabrication", w.Body.String())
 	}
+	if !strings.Contains(source.Rows[0].Fields["crew"], "Иванов Иван") || !strings.Contains(source.Rows[0].Fields["persons"], "Администратор") || !strings.Contains(source.Rows[0].Fields["persons"], "Прораб Петров Петр") {
+		t.Fatal("missing crew or internal responsible", source.Rows[0])
+	}
+	staffResponse := call("GET", base+"/sources?from=2026-09-01&to=2026-09-30&section=2", nil, admin, "")
+	var staff struct {
+		Rows []models.ConstructionRow `json:"rows"`
+	}
+	_ = json.Unmarshal(staffResponse.Body.Bytes(), &staff)
+	if len(staff.Rows) != 1 || !strings.Contains(staff.Rows[0].Fields["person"], "Петров Петр") || staff.Rows[0].Fields["qualification"] != "" {
+		t.Fatal("staff role inference", staffResponse.Body.String())
+	}
 	journal := models.ConstructionContent{Kind: "journal", Fields: map[string]string{"object_name": "Объект"}, Rows: source.Rows}
 	w = call("POST", base, payload("", 0, journal, ""), admin, token)
 	if w.Code != 200 {
@@ -158,5 +197,20 @@ func testConstructionDocuments(t *testing.T, r *gin.Engine, admin, worker *http.
 	report, err := storage.ValidateDocuments(map[string][]byte{"construction_documents.json": docBytes, "users.json": userBytes, "objects.json": objectBytes}, "")
 	if err != nil || report.Counts["construction_documents"] != 2 || report.Counts["construction_revisions"] != 3 {
 		t.Fatal("migration report", report, err)
+	}
+	if err = storage.LoadConstructionDocuments(); err != nil {
+		t.Fatal(err)
+	}
+	auto, err := storage.ConstructionAutomation(obj)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if auto.Defaults["responsible"] != "Администратор" || len(auto.Suggestions["work_name"]) != 1 || auto.Suggestions["work_name"][0] != "Уточнённые работы" || len(auto.People) == 0 {
+		t.Fatal("memory after reload", auto)
+	}
+	for _, path := range []string{"/cities?q=Минск", "/weather?city=Минск&latitude=53.9&longitude=27.5&from=2026-09-21&to=2026-09-21"} {
+		if res := call("GET", base+path, nil, worker, ""); res.Code != 403 {
+			t.Fatal("weather access", res.Code)
+		}
 	}
 }

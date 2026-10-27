@@ -4,6 +4,8 @@ package construction
 
 import (
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -42,6 +44,10 @@ var Common = []Field{
 	long("project", "Проект: разработчик, номера и даты чертежей", true),
 	long("permit", "Разрешение / уведомление: дата, номер, орган", true),
 	f("responsible", "Ответственный за строительство и ведение журнала: должность, ФИО", true),
+	f("quality_rep", "Внутренний контроль качества: должность, ФИО", false),
+	{Key: "weather_city", Label: "Город для погоды", Type: "city"},
+	{Key: "weather_latitude", Label: "Широта", Type: "hidden"},
+	{Key: "weather_longitude", Label: "Долгота", Type: "hidden"},
 }
 
 var Act = []Field{
@@ -62,6 +68,14 @@ var Act = []Field{
 	f("technical_rep", "Представитель технического надзора: должность, ФИО", true),
 	f("author_rep", "Представитель авторского надзора: должность, ФИО / основание отсутствия", true),
 	long("attachments", "Дополнительные сведения и ссылки на приложения", false),
+	f("contractor_signer", "Подрядчик: фамилия, инициалы подписанта", false),
+	{Key: "contractor_signed_at", Label: "Подрядчик: дата и время подписания", Type: "datetime-local"},
+	f("subcontractor_signer", "Субподрядчик: фамилия, инициалы подписанта", false),
+	{Key: "subcontractor_signed_at", Label: "Субподрядчик: дата и время подписания", Type: "datetime-local"},
+	f("technical_signer", "Технадзор: фамилия, инициалы подписанта", false),
+	{Key: "technical_signed_at", Label: "Технадзор: дата и время подписания", Type: "datetime-local"},
+	f("author_signer", "Авторский надзор: фамилия, инициалы подписанта", false),
+	{Key: "author_signed_at", Label: "Авторский надзор: дата и время подписания", Type: "datetime-local"},
 }
 
 var JournalCover = []Field{
@@ -85,7 +99,7 @@ var JournalCover = []Field{
 var JournalSections = []Section{
 	{2, "Инженерно-технический персонал", []Field{long("person", "ФИО, должность, участок работ", true), date("start", "Дата начала работ", true), long("qualification", "Разрешение на право производства работ / аттестация", true), date("end", "Дата окончания работ", false)}},
 	{3, "Реестр актов", []Field{long("act", "Наименование и номер акта, расположение конструкций и работ", true), date("signed_date", "Дата фактического подписания", true), long("signers", "Фамилии, инициалы и должности подписавших", true)}},
-	{4, "Производство работ", []Field{date("date", "Дата производства работ", true), f("shift", "Смена", true), long("description", "Работы и их расположение", true), f("weather", "Погода и температура наружного воздуха", true), long("measures", "Меры в особых условиях (зима, жара и др.)", true), f("unit", "Единица измерения", true), f("quantity", "Количество принятых работ", true), long("control", "Результаты операционного контроля, параметры измерений", true), long("persons", "Ответственный и оценивающий качество: должности, ФИО", true)}},
+	{4, "Производство работ", []Field{date("date", "Дата производства работ", true), f("shift", "Смена", true), long("description", "Работы и их расположение", true), long("crew", "Рабочие / бригада по назначениям", false), f("weather", "Погода и температура наружного воздуха", true), {Key: "weather_source", Label: "Источник погоды", Type: "annotation"}, {Key: "weather_date", Label: "Дата данных погоды", Type: "hidden"}, long("measures", "Меры в особых условиях (зима, жара и др.)", true), f("unit", "Единица измерения", true), f("quantity", "Количество принятых работ", true), long("control", "Результаты операционного контроля, параметры измерений", true), long("persons", "Ответственный и оценивающий качество: должности, ФИО", true)}},
 	{5, "Специальные журналы", []Field{f("name", "Наименование специального журнала", true), date("issued", "Дата выдачи", true), long("organization", "Организация, ответственное лицо: должность, ФИО", true), date("handed", "Дата сдачи-приемки", false), f("recipient", "Принявшее должностное лицо", false)}},
 	{6, "Замечания и устранение", []Field{f("inspector", "Контролирующее лицо: должность, ФИО", true), date("date", "Дата", true), long("remark", "Замечание / ссылка на предписание", true), long("response", "Принятие к исполнению и устранение", false)}},
 	{7, "Контроль и надзор", []Field{f("authority", "Контролирующий / надзорный орган", true), long("order", "Документ о назначении мероприятия / допуске: вид, номер, дата", false), f("inspector", "Должностное лицо: ФИО", true), date("start", "Начало мероприятия", true), date("end", "Окончание мероприятия", false), long("result", "Документ по результатам мероприятия", false), long("note", "Примечание, в том числе замена должностного лица", false)}},
@@ -125,8 +139,17 @@ func validateFields(values map[string]string, schema []Field) error {
 		if !ok || !utf8.ValidString(v) || utf8.RuneCountInString(v) > 5000 || strings.ContainsAny(v, "\x00\x01\x02\x03\x04\x05\x06\x07\x08\x0b\x0c") {
 			return fmt.Errorf("Недопустимое поле или слишком длинный текст: %s", k)
 		}
+		if strings.HasSuffix(k, "_signer") && utf8.RuneCountInString(v) > 150 {
+			return fmt.Errorf("Фамилия и инициалы: не более 150 символов")
+		}
 		if v != "" && f.Type == "date" && !ValidDate(v) {
 			return fmt.Errorf("Проверьте дату: %s", f.Label)
+		}
+		if v != "" && f.Type == "datetime-local" {
+			d, err := time.Parse("2006-01-02T15:04", v)
+			if err != nil || d.Year() < 1900 || d.Year() > 2200 {
+				return fmt.Errorf("Проверьте дату и время: %s", f.Label)
+			}
 		}
 		if f.Type == "violations" && v != "" && v != "none" && v != "present" {
 			return fmt.Errorf("Укажите результат проверки нарушений")
@@ -139,6 +162,20 @@ func validateFields(values map[string]string, schema []Field) error {
 	}
 	if values["act_date"] != "" && values["end_date"] > values["act_date"] {
 		return fmt.Errorf("Дата освидетельствования не может быть раньше окончания работ")
+	}
+	if values["weather_date"] != "" && (!ValidDate(values["weather_date"]) || values["weather_date"] != values["date"]) {
+		return fmt.Errorf("Погода относится к другой дате. Обновите её или удалите автоматическую подстановку")
+	}
+	if values["weather_latitude"] != "" || values["weather_longitude"] != "" {
+		for key, limit := range map[string]float64{"weather_latitude": 90, "weather_longitude": 180} {
+			v, e := strconv.ParseFloat(values[key], 64)
+			if e != nil || math.IsNaN(v) || math.IsInf(v, 0) || v < -limit || v > limit {
+				return fmt.Errorf("Выберите город из списка найденных населённых пунктов")
+			}
+		}
+		if strings.TrimSpace(values["weather_city"]) == "" {
+			return fmt.Errorf("Укажите город для погоды")
+		}
 	}
 	return nil
 }
