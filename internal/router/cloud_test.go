@@ -92,7 +92,7 @@ func testPersonalCloud(t *testing.T, r *gin.Engine, admin, other, worker *http.C
 	if w = upload("original.txt", "retry must not replace", id, token); w.Code != 200 {
 		t.Fatal("retry", w.Code)
 	}
-	for _, suffix := range []string{"", "?preview=text", "?preview=1", "?preview=video", "?preview=stream"} {
+	for _, suffix := range []string{"", "?preview=text", "?preview=1", "?preview=video", "?preview=stream", "?preview=thumbnail"} {
 		if w = request("GET", "/cloud/file/"+id+suffix, "", "", other); w.Code != 404 {
 			t.Fatal("other admin read", w.Code)
 		}

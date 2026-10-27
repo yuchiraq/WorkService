@@ -123,6 +123,10 @@ func CloudFile(c *gin.Context) {
 
 func serveCloudFile(c *gin.Context, item models.CloudItem, file *os.File) {
 	cloudHeaders(c)
+	if c.Query("preview") == "thumbnail" {
+		serveCloudThumbnail(c, item, file)
+		return
+	}
 	if c.Query("preview") == "video" || c.Query("preview") == "stream" {
 		serveCloudVideo(c, item, file)
 		return

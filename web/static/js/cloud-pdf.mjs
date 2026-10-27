@@ -3,6 +3,19 @@ import * as pdfjs from '/static/vendor/pdfjs-6.4.299/pdf.mjs';
 const assets='/static/vendor/pdfjs-6.4.299/';
 pdfjs.GlobalWorkerOptions.workerSrc=assets+'pdf.worker.mjs';
 
+export async function firstPageThumbnail(url,signal){
+  const loading=pdfjs.getDocument({url,cMapUrl:assets+'cmaps/',cMapPacked:true,standardFontDataUrl:assets+'standard_fonts/',wasmUrl:assets+'wasm/',isEvalSupported:false,disableAutoFetch:true,disableStream:true,maxImageSize:32*1024*1024});
+  let render=null;const abort=()=>{render?.cancel();loading.destroy().catch(()=>{});};signal.addEventListener('abort',abort,{once:true});
+  try{
+    if(signal.aborted)throw new DOMException('Aborted','AbortError');
+    const doc=await loading.promise,page=await doc.getPage(1),initial=page.getViewport({scale:1});
+    const viewport=page.getViewport({scale:Math.min(480/initial.width,320/initial.height)}),canvas=document.createElement('canvas');canvas.width=Math.ceil(viewport.width);canvas.height=Math.ceil(viewport.height);
+    if(signal.aborted)throw new DOMException('Aborted','AbortError');
+    render=page.render({canvasContext:canvas.getContext('2d'),viewport,background:'#fff'});await render.promise;
+    return await new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Thumbnail failed')),'image/jpeg',.82));
+  }finally{signal.removeEventListener('abort',abort);await loading.destroy().catch(()=>{});}
+}
+
 // Render pixels/text only; never attach PDF actions, scripts or external links.
 export function mountPDF(host,url) {
   let closed=false,documentPDF=null,renderTask=null,pageNumber=1,serial=0,timer;

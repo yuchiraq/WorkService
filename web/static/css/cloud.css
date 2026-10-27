@@ -111,6 +111,34 @@
 .cl-zoom-in { --cl-icon: url('/static/icons/lucide/zoom-in.svg'); }
 .cl-zoom-out { --cl-icon: url('/static/icons/lucide/zoom-out.svg'); }
 .cl-fit { --cl-icon: url('/static/icons/lucide/maximize-2.svg'); }
+.cl-grid { --cl-icon: url('/static/icons/lucide/layout-grid.svg'); }
+.cl-list { --cl-icon: url('/static/icons/lucide/list.svg'); }
+.cloud-thumbnail { display: none; }
+.cloud-layout-switch { display: flex; align-items: center; gap: 2px; width: fit-content; padding: 2px; border: 1px solid var(--border-strong); border-radius: 6px; background: var(--surface-solid); }
+.cloud-layout-switch .cl-button { border: 0; background: transparent; margin: 0; min-width: 44px; min-height: 44px; border-radius: 4px; color: var(--muted-strong); cursor: pointer; touch-action: manipulation; }
+.cloud-layout-switch .cl-button[aria-pressed=true] { background: var(--accent-cool-soft); color: var(--text); }
+.cloud-layout-tiles #cloud-list,.cloud-layout-tiles .cloud-public-list { display: grid; grid-template-columns: repeat(auto-fill,minmax(190px,1fr)); gap: 12px; }
+.cloud-layout-tiles .cloud-row,.cloud-layout-tiles .cloud-public-list li { display: block; position: relative; min-width: 0; min-height: 0; padding: 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface-solid); overflow: hidden; }
+.cloud-layout-tiles .cloud-row.is-selected { border-color: var(--primary); background: var(--accent-cool-soft); }
+.cloud-layout-tiles .cloud-row-open,.cloud-layout-tiles .cloud-public-open { display: flex; flex-direction: column; align-items: stretch; width: 100%; min-height: 0; gap: 0; border-radius: 0; }
+.cloud-layout-tiles .cloud-row-open > .cl-icon,.cloud-layout-tiles .cloud-public-open > .cl-icon,.cloud-layout-tiles .cloud-row-size,.cloud-layout-tiles .cloud-row-date { display: none; }
+.cloud-layout-tiles .cloud-thumbnail { display: grid; place-items: center; width: 100%; aspect-ratio: 4 / 3; flex: none; position: relative; overflow: hidden; background: var(--surface-soft); color: var(--muted-strong); }
+.cloud-layout-tiles .cloud-public-open > .cloud-thumbnail { flex: none; }
+.cloud-layout-tiles .cloud-thumbnail > .cl-icon { width: 48px; height: 48px; flex: none; }
+.cloud-layout-tiles .cloud-thumbnail > .cl-folder { color: var(--primary); }
+.cloud-thumbnail img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+.cloud-thumbnail-format { position: absolute; bottom: 6px; left: 8px; font-size: 11px; font-weight: 600; }
+.cloud-layout-tiles .cloud-row-copy { display: grid; padding: 10px; gap: 3px; min-height: 78px; }
+.cloud-layout-tiles .cloud-row-name,.cloud-layout-tiles .cloud-public-item-name { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; white-space: normal; overflow-wrap: anywhere; line-height: 20px; height: 40px; font-size: 14px; font-weight: 600; }
+.cloud-layout-tiles .cloud-row-meta { display: block; font-size: 12px; line-height: 16px; }
+.cloud-layout-tiles .cloud-check { position: absolute; top: 4px; left: 4px; z-index: 2; width: 44px; min-height: 44px; border-radius: 4px; background: color-mix(in srgb,var(--surface-solid) 96%,transparent); }
+.cloud-layout-tiles .cloud-row-actions { position: absolute; top: 4px; right: 4px; z-index: 2; border-radius: 4px; background: color-mix(in srgb,var(--surface-solid) 96%,transparent); }
+.cloud-layout-tiles .cloud-list-heading { display: block; margin: 0; padding: 0; border: 0; }
+.cloud-layout-tiles .cloud-list-heading > span { display: none; }
+.cloud-layout-tiles .cloud-public-list li > .cl-button { position: absolute; right: 4px; top: 4px; z-index: 2; width: 44px; height: 44px; border-radius: 4px; background: var(--surface-solid); }
+.cloud-layout-tiles .cloud-public-item-name { margin: 10px 10px 4px; flex: none !important; }
+.cloud-layout-tiles .cloud-public-open small { padding: 0 10px 10px; font-size: 12px; line-height: 16px; }
+@media(max-width:600px){.cloud-layout-tiles #cloud-list,.cloud-layout-tiles .cloud-public-list { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }}
 .cloud-shared-badge { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted-strong); }
 .cloud-shared-badge .cl-icon { width: 14px; height: 14px; flex-basis: 14px; }
 #cloud-share-name { font-weight: 600; overflow-wrap: anywhere; }

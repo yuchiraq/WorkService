@@ -4,12 +4,15 @@ import (
 	"archive/zip"
 	"bytes"
 	"encoding/json"
+	"image"
+	"image/png"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -119,5 +122,40 @@ func testCloudSharing(t *testing.T, r *gin.Engine, admin, other, worker *http.Co
 	}
 	if w = request("POST", url+"/archive", "", "", nil); w.Code != 404 {
 		t.Fatal("revoked ZIP creation", w.Code)
+	}
+	var imageBytes bytes.Buffer
+	png.Encode(&imageBytes, image.NewRGBA(image.Rect(0, 0, 64, 32)))
+	photo, err := storage.AddCloudFile("admin", "", "Thumbnail.png", uuid.NewString(), &imageBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = storage.SetCloudShare("admin", photo.ID, photo.Version, true, 0); err != nil {
+		t.Fatal(err)
+	}
+	for _, candidate := range storage.CloudState("admin").Items {
+		if candidate.ID == photo.ID {
+			photo = candidate
+		}
+	}
+	thumbURL := "/s/" + photo.ShareToken + "/file/" + photo.ID + "?preview=thumbnail"
+	deadline := time.Now().Add(3 * time.Second)
+	for {
+		w = request("GET", thumbURL, "", "", nil)
+		if w.Code != 202 || time.Now().After(deadline) {
+			break
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	if w.Code != 200 || w.Header().Get("Content-Type") != "image/jpeg" || !bytes.HasPrefix(w.Body.Bytes(), []byte{0xff, 0xd8}) {
+		t.Fatal("public image thumbnail", w.Code, w.Body.String())
+	}
+	if w = request("GET", "/s/"+photo.ShareToken+"/file/"+item.ID+"?preview=thumbnail", "", "", nil); w.Code != 404 {
+		t.Fatal("thumbnail scope leak", w.Code)
+	}
+	if err = storage.SetCloudShare("admin", photo.ID, photo.Version, false, 0); err != nil {
+		t.Fatal(err)
+	}
+	if w = request("GET", thumbURL, "", "", nil); w.Code != 404 {
+		t.Fatal("cached thumbnail survived share revocation", w.Code)
 	}
 }

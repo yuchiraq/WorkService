@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'avayusstroy-v29';
+const CACHE_VERSION = 'avayusstroy-v30';
 const APP_SHELL = [
   '/static/css/style.css?v=20',
   '/static/js/ui.js?v=19',

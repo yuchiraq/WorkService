@@ -29,6 +29,7 @@ type Engine struct {
 	jobs              map[string]*job
 	directory, binary string
 	working           bool
+	thumbnails        bool
 	run               func(context.Context, string, string, string) error
 }
 
@@ -39,6 +40,10 @@ func New(binary string) *Engine {
 func (e *Engine) Prepare(key, source string) Result {
 	e.mu.Lock()
 	defer e.mu.Unlock()
+	limit, outputLimit, extension, timeout, prefix := 4, int64(maxOutput), ".mp4", 10*time.Minute, "workservice-video-*"
+	if e.thumbnails {
+		limit, outputLimit, extension, timeout, prefix = 256, 1<<20, ".jpg", 30*time.Second, "workservice-thumbnails-*"
+	}
 	for k, j := range e.jobs {
 		age := 6 * time.Hour
 		if j.state == "error" {
@@ -73,14 +78,14 @@ func (e *Engine) Prepare(key, source string) Result {
 		bin = "ffmpeg"
 	}
 	resolved, err := exec.LookPath(bin)
-	if err != nil {
+	if err != nil && !e.thumbnails {
 		return Result{State: "unavailable", Message: "Для просмотра этого видео на сервере требуется FFmpeg. Оригинал можно скачать"}
 	}
 	info, err := os.Stat(source)
 	if err != nil || info.Size() > 512<<20 {
 		return Result{State: "error", Message: "Видео недоступно или больше 512 МБ. Скачайте оригинал"}
 	}
-	if len(e.jobs) >= 4 {
+	if len(e.jobs) >= limit {
 		oldest := ""
 		for k, j := range e.jobs {
 			if oldest == "" || j.at.Before(e.jobs[oldest].at) {
@@ -95,12 +100,12 @@ func (e *Engine) Prepare(key, source string) Result {
 		}
 	}
 	if e.directory == "" {
-		e.directory, err = os.MkdirTemp("", "workservice-video-*")
+		e.directory, err = os.MkdirTemp("", prefix)
 		if err != nil {
 			return Result{State: "error", Message: "Недостаточно места для предпросмотра"}
 		}
 	}
-	f, err := os.CreateTemp(e.directory, "*.mp4")
+	f, err := os.CreateTemp(e.directory, "*"+extension)
 	if err != nil {
 		return Result{State: "error", Message: "Не удалось создать предпросмотр"}
 	}
@@ -110,7 +115,7 @@ func (e *Engine) Prepare(key, source string) Result {
 	e.jobs[key] = j
 	e.working = true
 	go func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
 		stop := make(chan struct{})
 		go func() {
@@ -128,7 +133,7 @@ func (e *Engine) Prepare(key, source string) Result {
 						cancel()
 						return
 					}
-					if info, err := os.Stat(out); err == nil && info.Size() > maxOutput {
+					if info, err := os.Stat(out); err == nil && info.Size() > outputLimit {
 						cancel()
 						return
 					}
@@ -142,7 +147,7 @@ func (e *Engine) Prepare(key, source string) Result {
 		defer e.mu.Unlock()
 		e.working = false
 		j.at = time.Now()
-		if err != nil || ctx.Err() != nil || statErr != nil || info.Size() == 0 || info.Size() > maxOutput {
+		if err != nil || ctx.Err() != nil || statErr != nil || info.Size() == 0 || info.Size() > outputLimit {
 			j.state = "error"
 			os.Remove(out)
 		} else {

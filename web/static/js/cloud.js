@@ -8,6 +8,7 @@
   let view = 'files', folder = '', visible = 100, selected = new Set(), busy = false, uploading = false;
   let editing = null, sequence = 0, previewSequence = 0, queue = [], stopped = false, activeXHR = null;
   let previewDispose = null;
+  let tiles=null;
   const share = $('cloud-share');
   let sharing = null;
   const shared = item => !!item.shareToken && (!item.shareExpiresAt || new Date(item.shareExpiresAt) > new Date());
@@ -97,7 +98,10 @@
     const node=el('div','cloud-row'); node.dataset.id=item.id; node.classList.toggle('is-selected',selected.has(item.id));
     const label=el('label','cloud-check'); const check=el('input'); check.type='checkbox'; check.checked=selected.has(item.id); check.disabled=busy; check.setAttribute('aria-label',`Выбрать ${item.name}`);
     check.addEventListener('change',()=>{ if(check.checked && selected.size>=500) { check.checked=false; feedback('Выберите не более 500 элементов'); return; } check.checked?selected.add(item.id):selected.delete(item.id); node.classList.toggle('is-selected',check.checked); selectionUI(); }); label.append(check);
-    const open=el('button','cloud-row-open'); open.type='button'; open.title=item.name; open.disabled=busy; open.append(icon(item.kind==='folder'?'folder':item.mime?.startsWith('image/')?'image':'file'));
+    const open=el('button','cloud-row-open'); open.type='button'; open.title=item.name; open.disabled=busy;
+    const thumb=el('span','cloud-thumbnail');thumb.setAttribute('aria-hidden','true');Object.assign(thumb.dataset,{url:fileURL(item),name:item.name,mime:item.mime||'',kind:item.kind,deleted:String(!!item.deletedAt)});thumb.append(icon(item.kind==='folder'?'folder':item.mime?.startsWith('image/')?'image':'file'));
+    if(item.kind==='file')thumb.append(el('span','cloud-thumbnail-format',item.name.includes('.')?item.name.split('.').at(-1).slice(0,8).toUpperCase():'ФАЙЛ'));
+    open.append(thumb,icon(item.kind==='folder'?'folder':item.mime?.startsWith('image/')?'image':'file'));
     const copy=el('span','cloud-row-copy'); copy.append(el('span','cloud-row-name',item.name));
     if(shared(item)) { const badge=el('span','cloud-shared-badge','Доступ по ссылке'); badge.prepend(icon('link')); copy.append(badge); }
     node.classList.toggle('is-starred',item.starred);
@@ -130,6 +134,7 @@
     $('cloud-refresh').disabled=busy;
     for(const btn of root.querySelectorAll('[data-view]')) { if(btn.dataset.view===view) btn.setAttribute('aria-current','page'); else btn.removeAttribute('aria-current'); }
     selectionUI(visibleItems); breadcrumbs();
+    tiles?.refresh();
   }
   async function json(response) {
     if(response.redirected) throw new Error('Сессия завершилась. Войдите в аккаунт снова');
@@ -330,5 +335,9 @@
   window.addEventListener('focus',refresh);
   window.addEventListener('popstate',()=>{readLocation();selected.clear();visible=100;render();});
   window.addEventListener('beforeunload',event=>{if(uploading){event.preventDefault();event.returnValue='';}});
+  const layoutSwitch=root.querySelector('.cloud-layout-switch');if(layoutSwitch)root.querySelector('.cloud-toolbar').append(layoutSwitch);
   reindex();readLocation();render();
+  import('/static/js/cloud-tiles.mjs?v=1').then(({createFileTiles})=>{tiles=createFileTiles(root);}).catch(()=>{root.querySelector('.cloud-layout-switch')?.setAttribute('hidden','');});
+  window.addEventListener('pagehide',()=>tiles?.destroy(),{once:true});
+  window.addEventListener('pageshow',event=>{if(event.persisted)tiles?.refresh();});
 })();
