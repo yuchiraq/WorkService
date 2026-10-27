@@ -9,6 +9,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -171,4 +172,75 @@ func ConstructionSources(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"rows": rows})
+}
+
+// This proposes draft rows only; opening a journal never writes a revision.
+func ConstructionJournalAssignments(c *gin.Context) {
+	object, ok := constructionObject(c)
+	if !ok {
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2*1024*1024)
+	var input struct {
+		From     string   `json:"from"`
+		To       string   `json:"to"`
+		Excluded []string `json:"excluded"`
+	}
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&input); err != nil {
+		c.JSON(400, gin.H{"error": "Не удалось прочитать период назначений"})
+		return
+	}
+	if err := decoder.Decode(&struct{}{}); err != io.EOF {
+		c.JSON(400, gin.H{"error": "Ожидался один запрос назначений"})
+		return
+	}
+	today := time.Now().In(vehicleWaybillLocation).Format("2006-01-02")
+	openEnd := input.To == ""
+	if input.From == "" {
+		input.From = "1900-01-01"
+	}
+	if input.To == "" {
+		input.To = today
+	}
+	if !construction.ValidDate(input.From) || !construction.ValidDate(input.To) || (input.From > input.To && !openEnd) || len(input.Excluded) > 30000 {
+		c.JSON(422, gin.H{"error": "Проверьте период и источники записей"})
+		return
+	}
+	excluded := map[string]bool{}
+	for _, source := range input.Excluded {
+		if !strings.HasPrefix(source, "assignment:") || len(source) > 100 {
+			c.JSON(422, gin.H{"error": "Некорректный источник назначения"})
+			return
+		}
+		excluded[source] = true
+	}
+	if input.To > today {
+		input.To = today
+	}
+	if input.From > input.To {
+		c.JSON(200, gin.H{"rows": []models.ConstructionRow{}})
+		return
+	}
+	rows, err := storage.ConstructionJournalAssignmentRows(object, input.From, input.To, excluded)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Не удалось загрузить назначения объекта"})
+		return
+	}
+	if len(rows) > 1500 {
+		c.JSON(422, gin.H{"error": "Слишком много назначений. Уточните дату начала журнала или добавьте выбранный период через «Из назначений»"})
+		return
+	}
+	for _, row := range rows {
+		if len(row.Sources) > 500 {
+			c.JSON(422, gin.H{"error": "В одной смене более 500 назначений. Выберите записи вручную"})
+			return
+		}
+	}
+	if err := construction.Validate(models.ConstructionContent{Kind: "journal", Fields: map[string]string{}, Rows: rows}); err != nil {
+		c.JSON(422, gin.H{"error": "Слишком большой объём данных назначений. Выберите период вручную: " + err.Error()})
+		return
+	}
+	c.JSON(200, gin.H{"rows": rows})
 }

@@ -9,7 +9,8 @@
   const names = {act: 'Акт скрытых работ', journal: 'Журнал производства работ', requisites: 'Реквизиты объекта'};
   let state, current, section = 1, dirty = false, saving = false, row, rowDirty = false, sources = [], sourceKind = 'assignments', importSequence = 0;
   let opener, paperPreview = false, rowPage = 0;
-  const weatherRequests=new Map(), rowRequests=new WeakMap(), rowAutofill=new WeakMap();
+  const weatherRequests=new Map(), rowRequests=new WeakMap(), rowAutofill=new WeakMap(), assignmentRequests=new WeakMap();
+  let assignmentNotice='',assignmentError=false,editSequence=0;
   const el = (tag, text, cls) => { const node = document.createElement(tag); if (text != null) node.textContent = text; if (cls) node.className = cls; return node; };
   const icon = name => { const n = el('span', null, 'docs-icon'); n.dataset.icon = name; n.setAttribute('aria-hidden', 'true'); return n; };
   const button = (label, handler, iconName, cls = 'btn btn-secondary') => {
@@ -86,9 +87,11 @@
     });
   }
   async function edit(id, kind) {
+    const editing=++editSequence;
     if (!id || !state) await refresh();
+    if(editing!==editSequence)return;
     opener = document.activeElement;
-    if (id) current = await request('/' + encodeURIComponent(id));
+    if (id) {const document=await request('/' + encodeURIComponent(id));if(editing!==editSequence)return;current=document;}
     else {
       const defaults = state.automation?.defaults || state.documents.find(d => d.content.kind === 'requisites')?.content.fields || {};
       const fields = {};
@@ -115,7 +118,11 @@
     sections.forEach(s => { const o = el('option', s.number===0?s.title:`${s.number}. ${s.title}`); o.value = s.number; $('docs-section-select').append(o); });
     $('docs-section-select').parentElement.hidden = sections.length === 1;
     editor.querySelector('[data-docs=pdf]').hidden = current.content.kind === 'requisites';
+    assignmentNotice='';assignmentError=false;
+    const added=current.content.kind==='journal'?await syncJournalAssignments({render:false,quiet:true}):[];
+    if(editing!==editSequence||!root.isConnected)return;
     updateMeta(); renderEditor(); openDialog(editor);
+    if(added.length)fillWeatherRows(added,true);
   }
   function updateMeta() {
     $('docs-editor-meta').textContent = current.content.archived ? 'В архиве · сохранена история' : current.version ? `Версия ${current.version} · ${current.updatedBy}` : 'Новый черновик';
@@ -252,6 +259,31 @@
       r.reviewed=false;if(rowEditor.open&&row===r){rowDirty=true;$('docs-row-reviewed').checked=false;}else markDirty();
     }catch{}
   }
+  async function syncJournalAssignments({render=true,quiet=false}={}){
+    const doc=current;if(doc?.content.kind!=='journal'||doc.content.archived)return [];
+    if(assignmentRequests.has(doc))return assignmentRequests.get(doc);
+    const job=(async()=>{
+      try{
+        const fields=doc.content.fields;
+        const excluded=[...new Set((doc.content.rows||[]).flatMap(r=>r.sources||[]).filter(id=>id.startsWith('assignment:')))];
+        const result=await request('/assignments',{from:fields.actual_start||fields.planned_start||'',to:fields.actual_end||'',excluded});
+        if(current!==doc)return [];
+        const seen=new Set((doc.content.rows||[]).flatMap(r=>r.sources||[]));
+        const added=result.rows.filter(r=>r.sources?.length&&r.sources.every(id=>!seen.has(id)));
+        if((doc.content.rows?.length||0)+added.length>1500)throw new Error('В журнале допускается 1500 записей. Уточните период или создайте следующий том.');
+        if(added.length){
+          doc.content.rows||=[];doc.content.rows.push(...added);markDirty();
+          if(doc.version&&!$('docs-reason').value.trim())$('docs-reason').value='Добавление новых назначений объекта';
+        }
+        assignmentError=false;
+        assignmentNotice=added.length?`Добавлено записей из назначений: ${added.length}. Раздел 4 · черновики для проверки.`:quiet?'':'Новых назначений за период журнала нет.';
+        if(render&&editor.open){renderEditor();if(added.length)fillWeatherRows(added,true);}
+        return added;
+      }catch(error){if(current===doc){assignmentNotice=error.message;assignmentError=true;if(render&&editor.open)renderEditor();}return [];}
+    })();
+    assignmentRequests.set(doc,job);
+    try{return await job;}finally{assignmentRequests.delete(doc);}
+  }
   async function weatherLocation(){
     const values=current?.content.kind==='requisites'?current.content.fields:state.automation.defaults;
     let city=values.weather_city||'';
@@ -360,12 +392,18 @@
     window.WorkServiceDocumentSuggestions?.close();
     const body = $('docs-editor-body'); body.replaceChildren();
     const kind = current.content.kind, toolbar = el('div', null, 'docs-inline-tools');
+    if(kind==='journal'){
+      const count=(current.content.rows||[]).filter(r=>r.section===4).length,option=$('docs-section-select').querySelector('[value="4"]');
+      if(option)option.textContent='4. Производство работ'+(count?' · '+count:'');
+      if(assignmentNotice){const notice=el('p',assignmentNotice,assignmentError?'docs-error':'docs-note');notice.id='docs-assignment-notice';notice.setAttribute('role',assignmentError?'alert':'status');body.append(notice);}
+    }
     body.classList.toggle('docs-paper-workspace',kind!=='requisites');
     body.classList.toggle('docs-paper-preview',paperPreview);
     editor.querySelector('[data-docs=preview]').setAttribute('aria-pressed',String(paperPreview));
     $('docs-preview-label').textContent=paperPreview?'Редактировать':'Просмотр бланка';
     if (section === 0) {
       toolbar.append(button('Общие сведения',()=>{section=1;$('docs-section-select').value='1';renderEditor();$('docs-editor-body').scrollTop=0;},'chevron-right'));
+      if(!current.content.archived)toolbar.append(button('Обновить назначения',()=>syncJournalAssignments(),'refresh-cw'));
       body.append(toolbar,paperDocument(kind));
     } else if (section === 1) {
       if (kind === 'act') toolbar.append(button('Из назначений', () => openImport('assignments'), 'plus'));
@@ -380,6 +418,7 @@
       const spec = state.schema.sections.find(s => s.number === section);
       toolbar.append(button('Добавить запись', () => editRow(), 'plus', 'btn btn-primary'));
       if (section === 4||section===2) toolbar.append(button('Из назначений', () => openImport('assignments'), 'copy'));
+      if(section===4&&!current.content.archived)toolbar.append(button('Обновить назначения',()=>syncJournalAssignments(),'refresh-cw'));
       if(section===4)toolbar.append(button('Заполнить погоду',()=>fillWeatherRows(current.content.rows||[]),'refresh-cw'));
       if (section === 3) toolbar.append(button('Из актов объекта', () => openImport('acts'), 'copy'));
       body.append(toolbar);
@@ -439,6 +478,8 @@
   async function closeRow() { if (!rowDirty || await confirmAction('Закрыть запись без применения изменений?')) rowEditor.close(); }
   async function save() {
     if (saving) return false;
+    if(assignmentRequests.has(current))await assignmentRequests.get(current);
+    if(saving)return false;
     if (!dirty && current.id) return true;
     if (current.version && !$('docs-reason').value.trim()) { showError('Укажите основание изменения'); $('docs-reason').focus(); return false; }
     saving = true; $('docs-error').hidden = true;
@@ -448,6 +489,7 @@
     $('docs-save-state').textContent = 'Сохранение…';
     try {
       current = await request('', {id:current.id, version:current.version, content:current.content, reason:$('docs-reason').value});
+      assignmentNotice='';assignmentError=false;
       dirty = false; $('docs-number').value = current.content.number; $('docs-reason').value = ''; updateMeta();
       try { await refresh(); } catch { notify('Документ сохранён. Обновить список пока не удалось.'); }
       renderEditor();

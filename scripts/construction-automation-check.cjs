@@ -23,6 +23,9 @@ const output=path.join(os.tmpdir(),'workservice-document-automation');
   const req=state.documents.find(d=>d.content.kind==='requisites');
   await save({id:req?.id||'',version:req?.version||0,content:{kind:'requisites',number:'',archived:false,rows:[],fields:{...(req?.content.fields||{}),quality_rep:'Прораб Петров Петр',contractor_rep:'Администратор',technical_rep:'Внешний инженер Согласованный С. С.',weather_city:'Минск',weather_latitude:'53.9',weather_longitude:'27.5667'}},reason:'Настройка автоматизации для теста'});
   let cityRequests=0,weatherRequests=0;
+  // Automatic bulk import has its own end-to-end suite; keep this check focused
+  // on editing a single row and its date/people/weather guards.
+  await page.route('**/object/object/documents/assignments',route=>route.fulfill({json:{rows:[]}}));
   await page.route('**/object/object/documents',async route=>{
    if(route.request().method()!=='GET')return route.continue();const res=await route.fetch(),body=await res.json();body.weather={enabled:true,reason:'',provider:'Open-Meteo'};await route.fulfill({response:res,json:body});
   });

@@ -152,6 +152,16 @@ func ConstructionAutomation(object models.Object) (DocumentAutomation, error) {
 }
 
 func ConstructionAssignmentRows(object models.Object, from, to string, section int) ([]models.ConstructionRow, error) {
+	return constructionAssignmentRows(object, from, to, section, nil)
+}
+
+// Exclude individual assignments before grouping: a new assignment in a shift
+// that was already imported must not copy the old crew and notes a second time.
+func ConstructionJournalAssignmentRows(object models.Object, from, to string, excluded map[string]bool) ([]models.ConstructionRow, error) {
+	return constructionAssignmentRows(object, from, to, 4, excluded)
+}
+
+func constructionAssignmentRows(object models.Object, from, to string, section int, excluded map[string]bool) ([]models.ConstructionRow, error) {
 	entries, err := GetTimesheets()
 	if err != nil {
 		return nil, err
@@ -178,7 +188,7 @@ func ConstructionAssignmentRows(object models.Object, from, to string, section i
 		return entries[i].Date < entries[j].Date
 	})
 	for _, e := range entries {
-		if e.UserMark != "" || e.Date < from || e.Date > to || !slices.Contains(e.ObjectIDs, object.ID) {
+		if excluded["assignment:"+e.ID] || e.UserMark != "" || e.Date < from || e.Date > to || !slices.Contains(e.ObjectIDs, object.ID) {
 			continue
 		}
 		if section == 2 {

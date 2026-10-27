@@ -55,6 +55,7 @@ func SetupRouter(r *gin.Engine) {
 		authRequired.GET("/object/:id/documents", api.ConstructionDocuments)
 		authRequired.POST("/object/:id/documents", api.SaveConstructionDocument)
 		authRequired.GET("/object/:id/documents/sources", api.ConstructionSources)
+		authRequired.POST("/object/:id/documents/assignments", api.ConstructionJournalAssignments)
 		authRequired.GET("/object/:id/documents/cities", api.ConstructionCities)
 		authRequired.GET("/object/:id/documents/weather", api.ConstructionWeather)
 		authRequired.GET("/object/:id/documents/:documentID", api.ConstructionDocument)

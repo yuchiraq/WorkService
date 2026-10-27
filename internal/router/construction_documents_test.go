@@ -165,6 +165,46 @@ func testConstructionDocuments(t *testing.T, r *gin.Engine, admin, worker *http.
 	if !strings.Contains(source.Rows[0].Fields["crew"], "Иванов Иван") || !strings.Contains(source.Rows[0].Fields["persons"], "Администратор") || !strings.Contains(source.Rows[0].Fields["persons"], "Прораб Петров Петр") {
 		t.Fatal("missing crew or internal responsible", source.Rows[0])
 	}
+	for _, tc := range []struct {
+		cookie *http.Cookie
+		csrf   string
+	}{{worker, token}, {admin, ""}} {
+		if res := call("POST", base+"/assignments", map[string]any{}, tc.cookie, tc.csrf); res.Code != 403 {
+			t.Fatal("assignment draft access", res.Code)
+		}
+	}
+	for _, body := range []map[string]any{{"from": "bad"}, {"from": "2026-09-30", "to": "2026-09-01"}, {"excluded": []string{"act:other"}}} {
+		if res := call("POST", base+"/assignments", body, admin, token); res.Code != 422 {
+			t.Fatal("assignment validation", res.Code, res.Body.String())
+		}
+	}
+	if res := call("POST", base+"/assignments", map[string]any{"from": "2200-01-01"}, admin, token); res.Code != 200 || !strings.Contains(res.Body.String(), `"rows":[]`) {
+		t.Fatal("future journal", res.Code, res.Body.String())
+	}
+	allSources := append(append([]string{}, source.Rows[0].Sources...), source.Rows[1].Sources...)
+	if res := call("POST", base+"/assignments", map[string]any{"from": "2020-01-01", "to": "2200-12-31", "excluded": allSources}, admin, token); res.Code != 200 || !strings.Contains(res.Body.String(), `"rows":[]`) {
+		t.Fatal("reimport duplicates", res.Code, res.Body.String())
+	}
+	if res := call("POST", otherBase+"/assignments", map[string]any{}, admin, token); res.Code != 200 || !strings.Contains(res.Body.String(), `"rows":[]`) {
+		t.Fatal("cross object assignments", res.Code, res.Body.String())
+	}
+	addedEntry, err := storage.CreateTimesheet(models.TimesheetEntry{Date: "2026-09-21", StartTime: "08:00", EndTime: "17:00", WorkerIDs: []string{"other"}, ObjectIDs: []string{"object"}, Notes: "NEW_SAME_SHIFT", CreatedByID: "admin"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	res := call("POST", base+"/assignments", map[string]any{"from": "2026-09-01", "to": "2026-09-30", "excluded": allSources}, admin, token)
+	var fresh struct {
+		Rows []models.ConstructionRow `json:"rows"`
+	}
+	if err = json.Unmarshal(res.Body.Bytes(), &fresh); err != nil || res.Code != 200 || len(fresh.Rows) != 1 {
+		t.Fatal("incremental import", res.Code, res.Body.String())
+	}
+	if fresh.Rows[0].Fields["crew"] != "Прораб Петров Петр" || fresh.Rows[0].Fields["description"] != "NEW_SAME_SHIFT" || len(fresh.Rows[0].Sources) != 1 || fresh.Rows[0].Sources[0] != "assignment:"+addedEntry.ID || fresh.Rows[0].Reviewed {
+		t.Fatal("old assignment copied into new shift", fresh.Rows)
+	}
+	if err = storage.DeleteTimesheet(addedEntry.ID); err != nil {
+		t.Fatal(err)
+	}
 	staffResponse := call("GET", base+"/sources?from=2026-09-01&to=2026-09-30&section=2", nil, admin, "")
 	var staff struct {
 		Rows []models.ConstructionRow `json:"rows"`
