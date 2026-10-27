@@ -36,6 +36,8 @@ func SetupRouter(r *gin.Engine) {
 	r.GET("/s/:token", api.SharedCloudPage)
 	r.GET("/s/:token/file/:id", api.SharedCloudFile)
 	r.HEAD("/s/:token/file/:id", api.SharedCloudFile)
+	r.POST("/s/:token/archive", api.SharedCloudArchive)
+	r.GET("/s/:token/archive/:archiveID", api.DownloadSharedCloudArchive)
 
 	authRequired := r.Group("/")
 	authRequired.Use(api.AuthRequired(), api.CSRFMiddleware())

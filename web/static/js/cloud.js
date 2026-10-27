@@ -7,7 +7,7 @@
   let state = JSON.parse($('cloud-data').textContent), index = new Map();
   let view = 'files', folder = '', visible = 100, selected = new Set(), busy = false, uploading = false;
   let editing = null, sequence = 0, previewSequence = 0, queue = [], stopped = false, activeXHR = null;
-  let pdfDispose = null;
+  let previewDispose = null;
   const share = $('cloud-share');
   let sharing = null;
   const shared = item => !!item.shareToken && (!item.shareExpiresAt || new Date(item.shareExpiresAt) > new Date());
@@ -245,22 +245,8 @@
     $('cloud-preview-title').textContent=item.name; $('cloud-preview-meta').textContent=`${size(item.size)} · ${date(item.updatedAt)}`;
     $('cloud-preview-download').href=fileURL(item); $('cloud-preview-download').download=item.name;
     body.replaceChildren(el('p','','Загрузка...')); preview.uiReturnFocus=trigger; preview.showModal();
-    if(item.mime?.startsWith('text/plain')) {
-      try { const data=await json(await fetch(`${fileURL(item)}?preview=text`,{cache:'no-store'})); if(request!==previewSequence) return; body.replaceChildren(el('pre','',data.text)); if(data.truncated) body.append(el('p','','Показаны первые 512 КБ')); }
-      catch(error) { if(request===previewSequence) body.replaceChildren(el('p','',error.message)); }
-      return;
-    }
-    if(item.mime==='application/pdf') {
-      try { const {mountPDF}=await import('/static/js/cloud-pdf.mjs?v=2'); if(request===previewSequence) pdfDispose=mountPDF(body,`${fileURL(item)}?preview=1`); }
-      catch { if(request===previewSequence) body.replaceChildren(el('p','','Не удалось открыть PDF. Файл можно скачать')); }
-      return;
-    }
-    let media;
-    if(['image/jpeg','image/png','image/gif','image/webp'].includes(item.mime)) { media=el('img'); media.alt=item.name; }
-    else if(item.mime?.startsWith('video/')) { media=el('video'); media.controls=true; media.preload='metadata'; }
-    else if(item.mime?.startsWith('audio/')) { media=el('audio'); media.controls=true; media.preload='metadata'; }
-    if(!media) { body.replaceChildren(el('p','','Предпросмотр недоступен. Файл можно скачать')); return; }
-    media.src=`${fileURL(item)}?preview=1`; media.addEventListener('error',()=>{if(request===previewSequence) body.replaceChildren(el('p','','Не удалось открыть файл. Попробуйте скачать его'));}); body.replaceChildren(media);
+    try{const {mountPreview}=await import('/static/js/cloud-preview.mjs?v=1');if(request===previewSequence)previewDispose=mountPreview(body,{name:item.name,mime:item.mime,url:fileURL(item)});}
+    catch{if(request===previewSequence)body.replaceChildren(el('p','','Не удалось открыть предпросмотр. Оригинал можно скачать'));}
   }
   async function download(items) {
     if(!items.length || busy) return;
@@ -330,7 +316,7 @@
   $('cloud-editor-form').addEventListener('submit',event=>{event.preventDefault(); const payload={...editing}; if(payload.action==='folder'||payload.action==='rename') payload.name=$('cloud-name').value; if(payload.action==='move') payload.parentId=$('cloud-destination').value; mutate(payload,()=>editor.close());});
   for(const btn of root.querySelectorAll('[data-close-dialog]')) btn.addEventListener('click',()=>{if(!busy) btn.closest('dialog').close();});
   editor.addEventListener('cancel',event=>{if(busy)event.preventDefault();});
-  preview.addEventListener('close',()=>{previewSequence++; pdfDispose?.();pdfDispose=null;$('cloud-preview-body').replaceChildren();});
+  preview.addEventListener('close',()=>{previewSequence++; previewDispose?.();previewDispose=null;$('cloud-preview-body').replaceChildren();});
   for(const dialog of [editor,preview,menu,share]) dialog.addEventListener('close',()=>{if(!dialog.uiReturnFocus?.isConnected)$('cloud-refresh').focus({preventScroll:true});});
   for(const btn of root.querySelectorAll('[data-view]')) btn.addEventListener('click',()=>navigate('',btn.dataset.view));
   $('cloud-search').addEventListener('input',()=>{selected.clear();visible=100;saveLocation(true);render();});

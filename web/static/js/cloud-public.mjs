@@ -1,0 +1,16 @@
+import {mountPreview} from '/static/js/cloud-preview.mjs?v=1';
+const root=document.querySelector('.cloud-public');
+const host=document.getElementById('shared-preview');
+let dispose=null;
+if(host)dispose=mountPreview(host,{name:host.dataset.name,mime:host.dataset.mime,url:host.dataset.url});
+window.addEventListener('pagehide',()=>dispose?.(),{once:true});
+const archive=document.getElementById('shared-download-all'),status=document.getElementById('shared-download-status');
+archive?.addEventListener('click',async()=>{
+ if(archive.disabled)return;archive.disabled=true;status.textContent='Формируем архив…';
+ try{
+  const response=await fetch(root.dataset.archive,{method:'POST',headers:{Accept:'application/json'},cache:'no-store'}),data=await response.json();
+  if(!response.ok)throw new Error(data.error||'Не удалось создать архив');
+  const a=document.createElement('a');a.href=data.url;a.download='';document.body.append(a);a.click();a.remove();status.textContent='Архив готов. Скачивание началось.';
+ }catch(error){status.textContent=error.message||'Нет соединения. Повторите скачивание.';}
+ finally{archive.disabled=false;}
+});

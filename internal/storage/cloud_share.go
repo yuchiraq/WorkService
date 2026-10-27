@@ -5,6 +5,7 @@ import (
 	"crypto/subtle"
 	"encoding/base64"
 	"errors"
+	"io"
 	"os"
 	"sort"
 	"strings"
@@ -166,4 +167,14 @@ func OpenSharedCloudFile(token, id string) (models.CloudItem, *os.File, error) {
 	}
 	file, err := OpenCloudBlob(CloudDirectory(), item.ID)
 	return item, file, err
+}
+
+func WriteSharedCloudArchive(token, id string, writer io.Writer) error {
+	cloudMutex.RLock()
+	defer cloudMutex.RUnlock()
+	root, current, _, err := sharedCloudScope(token, id)
+	if err != nil {
+		return err
+	}
+	return writeCloudArchiveLocked(root.OwnerID, []string{current.ID}, writer)
 }

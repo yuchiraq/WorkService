@@ -392,6 +392,9 @@ func AddCloudFile(owner, parent, name, uploadID string, reader io.Reader) (model
 		return models.CloudItem{}, err
 	}
 	mime := http.DetectContentType(header[:n])
+	if strings.EqualFold(filepath.Ext(name), ".mov") && quickTimeHeader(header[:n]) {
+		mime = "video/quicktime"
+	}
 	if err = temp.Sync(); err != nil {
 		return models.CloudItem{}, err
 	}
@@ -615,6 +618,10 @@ func ChangeCloud(owner string, mutation CloudMutation) error {
 func WriteCloudArchive(owner string, ids []string, writer io.Writer) error {
 	cloudMutex.RLock()
 	defer cloudMutex.RUnlock()
+	return writeCloudArchiveLocked(owner, ids, writer)
+}
+
+func writeCloudArchiveLocked(owner string, ids []string, writer io.Writer) error {
 	if len(ids) == 0 || len(ids) > 500 {
 		return ErrCloudNotFound
 	}

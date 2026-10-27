@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"archive/zip"
+	"bytes"
 	"errors"
 	"strings"
 	"testing"
@@ -41,6 +43,31 @@ func TestCloudShareScopeAndLifecycle(t *testing.T) {
 	view, err := GetSharedCloud(root.ShareToken, nested.ID)
 	if err != nil || len(view.Items) != 1 || len(view.Breadcrumbs) != 2 {
 		t.Fatal("nested view", view, err)
+	}
+	var archive bytes.Buffer
+	if err = WriteSharedCloudArchive(root.ShareToken, "", &archive); err != nil {
+		t.Fatal(err)
+	}
+	z, err := zip.NewReader(bytes.NewReader(archive.Bytes()), int64(archive.Len()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, entry := range z.File {
+		if strings.Contains(entry.Name, "private") || strings.Contains(entry.Name, "foreign") {
+			t.Fatal("ZIP scope leak", entry.Name)
+		}
+		if entry.Name == "Shared/Nested/photo.txt" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("recursive shared ZIP missing file")
+	}
+	for _, id := range []string{private.ID, foreign.ID, "../private"} {
+		if err = WriteSharedCloudArchive(root.ShareToken, id, &bytes.Buffer{}); !errors.Is(err, ErrCloudNotFound) {
+			t.Fatal("ZIP scope escape", id, err)
+		}
 	}
 	if err := ChangeCloud("alice", CloudMutation{Action: "move", Items: []CloudRef{{file.ID, file.Version}}}); err != nil {
 		t.Fatal(err)

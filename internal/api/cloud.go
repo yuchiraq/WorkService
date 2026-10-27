@@ -22,8 +22,9 @@ var cloudUploadSlots = make(chan struct{}, 2)
 var cloudArchiveSlots = make(chan struct{}, 1)
 
 type cloudArchiveJob struct {
-	Owner, Path string
-	InUse       bool
+	Owner, Path              string
+	ShareToken, ItemID, Name string
+	InUse                    bool
 }
 
 var cloudArchiveMutex sync.Mutex
@@ -122,6 +123,10 @@ func CloudFile(c *gin.Context) {
 
 func serveCloudFile(c *gin.Context, item models.CloudItem, file *os.File) {
 	cloudHeaders(c)
+	if c.Query("preview") == "video" || c.Query("preview") == "stream" {
+		serveCloudVideo(c, item, file)
+		return
+	}
 	if c.Query("preview") == "text" {
 		if !strings.HasPrefix(item.MIME, "text/plain") {
 			c.JSON(415, gin.H{"error": "Для этого файла доступно только скачивание"})
@@ -225,7 +230,7 @@ func DownloadCloudArchive(c *gin.Context) {
 	token := c.Param("token")
 	cloudArchiveMutex.Lock()
 	job, ok := cloudArchives[token]
-	if !ok || job.Owner != c.GetString("userID") || job.InUse {
+	if !ok || job.Owner != c.GetString("userID") || job.ShareToken != "" || job.InUse {
 		cloudArchiveMutex.Unlock()
 		c.JSON(404, gin.H{"error": "Архив недоступен. Создайте его снова"})
 		return

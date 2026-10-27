@@ -1,7 +1,10 @@
 package router
 
 import (
+	"archive/zip"
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -76,10 +79,45 @@ func testCloudSharing(t *testing.T, r *gin.Engine, admin, other, worker *http.Co
 	if w = request("GET", "/s/invalid", "", "", nil); w.Code != 404 {
 		t.Fatal("invalid link", w.Code)
 	}
+	if w = request("POST", url+"/archive?item=outside", "", "", nil); w.Code != 404 {
+		t.Fatal("archive scope escape", w.Code)
+	}
+	w = request("POST", url+"/archive", "", "", nil)
+	var archive struct {
+		URL string `json:"url"`
+	}
+	if err = json.Unmarshal(w.Body.Bytes(), &archive); err != nil || w.Code != 200 {
+		t.Fatal("shared ZIP creation", w.Code, w.Body.String())
+	}
+	w = request("GET", archive.URL, "", "", nil)
+	if w.Code != 200 || w.Header().Get("Content-Type") != "application/zip" {
+		t.Fatal("shared ZIP", w.Code, w.Body.String())
+	}
+	z, err := zip.NewReader(bytes.NewReader(w.Body.Bytes()), int64(w.Body.Len()))
+	if err != nil || len(z.File) != 1 || z.File[0].Name != item.Name {
+		t.Fatal("ZIP content", err)
+	}
+	entry, _ := z.File[0].Open()
+	data, _ := io.ReadAll(entry)
+	entry.Close()
+	if string(data) != "shared content" {
+		t.Fatal("ZIP bytes changed")
+	}
+	w = request("POST", url+"/archive", "", "", nil)
+	if w.Code != 200 {
+		t.Fatal(w.Code, w.Body.String())
+	}
+	json.Unmarshal(w.Body.Bytes(), &archive)
 	if w = request("POST", path, `{"version":2,"enabled":false}`, csrf, admin); w.Code != 200 {
 		t.Fatal("revoke", w.Code)
 	}
 	if w = request("GET", url+"/file/"+item.ID, "", "", nil); w.Code != 404 {
 		t.Fatal("revoked download", w.Code)
+	}
+	if w = request("GET", archive.URL, "", "", nil); w.Code != 404 {
+		t.Fatal("prepared ZIP survived revocation", w.Code)
+	}
+	if w = request("POST", url+"/archive", "", "", nil); w.Code != 404 {
+		t.Fatal("revoked ZIP creation", w.Code)
 	}
 }

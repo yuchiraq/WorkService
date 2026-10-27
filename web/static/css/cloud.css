@@ -108,6 +108,9 @@
 .cl-next { --cl-icon: url('/static/icons/lucide/chevron-right.svg'); }
 .cl-link { --cl-icon: url('/static/icons/lucide/link.svg'); }
 .cl-copy { --cl-icon: url('/static/icons/lucide/copy.svg'); }
+.cl-zoom-in { --cl-icon: url('/static/icons/lucide/zoom-in.svg'); }
+.cl-zoom-out { --cl-icon: url('/static/icons/lucide/zoom-out.svg'); }
+.cl-fit { --cl-icon: url('/static/icons/lucide/maximize-2.svg'); }
 .cloud-shared-badge { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted-strong); }
 .cloud-shared-badge .cl-icon { width: 14px; height: 14px; flex-basis: 14px; }
 #cloud-share-name { font-weight: 600; overflow-wrap: anywhere; }
@@ -129,6 +132,20 @@
 .cloud-public .cloud-breadcrumbs a + a::before { content: '/'; margin-right: 8px; color: var(--muted-strong); }
 .cloud-public-file img { display: block; max-width: 100%; max-height: 65dvh; object-fit: contain; margin: 16px 0; }
 .cloud-public-file .btn { display: inline-flex; gap: 8px; align-items: center; min-height: 48px; }
+.cloud-public-title { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+.cloud-public-title h1 { flex: 1 1 250px; min-width: 0; }
+.cloud-public-title .btn { display: inline-flex; align-items: center; gap: 8px; min-height: 48px; }
+.cloud-public-status:empty { display: none; }
+.cloud-public-status,.cloud-public-meta,.cloud-preview-status { font-size: 14px; color: var(--muted-strong); overflow-wrap: anywhere; }
+.cloud-preview-content { min-width: 0; }
+.cloud-preview-content :is(video,audio),#cloud-preview-body :is(video,audio) { display: block; width: 100%; max-height: 70dvh; background: #151719; }
+.cloud-preview-content video,#cloud-preview-body video { min-height: 180px; }
+.cloud-image-tools { display: flex; align-items: center; justify-content: center; gap: 8px; margin-bottom: 8px; }
+.cloud-image-tools output { min-width: 50px; text-align: center; }
+.cloud-image-tools .cl-button { flex: none; width: 48px; height: 48px; }
+.cloud-image-stage { max-height: 70dvh; overflow: auto; width: 100%; padding: 8px; background: color-mix(in srgb,var(--text) 5%,var(--surface-solid)); }
+.cloud-public-file .cloud-image-stage img,#cloud-preview-body .cloud-image-stage img { display: block; max-width: none; max-height: none; height: auto; margin: 0 auto; }
+.cloud-text-preview { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 70dvh; overflow: auto; padding: 16px; background: var(--surface-solid); border: 1px solid var(--border); }
 .cloud-public :is(a,button):focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
 @media (max-width: 900px) {
   .cloud-row { grid-template-columns: 32px minmax(0, 1fr) 44px; gap: 6px; }

@@ -58,7 +58,7 @@ function testPDF() {
     await page.locator('[data-view=files]').click();
     const zipWait=page.waitForEvent('download');await menu('Документы','Скачать');const zip=await zipWait;await zip.saveAs(path.join(output,'documents.zip'));assert.equal(fs.readFileSync(path.join(output,'documents.zip')).subarray(0,2).toString(),'PK');
     await row('Документы').locator('.cloud-row-open').click();
-    await row('Страница.html').locator('.cloud-row-open').click();await page.getByText('Предпросмотр недоступен. Файл можно скачать',{exact:true}).waitFor();assert.equal(await page.evaluate(()=>!!window.cloudXSS),false);await page.keyboard.press('Escape');
+    await row('Страница.html').locator('.cloud-row-open').click();await page.getByText(/Для этого формата предпросмотр недоступен/).waitFor();assert.equal(await page.evaluate(()=>!!window.cloudXSS),false);await page.keyboard.press('Escape');
     await row('Документ.pdf').locator('.cloud-row-open').click();await page.locator('.cloud-pdf-text pre').filter({hasText:'WorkService PDF preview'}).waitFor({state:'attached'});
     assert(await page.locator('.cloud-pdf canvas').evaluate(c=>{const data=c.getContext('2d').getImageData(0,0,c.width,c.height).data;let dark=0;for(let i=0;i<data.length;i+=4)if(data[i]<100&&data[i+3]>0)dark++;return dark>50;}),'PDF is blank');
     await page.getByRole('button',{name:'Следующая страница',exact:true}).click();await page.locator('.cloud-pdf-text pre').filter({hasText:'Second page'}).waitFor({state:'attached'});
