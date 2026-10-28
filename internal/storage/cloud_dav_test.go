@@ -8,7 +8,116 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
+
+	"project/internal/models"
 )
+
+func TestCloudDAVUploadPlaceholders(t *testing.T) {
+	for _, scenario := range []string{"complete", "aborted", "persistence failure", "conflict", "expired", "starred", "shared", "website empty", "copied empty", "real replacement", "repeated empty"} {
+		t.Run(scenario, func(t *testing.T) {
+			dir := cloudFixture(t)
+			ctx := context.Background()
+			write := func(fs *CloudDAV, body string) {
+				t.Helper()
+				f, err := fs.OpenFile(ctx, "/upload.txt", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if _, err = io.WriteString(f, body); err != nil {
+					t.Fatal(err)
+				}
+				if err = f.Close(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var original models.CloudItem
+			if scenario == "website empty" {
+				original = cloudUpload(t, "a", "", "upload.txt", "")
+			} else {
+				fs := NewCloudDAV("a", true)
+				if scenario != "copied empty" {
+					fs.TrackUploadPlaceholders()
+				}
+				body := ""
+				if scenario == "real replacement" {
+					body = "original"
+				}
+				write(fs, body)
+				if err := fs.Commit(ctx); err != nil {
+					t.Fatal(err)
+				}
+				fs.Close()
+				original = CloudState("a").Items[0]
+			}
+			// Exercise persistence across requests/restarts, not just memory state.
+			if err := LoadCloud(); err != nil {
+				t.Fatal(err)
+			}
+			switch scenario {
+			case "expired":
+				cloudItems[0].CreatedAt = time.Now().Add(-11 * time.Minute).UTC().Format(time.RFC3339Nano)
+			case "starred":
+				if err := ChangeCloud("a", CloudMutation{Action: "star", Items: []CloudRef{{original.ID, original.Version}}, Starred: true}); err != nil {
+					t.Fatal(err)
+				}
+			case "shared":
+				cloudItems[0].ShareToken = strings.Repeat("a", 43)
+			}
+			if scenario == "repeated empty" {
+				fs := NewCloudDAV("a", true)
+				fs.TrackUploadPlaceholders()
+				write(fs, "")
+				if err := fs.Commit(ctx); err != nil {
+					t.Fatal(err)
+				}
+				fs.Close()
+				if len(CloudState("a").Items) != 1 || CloudState("a").Items[0].CreatedAt != original.CreatedAt {
+					t.Fatal("empty retry created trash or extended reservation")
+				}
+				original = CloudState("a").Items[0]
+			}
+			fs := NewCloudDAV("a", true)
+			defer fs.Close()
+			fs.TrackUploadPlaceholders()
+			write(fs, "content")
+			expectFailure := scenario == "aborted" || scenario == "persistence failure" || scenario == "conflict"
+			if scenario == "conflict" {
+				if err := ChangeCloud("a", CloudMutation{Action: "star", Items: []CloudRef{{original.ID, original.Version}}, Starred: true}); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if scenario == "persistence failure" {
+				oldBackend, oldFile := backend, cloudFile
+				backend, cloudFile = nil, dir
+				t.Cleanup(func() { backend, cloudFile = oldBackend, oldFile })
+			}
+			if scenario != "aborted" {
+				err := fs.Commit(ctx)
+				if (err != nil) != expectFailure {
+					t.Fatalf("commit: %v", err)
+				}
+			}
+			items := CloudState("a").Items
+			p, _ := CloudBlobPath(CloudDirectory(), original.ID)
+			_, blobErr := os.Stat(p)
+			consumed := scenario == "complete" || scenario == "repeated empty"
+			if consumed {
+				if len(items) != 1 || items[0].DeletedAt != "" || items[0].DAVPlaceholder || !os.IsNotExist(blobErr) {
+					t.Fatal("placeholder leaked")
+				}
+			} else if expectFailure {
+				if len(items) != 1 || items[0].ID != original.ID || blobErr != nil {
+					t.Fatal("failed upload lost original")
+				}
+			} else {
+				if len(items) != 2 || cloudCurrent(t, "a", original.ID).DeletedAt == "" || blobErr != nil {
+					t.Fatal("real original not recoverable")
+				}
+			}
+		})
+	}
+}
 
 func TestCloudDAVTransactions(t *testing.T) {
 	dir := cloudFixture(t)

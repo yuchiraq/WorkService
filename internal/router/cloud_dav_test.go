@@ -205,6 +205,45 @@ func testCloudDAV(t *testing.T, r *gin.Engine, admin, other, worker *http.Cookie
 		t.Fatal("move", w.Code, w.Body.String())
 	}
 	lockXML := `<D:lockinfo xmlns:D="DAV:"><D:lockscope><D:exclusive/></D:lockscope><D:locktype><D:write/></D:locktype><D:owner>test</D:owner></D:lockinfo>`
+	for _, initialMethod := range []string{"PUT", "LOCK"} {
+		target := "/dav/DAV-test/new-" + initialMethod + ".txt"
+		initialBody := ""
+		if initialMethod == "LOCK" {
+			initialBody = lockXML
+		}
+		w = request(initialMethod, target, strings.NewReader(initialBody), "admin", key, nil, nil)
+		if w.Code != 201 {
+			t.Fatal("upload reservation", initialMethod, w.Code, w.Body.String())
+		}
+		token := w.Header().Get("Lock-Token")
+		headers := map[string]string{}
+		if token != "" {
+			headers["If"] = "(" + token + ")"
+		}
+		before := storage.CloudState("admin")
+		w = request("PUT", target, &brokenDAVBody{}, "admin", key, headers, nil)
+		if w.Code < 400 || len(storage.CloudState("admin").Items) != len(before.Items) {
+			t.Fatal("failed placeholder upload published")
+		}
+		w = request("PUT", target, strings.NewReader("uploaded"), "admin", key, headers, nil)
+		if w.Code != 201 {
+			t.Fatal("complete reserved upload", w.Code, w.Body.String())
+		}
+		if len(storage.CloudState("admin").Items) != len(before.Items) {
+			t.Fatal("new upload added trash")
+		}
+		uploadETag := w.Header().Get("ETag")
+		w = request("GET", target, nil, "admin", key, nil, nil)
+		if w.Code != 200 || w.Body.String() != "uploaded" || w.Header().Get("ETag") != uploadETag {
+			t.Fatal("uploaded file or etag mismatch")
+		}
+		if token != "" {
+			w = request("UNLOCK", target, nil, "admin", key, map[string]string{"Lock-Token": token}, nil)
+			if w.Code != 204 {
+				t.Fatal("unlock new upload", w.Code)
+			}
+		}
+	}
 	w = request("LOCK", filePath, strings.NewReader(lockXML), "admin", key, map[string]string{"Content-Type": "application/xml", "Timeout": "Infinite"}, nil)
 	if w.Code != 200 {
 		t.Fatal("lock", w.Code, w.Body.String())

@@ -240,6 +240,9 @@ func (s *CloudDAVService) Serve(c *gin.Context) {
 	r = r.WithContext(ctx)
 	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	fs := storage.NewCloudDAV(device.OwnerID, !read)
+	if r.Method == "PUT" || r.Method == "LOCK" {
+		fs.TrackUploadPlaceholders()
+	}
 	defer fs.Close()
 	if !read {
 		info, e := fs.Stat(ctx, strings.TrimPrefix(r.URL.Path, "/dav"))

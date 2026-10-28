@@ -30,7 +30,13 @@ type CloudDAV struct {
 	writable       bool
 	dirty          bool
 	lookup         map[string]int
+	upload         bool
+	retired        []string
 }
+
+// TrackUploadPlaceholders distinguishes initial PUT/LOCK files from empty files
+// uploaded through the website or copied from existing documents.
+func (fs *CloudDAV) TrackUploadPlaceholders() { fs.upload = true }
 
 func NewCloudDAV(owner string, writable bool) *CloudDAV {
 	s := CloudState(owner)
@@ -93,6 +99,11 @@ func (fs *CloudDAV) Commit(ctx context.Context) error {
 		return err
 	}
 	fs.staged = map[string]string{}
+	// Remove superseded empty blobs only after metadata is durably committed.
+	for _, id := range fs.retired {
+		p, _ := CloudBlobPath(CloudDirectory(), id)
+		_ = os.Remove(p)
+	}
 	return nil
 }
 
@@ -458,9 +469,23 @@ func (f *davFile) Close() error {
 	if err = f.file.Close(); err != nil {
 		return err
 	}
-	// Replacements keep the previous original in the website's recoverable trash.
+	f.item.DAVPlaceholder = f.fs.upload && f.previous == "" && f.item.Size == 0
+	// A short-lived, untouched DAV empty file is the client's upload reservation,
+	// not a previous document version. Real replacements remain recoverable.
 	if f.previous != "" {
-		f.fs.trash(f.previous)
+		index := cloudIndex(f.fs.items)[f.previous]
+		previous := f.fs.items[index]
+		created, err := time.Parse(time.RFC3339Nano, previous.CreatedAt)
+		age := time.Since(created)
+		if f.fs.upload && previous.DAVPlaceholder && previous.Size == 0 && previous.Version == 1 &&
+			!previous.Starred && previous.ShareToken == "" && err == nil && age >= 0 && age < 10*time.Minute {
+			f.fs.items = append(f.fs.items[:index], f.fs.items[index+1:]...)
+			f.fs.retired = append(f.fs.retired, previous.ID)
+			f.item.CreatedAt = previous.CreatedAt
+			f.item.DAVPlaceholder = f.item.Size == 0
+		} else {
+			f.fs.trash(f.previous)
+		}
 	}
 	f.fs.items = append(f.fs.items, f.item)
 	f.fs.lookup = nil

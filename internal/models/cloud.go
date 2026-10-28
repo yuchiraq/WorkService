@@ -18,4 +18,5 @@ type CloudItem struct {
 	Version        int64  `json:"version"`
 	ShareToken     string `json:"shareToken,omitempty"`
 	ShareExpiresAt string `json:"shareExpiresAt,omitempty"`
+	DAVPlaceholder bool   `json:"davPlaceholder,omitempty"`
 }
