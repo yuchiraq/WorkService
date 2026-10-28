@@ -2,6 +2,8 @@ package main
 
 import (
 	"log"
+	"os"
+	"strings"
 
 	"project/internal/router"
 	"project/internal/storage"
@@ -50,6 +52,9 @@ func main() {
 	if err := storage.LoadCloud(); err != nil {
 		log.Fatalf("Failed to load cloud: %v", err)
 	}
+	if err := storage.LoadCloudDevices(); err != nil {
+		log.Fatalf("Failed to load cloud devices: %v", err)
+	}
 	if err := storage.LoadConstructionDocuments(); err != nil {
 		log.Fatalf("Failed to load construction documents: %v", err)
 	}
@@ -60,8 +65,12 @@ func main() {
 	// Setup all routes from the router package
 	router.SetupRouter(r)
 
-	log.Println("Starting HTTP server on port 8099")
-	if err := r.Run(":8099"); err != nil {
+	address := strings.TrimSpace(os.Getenv("WORKSERVICE_LISTEN_ADDR"))
+	if address == "" {
+		address = ":8099"
+	}
+	log.Printf("Starting HTTP server on %s", address)
+	if err := r.Run(address); err != nil {
 		log.Fatalf("Failed to start HTTP server: %v", err)
 	}
 }

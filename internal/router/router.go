@@ -8,6 +8,11 @@ import (
 )
 
 func SetupRouter(r *gin.Engine) {
+	dav := api.NewCloudDAVService()
+	for _, method := range []string{"OPTIONS", "GET", "HEAD", "PROPFIND", "PROPPATCH", "MKCOL", "PUT", "DELETE", "COPY", "MOVE", "LOCK", "UNLOCK"} {
+		r.Handle(method, "/dav", dav.Serve)
+		r.Handle(method, "/dav/*path", dav.Serve)
+	}
 	r.GET("/document-fonts/:name", api.ConstructionFont)
 	r.Static("/static", "./web/static")
 	r.GET("/manifest.webmanifest", func(c *gin.Context) {
@@ -130,6 +135,10 @@ func SetupRouter(r *gin.Engine) {
 		adminRequired.POST("/users/delete/:id", api.DeleteUser)
 		adminRequired.GET("/settings", api.SettingsPage)
 		adminRequired.GET("/cloud", api.CloudPage)
+		adminRequired.GET("/cloud/connections", api.CloudConnectionsPage)
+		adminRequired.GET("/cloud/devices", dav.Devices)
+		adminRequired.POST("/cloud/devices", dav.CreateDevice)
+		adminRequired.POST("/cloud/devices/:id/revoke", dav.RevokeDevice)
 		adminRequired.GET("/cloud/items", api.CloudItems)
 		adminRequired.POST("/cloud/action", api.MutateCloud)
 		adminRequired.POST("/cloud/share/:id", api.SetCloudShare)

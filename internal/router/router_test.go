@@ -115,6 +115,9 @@ func testSiteIntegration(t *testing.T, mode string) {
 			t.Fatal(err)
 		}
 	}
+	if err = storage.LoadCloudDevices(); err != nil {
+		t.Fatal(err)
+	}
 	vehicle, err := storage.CreateVehicle(models.Vehicle{Name: "Ford Transit", RegistrationNumber: "1234 AB-7", AssignedUserID: "user", CreatedByUserID: "admin"})
 	if err != nil {
 		t.Fatal(err)
@@ -157,6 +160,8 @@ func testSiteIntegration(t *testing.T, mode string) {
 		return
 	}
 	r := gin.New()
+	t.Setenv("WORKSERVICE_DAV_ORIGIN", "https://appworks.example")
+	t.Setenv("WORKSERVICE_DAV_TRUSTED_PROXIES", "127.0.0.1/32")
 	SetupRouter(r)
 	request := func(method, path string, form url.Values, cookie *http.Cookie) *httptest.ResponseRecorder {
 		t.Helper()
@@ -202,6 +207,7 @@ func testSiteIntegration(t *testing.T, mode string) {
 	})
 	t.Run("personal cloud", func(t *testing.T) { testPersonalCloud(t, r, admin, login("admin2"), user) })
 	t.Run("cloud sharing", func(t *testing.T) { testCloudSharing(t, r, admin, login("admin2"), user) })
+	t.Run("cloud WebDAV", func(t *testing.T) { testCloudDAV(t, r, admin, login("admin2"), user) })
 	t.Run("quick vehicle records", func(t *testing.T) { testQuickVehicleRecords(t, r, vehicle.ID, admin, user, login("other")) })
 	t.Run("assignment privacy", func(t *testing.T) { testAssignmentPrivacy(t, r, admin, user) })
 	t.Run("construction documents", func(t *testing.T) { testConstructionDocuments(t, r, admin, user) })

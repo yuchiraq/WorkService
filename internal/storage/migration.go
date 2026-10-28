@@ -43,6 +43,17 @@ func ValidateDocuments(documents map[string][]byte, photoDir string, cloudDirs .
 	var constructionDocs []models.ConstructionDocument
 	targets := map[string]any{"users.json": &u, "workers.json": &w, "objects.json": &o, "timesheets.json": &t, "improvements.json": &improvements, "app_settings.json": &settings, "telegram_contacts.json": &contacts, "vehicles.json": &fleet, "inventory.json": &inv, "object_photos.json": &photos}
 	for name, data := range documents {
+		if name == "cloud_devices.json" {
+			var devices []cloudDeviceRecord
+			if err := json.Unmarshal(data, &devices); err != nil {
+				return report, err
+			}
+			if err := validateCloudDevices(devices); err != nil {
+				return report, err
+			}
+			report.Counts["cloud_devices"] = len(devices)
+			continue
+		}
 		if name == "construction_documents.json" {
 			if err := json.Unmarshal(data, &constructionDocs); err != nil {
 				return report, err
